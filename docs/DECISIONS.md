@@ -170,3 +170,37 @@ Newest entries at the bottom of each section.
   one line; any backward move is its own "moved back" line.
 - **A re-read** starts with the previous reading's total; it can be changed
   by tapping the page count.
+
+## Milestone 5: adding books, providers, covers
+
+- **HTTPS client:** reqwest with rustls (aws-lc-rs) and the system's
+  certificate store; needs `cmake` and a C compiler at build time.
+  User-Agent `mau/<version> (+<public_url>)`, 20 s timeout.
+- **Provider fallback:** enabled providers are asked in the admin's order;
+  for a text search the next one is asked when fewer than 3 results came back
+  ("thin"), and results are de-duplicated by title and first author, up to 20.
+  For an ISBN, the first provider with a match wins.
+- **Provider responses are cached 30 days** in `provider_cache` (search
+  results, ISBN lookups, edition lists, and each offered search result).
+  Adding a book uses the cached result, so clients can't inject catalog data.
+- **What a work brings into the shared catalog:** its title, authors, first
+  year, cover, and up to 20 editions (the scanned/chosen ISBN first, then
+  editions with ISBNs). An existing shared work is reused when the provider ID
+  or the wanted ISBN matches. Editions already in the catalog by ISBN are skipped.
+- **Google Books, ISBNdb, and Hardcover** return editions, not works; each
+  result is offered as a work with one edition. These three clients are written
+  against their public API docs but untested here (they need keys); Open
+  Library was tested live.
+- **Covers** are stored as JPEG (quality 82) at 120, 300, and 600 px wide,
+  named by the first 16 bytes (hex) of the original's SHA-256, under
+  `<data_dir>/covers`, served at `/covers/<hash>-<s|m|l>.jpg` with year-long
+  caching. Uploads are limited to 10 MB. Open Library's 1×1 "no cover" images
+  are ignored.
+- **Search result covers** go through `/api/catalog/thumb?u=…`, which only
+  fetches from the providers' image hosts, so browsers never contact
+  providers directly.
+- **Rate limits** (in memory, per minute): catalog search 30 per user. More
+  are added in milestone 8.
+- **Similar-title check** for manual entries: shared works whose title
+  contains, or is contained in, the entered title (ignoring a leading
+  The/A/An), or shares a word of 5+ letters. Up to 5 are offered.

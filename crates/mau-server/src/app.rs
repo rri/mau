@@ -17,6 +17,7 @@ use crate::auth::ceremony::Ceremonies;
 use crate::auth::{handlers as auth, manage};
 use crate::config::Config;
 use crate::error::ApiError;
+use crate::ratelimit::RateLimits;
 use crate::web;
 
 #[derive(Clone)]
@@ -27,11 +28,24 @@ pub struct AppState {
     pub ceremonies: Arc<Ceremonies>,
     /// One-time link for creating the first admin; `None` once an admin exists.
     pub setup_token: Arc<Mutex<Option<String>>>,
+    /// Outgoing HTTP (catalog providers, cover downloads).
+    pub http: reqwest::Client,
+    pub limits: Arc<RateLimits>,
 }
 
 impl AppState {
     pub fn new(db: SqlitePool, config: Config) -> anyhow::Result<Self> {
+        let http = reqwest::Client::builder()
+            .user_agent(format!(
+                "mau/{} (+{})",
+                mau_core::VERSION,
+                config.public_url
+            ))
+            .timeout(std::time::Duration::from_secs(20))
+            .build()?;
         Ok(Self {
+            http,
+            limits: Arc::new(RateLimits::default()),
             webauthn: Arc::new(crate::auth::build_webauthn(&config)?),
             db,
             config: Arc::new(config),
@@ -83,10 +97,25 @@ pub fn router(state: AppState) -> Router {
         .route("/recovery-codes/regenerate", post(manage::regenerate_codes))
         // Library sync
         .route("/sync", post(crate::library::sync))
+        // Catalog and covers
+        .route("/catalog/search", get(crate::catalog::search))
+        .route("/catalog/editions", get(crate::catalog::editions))
+        .route("/catalog/ensure", post(crate::catalog::ensure))
+        .route("/catalog/similar", get(crate::catalog::similar))
+        .route("/catalog/thumb", get(crate::covers::thumb))
+        .route("/catalog/works/{id}", get(crate::catalog::work))
+        .route("/catalog/works/{id}/suggest", post(crate::catalog::suggest))
+        .route(
+            "/covers",
+            post(crate::covers::upload).layer(axum::extract::DefaultBodyLimit::max(
+                crate::covers::MAX_BYTES,
+            )),
+        )
         .fallback(api_not_found)
         .layer(middleware::from_fn_with_state(state.clone(), check_origin));
     Router::new()
         .nest("/api", api)
+        .route("/covers/{name}", get(crate::covers::serve))
         .fallback(web::serve)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
