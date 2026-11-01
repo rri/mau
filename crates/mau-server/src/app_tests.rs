@@ -300,3 +300,31 @@ async fn last_passkey_cannot_be_removed() {
     assert_eq!(err["error"], "last_passkey");
     let _ = Arc::clone(&app.state.config);
 }
+
+#[tokio::test]
+async fn recovery_attempts_are_rate_limited() {
+    let app = TestApp::new().await;
+    app.user("rri", false).await;
+    let mut last = StatusCode::OK;
+    for _ in 0..6 {
+        let (status, _, _) = app
+            .request(
+                "POST",
+                "/api/auth/recovery",
+                Some(json!({"username": "rri", "code": "aaaaa-bbbbb"})),
+                None,
+            )
+            .await;
+        last = status;
+    }
+    assert_eq!(last, StatusCode::TOO_MANY_REQUESTS);
+}
+
+#[tokio::test]
+async fn responses_carry_security_headers() {
+    let app = TestApp::new().await;
+    let req = Request::get("/api/health").body(Body::empty()).unwrap();
+    let res = router(app.state.clone()).oneshot(req).await.unwrap();
+    assert_eq!(res.headers()["x-content-type-options"], "nosniff");
+    assert_eq!(res.headers()["x-frame-options"], "DENY");
+}

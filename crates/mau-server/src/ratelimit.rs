@@ -4,6 +4,13 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use axum::extract::{Request, State};
+use axum::http::Method;
+use axum::middleware::Next;
+use axum::response::Response;
+
+use crate::app::AppState;
+use crate::client_ip::ClientIp;
 use crate::error::ApiError;
 use crate::util::{MINUTE_MS, now_ms};
 
@@ -32,6 +39,34 @@ impl RateLimits {
         times.push(now);
         Ok(())
     }
+}
+
+/// Per-IP limits for sign-in, signup, and recovery endpoints (per minute).
+fn rule(method: &Method, path: &str) -> Option<(&'static str, usize)> {
+    let post = method == Method::POST;
+    match path {
+        "/auth/login/start" | "/auth/login/finish" if post => Some(("login", 20)),
+        "/auth/recovery" if post => Some(("recovery", 5)),
+        "/auth/register/start" | "/auth/register/finish" if post => Some(("register", 20)),
+        "/auth/username-available" if post => Some(("username", 60)),
+        "/auth/setup-check" if post => Some(("setup", 10)),
+        p if p.starts_with("/auth/invite/") => Some(("invite", 20)),
+        p if p.starts_with("/auth/enroll/") => Some(("enroll", 10)),
+        _ => None,
+    }
+}
+
+/// Middleware on the API router (paths here are relative to `/api`).
+pub async fn layer(
+    State(state): State<AppState>,
+    ip: ClientIp,
+    req: Request,
+    next: Next,
+) -> Result<Response, ApiError> {
+    if let Some((bucket, per_minute)) = rule(req.method(), req.uri().path()) {
+        state.limits.check(bucket, &ip.key(), per_minute)?;
+    }
+    Ok(next.run(req).await)
 }
 
 #[cfg(test)]

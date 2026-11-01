@@ -25,6 +25,8 @@ pub struct Config {
     pub data_dir: PathBuf,
     /// Proxies whose `X-Forwarded-*` headers are trusted.
     pub trusted_proxies: Vec<IpAddr>,
+    /// Daily database snapshots to keep in `<data_dir>/backups` (0 turns them off).
+    pub backup_keep: usize,
 }
 
 impl Default for Config {
@@ -34,6 +36,7 @@ impl Default for Config {
             public_url: "http://localhost:8370".into(),
             data_dir: PathBuf::from("data"),
             trusted_proxies: vec![IpAddr::from([127, 0, 0, 1]), "::1".parse().unwrap()],
+            backup_keep: 7,
         }
     }
 }
@@ -71,6 +74,9 @@ impl Config {
         }
         if let Some(v) = get("MAU_DATA_DIR") {
             self.data_dir = PathBuf::from(v);
+        }
+        if let Some(v) = get("MAU_BACKUP_KEEP") {
+            self.backup_keep = v.parse().context("MAU_BACKUP_KEEP must be a number")?;
         }
         if let Some(v) = get("MAU_TRUSTED_PROXIES") {
             self.trusted_proxies = v

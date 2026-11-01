@@ -14,3 +14,7 @@ data_dir = "/var/lib/mau"
 
 # Reverse proxies whose X-Forwarded-For / X-Forwarded-Proto headers are trusted.
 trusted_proxies = ["127.0.0.1", "::1"]
+
+# Daily database snapshots kept in <data_dir>/backups (0 turns them off).
+# Cover images are plain files in <data_dir>/covers; include them in your own backups.
+backup_keep = 7

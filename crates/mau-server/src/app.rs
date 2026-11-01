@@ -185,6 +185,10 @@ pub fn router(state: AppState) -> Router {
             )),
         )
         .fallback(api_not_found)
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::ratelimit::layer,
+        ))
         .layer(middleware::from_fn_with_state(state.clone(), check_origin));
     Router::new()
         .nest("/api", api)
@@ -192,6 +196,11 @@ pub fn router(state: AppState) -> Router {
         .route("/u/{username}", get(crate::public::profile))
         .route("/s/{token}", get(crate::public::share))
         .fallback(web::serve)
+        .layer(middleware::from_fn(security_headers))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::client_ip::layer,
+        ))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
@@ -215,6 +224,26 @@ async fn check_origin(
         }
     }
     Ok(next.run(req).await)
+}
+
+/// Conservative headers on every response.
+async fn security_headers(req: Request, next: Next) -> Response {
+    let mut res = next.run(req).await;
+    let h = res.headers_mut();
+    h.insert(
+        "x-content-type-options",
+        header::HeaderValue::from_static("nosniff"),
+    );
+    h.insert(
+        "referrer-policy",
+        header::HeaderValue::from_static("same-origin"),
+    );
+    h.insert("x-frame-options", header::HeaderValue::from_static("DENY"));
+    h.insert(
+        "permissions-policy",
+        header::HeaderValue::from_static("camera=(self), microphone=(), geolocation=()"),
+    );
+    res
 }
 
 #[derive(Serialize)]

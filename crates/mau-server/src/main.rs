@@ -6,7 +6,9 @@ mod app;
 mod app_tests;
 mod audit;
 mod auth;
+mod backup;
 mod catalog;
+mod client_ip;
 mod config;
 mod covers;
 mod db;
@@ -48,6 +50,8 @@ struct Cli {
 enum Command {
     /// Run the server (the default).
     Serve,
+    /// Write a consistent copy of the database to PATH (which must not exist).
+    Backup { path: PathBuf },
     /// Development only: add the sample books from the design mocks to an account.
     Seed {
         /// Username to add the books to.
@@ -69,6 +73,16 @@ async fn main() -> Result<()> {
 
     match cli.command.unwrap_or(Command::Serve) {
         Command::Serve => serve(config).await,
+        Command::Backup { path } => {
+            let db = db::open(&config.database_path()).await?;
+            backup::snapshot(&db, &path).await?;
+            println!(
+                "Database copied to {}. Back up {} too.",
+                path.display(),
+                covers::dir(&config.data_dir).display()
+            );
+            Ok(())
+        }
         Command::Seed { user } => {
             let db = db::open(&config.database_path()).await?;
             seed::run(&config, &db, &user).await
@@ -85,9 +99,13 @@ async fn serve(config: config::Config) -> Result<()> {
 
     let state = app::AppState::new(db.clone(), config)?;
     announce_setup_link(&state).await?;
-    axum::serve(listener, app::router(state))
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    backup::schedule(state.config.clone(), db.clone());
+    axum::serve(
+        listener,
+        app::router(state).into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
     db.close().await;
     Ok(())
 }

@@ -667,6 +667,8 @@ pub async fn recovery_sign_in(
         )
     };
     let name = req.username.trim().to_ascii_lowercase();
+    // Besides the per-IP limit, slow down guessing against one account.
+    state.limits.check("recovery-user", &name, 5)?;
     let user: Option<User> = sqlx::query_as(concat!(
         "SELECT ",
         crate::user_columns!(),

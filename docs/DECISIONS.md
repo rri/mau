@@ -303,3 +303,24 @@ Newest entries at the bottom of each section.
   ordered by finish date (newest first), tags and the whole catalog by date
   added, currently reading in the owner's manual order. The profile shows up to
   8 books per item with "See all N" linking to the item's own page.
+
+## Milestone 8: hardening and release
+
+- **Client IP behind a proxy:** when the direct peer is a trusted proxy, the
+  client is the right-most `X-Forwarded-For` address that isn't a trusted proxy
+  (so clients can't spoof by adding entries).
+- **Rate limits per IP, per minute:** sign-in 20, recovery-code sign-in 5
+  (plus 5 per username), registration 20, username checks 60, setup-link
+  checks 10, invite and enrollment links 20 and 10. Limits are in memory and
+  reset on restart. Over the limit: HTTP 429 "Too many attempts".
+- **Security headers on every response:** `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`, and a
+  `Permissions-Policy` that allows only this site to use the camera (for
+  scanning). No Content-Security-Policy yet: it needs care around the app's
+  inline styles and should be added deliberately.
+- **Backups:** checked hourly; when the newest snapshot in `<data_dir>/backups`
+  is a day old or missing, a new `mau-YYYYMMDD-HHMMSS.db` is written with
+  SQLite's `VACUUM INTO` (consistent, safe while running), and the newest
+  `backup_keep` (default 7; `0` turns them off) are kept. `mau backup PATH`
+  makes a one-off copy. Cover images aren't copied; back up `<data_dir>/covers`
+  with your own tools.
