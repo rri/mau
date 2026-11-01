@@ -10,12 +10,16 @@ rust-version = "1.96"
 
 [workspace.dependencies]
 anyhow = "1"
+argon2 = "0.5"
+base64 = "0.22"
 axum = "0.8"
 clap = { version = "4", features = ["derive", "env"] }
 mime_guess = "2"
+rand = "0.9"
 rust-embed = "8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 sqlx = { version = "0.9", default-features = false, features = ["sqlite", "runtime-tokio", "migrate", "macros"] }
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "fs"] }
@@ -23,6 +27,10 @@ toml = "0.9"
 tower-http = { version = "0.6", features = ["trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+ts-rs = "11"
+uuid = { version = "1", features = ["v4", "v7", "serde"] }
+webauthn-rs = { version = "0.6", features = ["conditional-ui"] }
+webauthn-rs-proto = "0.6"
 
 [profile.release]
 lto = "thin"
