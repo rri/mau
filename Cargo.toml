@@ -17,6 +17,7 @@ futures = "0.3"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 csv = "1"
 clap = { version = "4", features = ["derive", "env"] }
+maud = "0.27"
 mime_guess = "2"
 rand = "0.9"
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "query", "http2"] }

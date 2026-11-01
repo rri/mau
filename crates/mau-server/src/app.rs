@@ -6,7 +6,7 @@ use axum::extract::{Request, State};
 use axum::http::{Method, header};
 use axum::middleware::{self, Next};
 use axum::response::Response;
-use axum::routing::{delete, get, patch, post};
+use axum::routing::{delete, get, patch, post, put};
 use axum::{Json, Router};
 use serde::Serialize;
 use sqlx::SqlitePool;
@@ -136,6 +136,48 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/import/{job}", get(crate::importer::status))
         .route("/import/{job}/commit", post(crate::importer::commit))
+        // Invites (admins, or everyone when allowed)
+        .route(
+            "/invites",
+            get(crate::admin::list_invites).post(crate::admin::create_invite),
+        )
+        .route("/invites/{id}", delete(crate::admin::revoke_invite))
+        // Admin
+        .route("/admin/users", get(crate::admin::users))
+        .route(
+            "/admin/users/{id}",
+            patch(crate::admin::update_user).delete(crate::admin::delete_user),
+        )
+        .route(
+            "/admin/users/{id}/enroll-link",
+            post(crate::admin::enroll_link),
+        )
+        .route(
+            "/admin/signup",
+            get(crate::admin::get_signup).put(crate::admin::put_signup),
+        )
+        .route(
+            "/admin/providers",
+            get(crate::admin::get_providers).put(crate::admin::put_providers),
+        )
+        .route("/admin/queue", get(crate::admin::queue))
+        .route("/admin/queue/{id}/promote", post(crate::admin::promote))
+        .route("/admin/queue/{id}/merge", post(crate::admin::merge))
+        .route("/admin/queue/{id}/decline", post(crate::admin::decline))
+        .route("/admin/catalog", get(crate::admin::catalog_search))
+        .route("/admin/catalog/works/{id}", put(crate::admin::edit_work))
+        .route(
+            "/admin/catalog/works/{id}/cover",
+            post(crate::admin::set_work_cover).layer(axum::extract::DefaultBodyLimit::max(
+                crate::covers::MAX_BYTES,
+            )),
+        )
+        .route(
+            "/admin/catalog/editions/{id}",
+            put(crate::admin::edit_edition),
+        )
+        .route("/admin/audit", get(crate::admin::audit_log))
+        .route("/admin/stats", get(crate::admin::stats))
         .route(
             "/covers",
             post(crate::covers::upload).layer(axum::extract::DefaultBodyLimit::max(
@@ -147,6 +189,8 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .nest("/api", api)
         .route("/covers/{name}", get(crate::covers::serve))
+        .route("/u/{username}", get(crate::public::profile))
+        .route("/s/{token}", get(crate::public::share))
         .fallback(web::serve)
         .layer(TraceLayer::new_for_http())
         .with_state(state)

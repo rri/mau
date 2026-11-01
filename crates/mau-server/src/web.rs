@@ -50,3 +50,16 @@ fn response(body: Vec<u8>, content_type: &str, cache: &'static str) -> Response 
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static(cache));
     res
 }
+
+/// The served path of a built asset whose file name starts with `prefix`
+/// (e.g. the hashed Newsreader font, for server-rendered pages).
+pub fn asset_path(prefix: &str) -> Option<String> {
+    Assets::iter()
+        .find(|p| {
+            p.starts_with("_app/immutable/assets/")
+                && p.rsplit('/')
+                    .next()
+                    .is_some_and(|name| name.starts_with(prefix))
+        })
+        .map(|p| format!("/{p}"))
+}

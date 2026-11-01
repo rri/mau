@@ -273,3 +273,33 @@ Newest entries at the bottom of each section.
 - **Import review defaults:** matched rows are imported, "check match" rows
   take the first candidate, "not found" rows become manual entries, and books
   already on the list are skipped. Each can be changed before importing.
+
+## Milestone 7: admin and public pages
+
+- **Suspending a user signs them out everywhere** (their sessions are
+  deleted); unsuspending lets them sign in again.
+- **Admins can't delete their own account from the admin page;** that goes
+  through Settings → Account (with its passkey confirmation).
+- **Creating an enrollment link** also adds a note to the user's Recovery
+  activity right away ("An admin (name) issued a one-time link…"), and another
+  when it's used.
+- **Invites:** admins see and can revoke all pending invites; when everyone
+  may invite, other users see their own under Settings → Invites. Creating an
+  invite while signup is closed is refused.
+- **Provider API keys are never sent to browsers;** the admin page shows only
+  whether a key is saved. Leaving the key field empty keeps the saved key.
+- **Review queue actions:** "Add to shared catalog" (optionally edited first)
+  makes the work and its editions shared; "Merge into existing" moves the
+  owner's book to the existing shared work (copies keep their edition when an
+  edition with the same ISBN exists there) and deletes the duplicate; "Decline"
+  keeps it private. Possible duplicates are listed using the similar-title rule.
+- **Shared catalog editor:** admins search shared works by title, author, or
+  ISBN, edit title, people, year, and editions, and replace covers. Every edit
+  bumps the work's change number, so the change reaches every device with the
+  book on its list.
+- **Public pages** are plain HTML with inline CSS and the app's self-hosted
+  Newsreader font, cached for 60 seconds. They follow the visitor's light or
+  dark mode. Suspended users' pages show "Nothing here". Finished books are
+  ordered by finish date (newest first), tags and the whole catalog by date
+  added, currently reading in the owner's manual order. The profile shows up to
+  8 books per item with "See all N" linking to the item's own page.

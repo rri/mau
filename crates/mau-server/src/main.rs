@@ -1,5 +1,6 @@
 //! The `mau` binary.
 
+mod admin;
 mod app;
 #[cfg(test)]
 mod app_tests;
@@ -14,6 +15,7 @@ mod export;
 mod importer;
 mod library;
 mod providers;
+mod public;
 mod ratelimit;
 mod seed;
 mod settings;

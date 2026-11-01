@@ -20,6 +20,7 @@ clap.workspace = true
 futures.workspace = true
 image.workspace = true
 csv.workspace = true
+maud.workspace = true
 mime_guess.workspace = true
 rand.workspace = true
 reqwest.workspace = true
