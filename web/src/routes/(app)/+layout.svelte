@@ -3,12 +3,15 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { auth } from '#lib/auth.svelte.ts';
+	import { library } from '#lib/library.svelte.ts';
+	import Toast from '#lib/components/Toast.svelte';
 
 	let { children } = $props();
 
 	$effect(() => {
 		if (!auth.me) goto('/signin', { replaceState: true });
 		else if (auth.restricted) goto('/add-passkey', { replaceState: true });
+		else library.open(auth.me.id);
 	});
 
 	const tabs = [
@@ -67,6 +70,7 @@
 			{@render children()}
 		</main>
 	</div>
+	<Toast />
 {/if}
 
 <style>

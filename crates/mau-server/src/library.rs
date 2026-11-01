@@ -147,34 +147,44 @@ pub struct Op {
 #[derive(Debug, Clone, Default, Deserialize, TS)]
 #[ts(export)]
 pub struct BookFields {
+    #[ts(optional)]
     pub rank: Option<String>,
+    #[ts(optional)]
     pub active: Option<bool>,
-    #[ts(type = "number")]
+    #[ts(as = "Option<i32>", optional)]
     pub rating: Option<i64>,
+    #[ts(optional)]
     pub notes: Option<String>,
     /// `""` clears the override.
+    #[ts(optional)]
     pub title_override: Option<String>,
     /// An empty list clears the override.
+    #[ts(optional)]
     pub authors_override: Option<Vec<String>>,
     /// `""` clears the override.
+    #[ts(optional)]
     pub cover_override: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, TS)]
 #[ts(export)]
 pub struct CopyFields {
+    #[ts(optional)]
     pub format: Option<String>,
+    #[ts(optional)]
     pub location: Option<String>,
     /// `""` means unknown edition.
+    #[ts(optional)]
     pub edition_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, TS)]
 #[ts(export)]
 pub struct ReadingFields {
-    #[ts(type = "number")]
+    #[ts(as = "Option<i32>", optional)]
     pub total: Option<i64>,
     /// `""` means not finished.
+    #[ts(optional)]
     pub finished_on: Option<String>,
 }
 
@@ -246,6 +256,9 @@ pub enum OpKind {
     },
     #[serde(rename = "reading.set")]
     ReadingSet { id: String, fields: ReadingFields },
+    /// Removes a reading and its events (undoing "start reading").
+    #[serde(rename = "reading.delete")]
+    ReadingDelete { id: String },
     /// Moves the position. `base` is the position clock the device saw.
     #[serde(rename = "progress")]
     Progress {
@@ -809,6 +822,24 @@ pub async fn apply(
             .bind(id)
             .execute(&mut *conn)
             .await?;
+            Ok(Applied::Yes)
+        }
+        ReadingDelete { id } => {
+            let n = sqlx::query("UPDATE readings SET deleted = 1, seq = ? WHERE id = ? AND user_id = ? AND deleted = 0")
+                .bind(seq)
+                .bind(id)
+                .bind(user_id)
+                .execute(&mut *conn)
+                .await?
+                .rows_affected();
+            if n == 0 {
+                return Ok(Applied::Dropped);
+            }
+            sqlx::query("UPDATE progress_events SET deleted = 1, seq = ? WHERE reading_id = ?")
+                .bind(seq)
+                .bind(id)
+                .execute(&mut *conn)
+                .await?;
             Ok(Applied::Yes)
         }
         Progress {

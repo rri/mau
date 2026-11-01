@@ -3,5 +3,6 @@
 	"compilerOptions": {
 		"strict": true
 	},
-	"include": ["src", "vite.config.ts", "playwright.config.ts", "prettier.config.js"]
+	"include": ["src", "vite.config.ts", "playwright.config.ts", "prettier.config.js"],
+	"exclude": ["src/service-worker", "src/service-worker.ts"]
 }

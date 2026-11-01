@@ -124,3 +124,26 @@ Newest entries at the bottom of each section.
   `http://localhost…`.
 - **Dates for progress events** are computed by the device in the user's time
   zone setting and stored as `YYYY-MM-DD`.
+- **Undoing "start reading"** deletes the new reading (`reading.delete`), so an
+  undone start or re-read leaves no empty reading behind.
+- **The browser keeps two layers:** the last data the server sent (in
+  IndexedDB, one database per user: `mau-<user id>`) and the unsent
+  operations (an outbox). The screen shows the server data with the outbox
+  replayed on top, using the same rules as the server. After each sync the
+  view is rebuilt from the server's answer plus whatever is still unsent.
+- **Sync timing:** 0.8 s after the last change, when the browser comes back
+  online, when the tab becomes visible, and every 60 s. Up to 500 operations
+  per request.
+- **A revoked session** (the server answers 401 to a sync) wipes this device's
+  copy, including unsent changes, and goes to sign-in (spec assumption 3).
+- **Rejected operations** are discarded and the first reason is shown in a toast.
+- **The service worker** caches the app shell and assets at install, serves the
+  cached shell for page loads when offline, and caches cover images as they're
+  seen. It never caches `/api` (data lives in IndexedDB) or the server-rendered
+  public pages (`/u/…`, `/s/…`). In SvelteKit 3 it's excluded from the main
+  `tsconfig.json` and checked with `tsconfig.service-worker.json`.
+- **"Today"** is computed in the user's time zone setting, not the device's.
+- **Finished books leave the Reading view at once** (spec decision); the undo
+  toast brings them back.
+- **Status line:** the Reading header says "Offline · N unsynced" or
+  "Syncing…" when relevant, and nothing otherwise.
