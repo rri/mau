@@ -5,8 +5,15 @@
 		title,
 		author = '',
 		cover = null,
+		src = null,
 		size = 's'
-	}: { title: string; author?: string; cover?: string | null; size?: 's' | 'm' | 'l' } = $props();
+	}: {
+		title: string;
+		author?: string;
+		cover?: string | null;
+		src?: string | null;
+		size?: 's' | 'm' | 'l';
+	} = $props();
 
 	let failed = $state(false);
 

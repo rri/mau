@@ -204,3 +204,19 @@ Newest entries at the bottom of each section.
 - **Similar-title check** for manual entries: shared works whose title
   contains, or is contained in, the entered title (ignoring a leading
   The/A/An), or shares a word of 5+ letters. Up to 5 are offered.
+- **The barcode decoder** (zxing-wasm, about 950 KB) is bundled and loaded
+  when the scanner opens. Its default CDN location is overridden, so it never
+  loads from jsDelivr. The service worker does precache it with the rest of
+  the app at install, so scanning works offline (the lookup that follows
+  needs a connection).
+- **Scanning** reads EAN-13 codes four times a second and accepts only
+  978/979 (Bookland) codes, which are ISBNs.
+- **A scanned or typed ISBN with exactly one match** opens the confirm sheet
+  straight away.
+- **Adding from search needs a connection** (the work must exist on the
+  server first). Manual entry works offline; its similar-title check is
+  skipped when offline.
+- **A cover chosen during manual entry** becomes the book's cover override
+  (only the creator sees the private work anyway).
+- **"Add another copy" mode** (the book is already on your list) always
+  records a copy; "I own a copy" isn't shown.
