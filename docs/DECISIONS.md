@@ -262,3 +262,14 @@ Newest entries at the bottom of each section.
   Started, Finished, Rating, Tags, Owned, Copies, ISBN, Notes.
 - **Share links** are `/s/<22-character token>` (128 bits). Each kind of share
   (finished, active, the whole catalog, or a given tag) can exist once.
+- **Settings → Account** holds display name, bio, username, time zone (any
+  IANA zone, with a one-tap "use this device's zone" hint), appearance
+  (per device), and account deletion.
+- **Signing out with unsynced changes** asks first, saying how many changes
+  will be lost (spec assumption 2). Signing out offline still deletes this
+  device's copy.
+- **CSV column mapping** is pre-filled by guessing from header names; each mau
+  field can be mapped once.
+- **Import review defaults:** matched rows are imported, "check match" rows
+  take the first candidate, "not found" rows become manual entries, and books
+  already on the list are skipped. Each can be changed before importing.

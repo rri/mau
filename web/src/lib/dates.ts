@@ -24,6 +24,7 @@ export function addDays(d: string, n: number): string {
 
 /** "today", "yesterday", "3 days ago", "2 weeks ago", "4 months ago". */
 export function ago(date: string, today: string): string {
+	if (date === UNKNOWN_DATE) return 'a while ago';
 	const d = daysBetween(date, today);
 	if (d <= 0) return 'today';
 	if (d === 1) return 'yesterday';
@@ -50,9 +51,14 @@ const monthYear = new Intl.DateTimeFormat('en-US', {
 	timeZone: 'UTC'
 });
 
-export const fmtDate = (d: string) => full.format(new Date(d + 'T00:00:00Z'));
+/** Imported reads without a date are stored with this placeholder. */
+export const UNKNOWN_DATE = '0000-01-01';
+
+export const fmtDate = (d: string) =>
+	d === UNKNOWN_DATE ? 'date unknown' : full.format(new Date(d + 'T00:00:00Z'));
 export const fmtMonthDay = (d: string) => monthDay.format(new Date(d + 'T00:00:00Z'));
-export const fmtMonthYear = (d: string) => monthYear.format(new Date(d + 'T00:00:00Z'));
+export const fmtMonthYear = (d: string) =>
+	d === UNKNOWN_DATE ? 'date unknown' : monthYear.format(new Date(d + 'T00:00:00Z'));
 
 /** The local date of an epoch-ms instant in a time zone. */
 export function dateOfMs(ms: number, timeZone: string): string {
