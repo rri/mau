@@ -89,3 +89,14 @@ Newest entries at the bottom of each section.
   web app builds without running Rust tests first.
 - **Deleting the last admin's account is refused** ("make someone else an
   admin first"), extending the spec's "last admin is protected" to self-deletion.
+- **Imports use explicit extensions** (`#lib/api/client.ts`), as the SvelteKit
+  3 template's `package.json` "imports" mapping requires. ts-rs is told to
+  emit `.ts` extensions too (`TS_RS_IMPORT_EXTENSION`).
+- **End-to-end tests start their own server** on port 8371 with a temporary
+  data directory, and read the setup link from its log. They use Chromium
+  (Playwright) because only Chromium offers a scriptable virtual authenticator.
+- **Who's signed in is cached in localStorage** (`mau.me`) so the app opens
+  offline; the server's answer always wins when it's reachable.
+- **Routes:** signed-out pages under `src/routes/(public)`, the app under
+  `src/routes/(app)` with the tab bar (bottom on phones, left sidebar from
+  900px wide).

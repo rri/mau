@@ -1,9 +1,14 @@
 <script lang="ts">
 	import '#lib/styles/theme.css';
 	import favicon from '#lib/assets/favicon.svg';
-	import type { LayoutProps } from './$types';
+	import { auth } from '#lib/auth.svelte.ts';
+	import { applyStoredTheme } from '#lib/theme.ts';
+	import type { LayoutProps } from './$types.ts';
 
 	let { children }: LayoutProps = $props();
+
+	applyStoredTheme();
+	auth.refresh();
 </script>
 
 <svelte:head>
@@ -11,4 +16,6 @@
 	<title>mau</title>
 </svelte:head>
 
-{@render children()}
+{#if auth.ready}
+	{@render children()}
+{/if}

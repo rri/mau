@@ -44,3 +44,8 @@ fmt:
 release: web-build
     cargo build --release -p mau-server
     @ls -lh target/release/mau
+
+# End-to-end tests (needs `npx playwright install chromium` once)
+e2e: web-build
+    cargo build -p mau-server
+    cd web && npx playwright test
