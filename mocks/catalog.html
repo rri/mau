@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mau catalog view mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: phone-width app column (header, filters, results, tab bar) beside a notes column. */
+  --bg: #eef0f3;
+  --surface: #ffffff;
+  --ink: #16181d;
+  --muted: #626a78;
+  --line: #dde1e8;
+  --accent: #2b54c7;
+  --accent-soft: #e5ebfb;
+  --good: #1f7a4d;
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-book: "Source Serif 4", Georgia, "Times New Roman", serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1014; --surface: #171a20; --ink: #e8eaee; --muted: #9aa2b1; --line: #2a2f39;
+    --accent: #8aa4ff; --accent-soft: #1e2640; --good: #5cc98f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1014; --surface: #171a20; --ink: #e8eaee; --muted: #9aa2b1; --line: #2a2f39;
+  --accent: #8aa4ff; --accent-soft: #1e2640; --good: #5cc98f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--font-ui); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.page { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 460px); gap: 32px; justify-content: center; padding: 24px 16px 96px; }
+@media (max-width: 900px) { .page { grid-template-columns: minmax(0, 480px); } }
+
+.app { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; align-self: start; display: flex; flex-direction: column; position: relative; }
+.app-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 18px 14px 10px 18px; }
+.app-head h1 { margin: 0; font: 600 20px/1.2 var(--font-ui); letter-spacing: -0.01em; }
+.app-head .brand { color: var(--muted); font-size: 13px; }
+.head-actions { display: flex; gap: 6px; }
+.icon-btn { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; cursor: pointer; color: var(--ink); }
+.icon-btn.add { background: var(--accent); border-color: var(--accent); color: var(--surface); font-size: 22px; line-height: 1; }
+.icon-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+
+.filters { display: grid; gap: 8px; padding: 0 14px 12px; border-bottom: 1px solid var(--line); }
+.search { width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.chip { flex: none; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 13px; cursor: pointer; white-space: nowrap; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.chip.tag { color: var(--muted); }
+.chip.tag::before { content: "#"; opacity: .6; }
+.chip.tag[aria-pressed="true"], .chip.st[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.chip.st { color: var(--muted); }
+.state-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.own-check { flex: none; display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+.own-check input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+.bar-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
+.bar-row select { border: 1px solid var(--line); border-radius: 8px; padding: 3px 6px; background: var(--surface); font-size: 13px; }
+.bar-row .clear { background: none; border: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font-size: 13px; padding: 0; }
+
+.results { min-height: 360px; }
+ul.list { list-style: none; margin: 0; padding: 0; }
+.item { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.item:hover { background: var(--bg); }
+.cover { width: 40px; height: 56px; border-radius: 3px; display: grid; place-items: center; font: 600 13px var(--font-book); color: #fff; background: hsl(var(--h) 38% 42%); position: relative; }
+.title { font: 600 16px/1.25 var(--font-book); text-wrap: balance; }
+.author { color: var(--muted); font-size: 13px; }
+.sub { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-top: 4px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.state { font-weight: 500; }
+.state.active { color: var(--accent); }
+.state.finished { color: var(--good); }
+.tagtxt::before { content: "#"; opacity: .6; }
+.owned { width: 26px; height: 26px; display: grid; place-items: center; color: var(--muted); }
+.owned svg { display: block; }
+
+ul.grid { list-style: none; margin: 0; padding: 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 16px 12px; }
+.tile { cursor: pointer; display: grid; gap: 6px; align-content: start; }
+.tile .art { position: relative; aspect-ratio: 2 / 3; border-radius: 4px; overflow: hidden; box-shadow: 0 1px 4px rgb(0 0 0 / .18); }
+.tile .art svg { display: block; width: 100%; height: 100%; }
+.tile .t { font: 600 13px/1.25 var(--font-book); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tile .minibar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.tile .minibar span { display: block; height: 100%; background: var(--accent); }
+.tile .minibar.idle span { background: var(--muted); }
+.badge { position: absolute; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / .25); }
+.badge.own { right: 5px; bottom: 5px; }
+.badge.done { left: 5px; top: 5px; color: var(--good); }
+.badge.live { left: 5px; top: 5px; color: var(--accent); }
+.empty { padding: 40px 18px; text-align: center; color: var(--muted); }
+
+.tabbar { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); background: var(--surface); position: sticky; bottom: 0; }
+.tab { display: grid; justify-items: center; gap: 2px; padding: 8px 0 10px; font-size: 12px; color: var(--muted); background: none; border: 0; cursor: pointer; }
+.tab[aria-current="page"] { color: var(--accent); font-weight: 600; }
+
+.toast { position: absolute; left: 12px; right: 12px; bottom: 70px; padding: 10px 14px; border-radius: 12px; background: var(--ink); color: var(--surface); font-size: 14px; }
+.toast[hidden] { display: none; }
+
+.notes { align-self: start; display: grid; gap: 22px; max-width: 62ch; }
+.notes h2 { margin: 0 0 6px; font: 600 13px var(--font-ui); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.notes h1 { margin: 0; font: 600 22px/1.25 var(--font-ui); text-wrap: balance; }
+.notes p { margin: 6px 0 0; color: var(--muted); }
+.notes ul, .notes ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.notes em { font-style: normal; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <section class="app" aria-label="mau catalog view">
+    <header class="app-head">
+      <div><div class="brand">mau</div><h1>Catalog</h1></div>
+      <div class="head-actions">
+        <button class="icon-btn" id="view-list" type="button" aria-label="List layout" title="List"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><g fill="currentColor"><rect x="1" y="2" width="14" height="2" rx="1"/><rect x="1" y="7" width="14" height="2" rx="1"/><rect x="1" y="12" width="14" height="2" rx="1"/></g></svg></button>
+        <button class="icon-btn" id="view-grid" type="button" aria-label="Grid layout" title="Grid"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><g fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></g></svg></button>
+        <button class="icon-btn add" id="add" type="button" aria-label="Add a book" title="Add a book">+</button>
+      </div>
+    </header>
+    <div class="filters">
+      <input class="search" id="q" type="search" placeholder="Search title or author" aria-label="Search your catalog">
+      <div class="state-row">
+        <div class="chips" id="state-chips" role="group" aria-label="Reading state"></div>
+        <label class="own-check" for="owned"><input type="checkbox" id="owned"> Owned?</label>
+      </div>
+      <div class="chips" id="tag-chips" role="group" aria-label="Tags"></div>
+      <div class="bar-row"><span id="count"></span>
+        <span><button class="clear" id="clear" type="button" hidden>Clear filters</button>
+        <label for="sort">Sort</label> <select id="sort">
+          <option value="added">Recently added</option>
+          <option value="title">Title</option>
+          <option value="author">Author</option>
+          <option value="finished">Recently finished</option>
+        </select></span>
+      </div>
+    </div>
+    <div class="results" id="results"></div>
+    <nav class="tabbar" aria-label="Main">
+      <button class="tab" type="button" data-tab="Reading"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4.5C5.5 3.5 8 3.8 10 5.2c2-1.4 4.5-1.7 7-.7v11c-2.5-1-5-.7-7 .7-2-1.4-4.5-1.7-7-.7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 5.2v11" stroke="currentColor" stroke-width="1.6"/></svg>Reading</button>
+      <button class="tab" type="button" aria-current="page"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="3" height="14" rx="1"/><rect x="8" y="3" width="3" height="14" rx="1"/><path d="M13 4.2l2.8-.8 2.2 13.4-2.8.8z" stroke-linejoin="round"/></g></svg>Catalog</button>
+      <button class="tab" type="button" data-tab="Settings"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6"/></g></svg>Settings</button>
+    </nav>
+    <div class="toast" id="toast" role="status" hidden></div>
+  </section>
+
+  <aside class="notes">
+    <div>
+      <h1>Catalog view, mock 3</h1>
+      <p>Every book on your list, including finished ones. The visual style is a placeholder.</p>
+    </div>
+    <div>
+      <h2>Try these</h2>
+      <ul>
+        <li>Switch between list and grid with the header buttons.</li>
+        <li>Tap <strong>Active</strong> and <strong>Inactive</strong> to turn them off, leaving Finished. Then tick <strong>Owned?</strong> and tap <strong>#classics</strong>. Filters combine.</li>
+        <li>Search for "ishiguro".</li>
+        <li>Change the sort to Author or Recently finished.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Approved decisions shown</h2>
+      <ul>
+        <li>List and grid layouts, switchable.</li>
+        <li>State chips Active, Inactive, Finished: several can be selected, and all three are on by default.</li>
+        <li>An <strong>Owned?</strong> checkbox on the same row as the state chips.</li>
+        <li>Text search, and tag chips where several tags must all match.</li>
+        <li>Sort menu, defaulting to recently added.</li>
+        <li>Adding a book is the <strong>+</strong> in the catalog header.</li>
+        <li>Bottom tab bar: Reading, Catalog, Settings.</li>
+        <li>Tapping a book opens its detail page (the next mock).</li>
+        <li>Rows don't separate unstarted from paused: both say Inactive, with pages if there's progress.</li>
+        <li>Finished books show only the latest finish date; all read dates go on the detail page.</li>
+        <li>The grid shows cover artwork.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Open questions for this screen</h2>
+      <ol>
+        <li>Unchecking <strong>Owned?</strong> shows all books, owned or not. There's no way to see only books you don't own. <em>Mock: as described.</em></li>
+        <li>Turning off all three state chips. <em>Mock: allowed; the list is empty with a hint. Alternative: the last chip can't be turned off.</em></li>
+        <li>What a list row shows. <em>Mock: cover, title, author, state with pages or finish date, up to two tags, and a bookshelf icon if owned.</em></li>
+        <li>What a grid tile shows. <em>Mock: cover artwork with badges (dot if active, check if finished, shelf if owned), a progress bar if started and unfinished, and the title below.</em></li>
+        <li>The artwork here is drawn as a stand-in, because the mock can't load real images. Where real covers come from is a backend decision: the online catalog, your own upload, or both.</li>
+        <li>A book with no cover image. <em>Proposal: fall back to a generated tile like these.</em></li>
+        <li>Should the list view and the progress view use real cover thumbnails too, instead of the generated initials? <em>Mock: initials tiles there for now.</em></li>
+        <li>Is the title under the cover needed in the grid, since the cover usually shows it? <em>Mock: shown.</em></li>
+        <li>Title sort ignores a leading "The", "A", or "An"? <em>Mock: yes.</em></li>
+        <li>Author sort uses the surname? <em>Mock: yes. Le Guin sorts under L.</em></li>
+        <li>How "Recently finished" treats unfinished books. <em>Mock: they go after all finished books, by date added.</em></li>
+        <li>Are the remembered layout, sort, and filters kept per device or per account? <em>Mock: n/a; layout and sort would be remembered, filters reset each visit.</em></li>
+        <li>A count line ("16 books", "3 of 16 books"). Keep it?</li>
+        <li>On desktop, the tab bar becomes a left sidebar. <em>Not shown in this phone-width mock.</em></li>
+      </ol>
+    </div>
+  </aside>
+</div>
+
+<script>
+const BOOKS = [
+  { id: 'lhod', title: 'The Left Hand of Darkness', author: 'Ursula K. Le Guin', sortAuthor: 'Le Guin', state: 'reading', pos: 140, total: 304, owned: true, tags: ['sci-fi', 'classics'], added: '2026-09-12' },
+  { id: 'mm', title: 'Middlemarch', author: 'George Eliot', sortAuthor: 'Eliot', state: 'reading', pos: 299, total: 880, owned: true, tags: ['classics'], added: '2026-08-01' },
+  { id: 'wiz', title: 'A Wizard of Earthsea', author: 'Ursula K. Le Guin', sortAuthor: 'Le Guin', state: 'reading', pos: 182, total: 183, owned: true, tags: ['fantasy'], added: '2026-10-02' },
+  { id: 'geb', title: 'Gödel, Escher, Bach', author: 'Douglas Hofstadter', sortAuthor: 'Hofstadter', state: 'reading', pos: 212, total: 777, owned: true, tags: ['non-fiction'], added: '2026-06-20' },
+  { id: 'se', title: 'Station Eleven', author: 'Emily St. John Mandel', sortAuthor: 'St. John Mandel', state: 'unstarted', owned: false, tags: ['sci-fi', 'book club'], added: '2026-10-27' },
+  { id: 'bk', title: 'The Brothers Karamazov', author: 'Fyodor Dostoevsky', sortAuthor: 'Dostoevsky', state: 'paused', pos: 310, total: 796, owned: true, tags: ['classics'], added: '2026-04-11' },
+  { id: 'tfs', title: 'Thinking, Fast and Slow', author: 'Daniel Kahneman', sortAuthor: 'Kahneman', state: 'paused', pos: 160, total: 499, owned: false, tags: ['non-fiction'], added: '2026-02-03' },
+  { id: 'pf', title: 'Pale Fire', author: 'Vladimir Nabokov', sortAuthor: 'Nabokov', state: 'unstarted', owned: true, tags: ['classics'], added: '2026-07-01' },
+  { id: 'nr', title: 'The Name of the Rose', author: 'Umberto Eco', sortAuthor: 'Eco', state: 'paused', pos: 45, total: 536, owned: true, tags: ['classics'], added: '2025-12-24' },
+  { id: 'hyp', title: 'Hyperion', author: 'Dan Simmons', sortAuthor: 'Simmons', state: 'unstarted', owned: true, tags: ['sci-fi'], added: '2026-10-15' },
+  { id: 'kats', title: 'Klara and the Sun', author: 'Kazuo Ishiguro', sortAuthor: 'Ishiguro', state: 'unstarted', owned: false, tags: ['book club'], added: '2026-10-30' },
+  { id: 'pir', title: 'Piranesi', author: 'Susanna Clarke', sortAuthor: 'Clarke', state: 'finished', finished: '2026-10-20', owned: true, tags: ['fantasy'], added: '2026-09-28' },
+  { id: 'rotd', title: 'The Remains of the Day', author: 'Kazuo Ishiguro', sortAuthor: 'Ishiguro', state: 'finished', finished: '2026-09-03', owned: true, tags: ['book club'], added: '2026-08-10' },
+  { id: 'phm', title: 'Project Hail Mary', author: 'Andy Weir', sortAuthor: 'Weir', state: 'finished', finished: '2026-07-15', owned: false, tags: ['sci-fi'], added: '2026-06-30' },
+  { id: 'bs', title: 'Braiding Sweetgrass', author: 'Robin Wall Kimmerer', sortAuthor: 'Kimmerer', state: 'finished', finished: '2026-05-02', owned: true, tags: ['non-fiction'], added: '2026-03-15' },
+  { id: 'disp', title: 'The Dispossessed', author: 'Ursula K. Le Guin', sortAuthor: 'Le Guin', state: 'finished', finished: '2026-03-11', owned: true, tags: ['sci-fi', 'classics'], added: '2019-05-04' }
+];
+const STATES = [['active', 'Active'], ['inactive', 'Inactive'], ['finished', 'Finished']];
+const group = b => b.state === 'reading' ? 'active' : b.state === 'finished' ? 'finished' : 'inactive';
+const TAGS = [...new Set(BOOKS.flatMap(b => b.tags))].sort();
+
+const ALL_STATES = STATES.map(s => s[0]);
+let ui = { layout: 'list', states: ALL_STATES.slice(), owned: false, tags: [], q: '', sort: 'added' };
+
+const $ = id => document.getElementById(id);
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function hue(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+function initials(t) { return t.replace(/^(The|A|An) /, '').split(/\s+/).slice(0, 2).map(w => w[0]).join(''); }
+const sortTitle = t => t.replace(/^(The|A|An) /, '').toLowerCase();
+const fmtDate = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+const shelfIcon = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="3" height="11" rx=".8"/><rect x="6.5" y="2.5" width="3" height="11" rx=".8"/><path d="M11 3.4l2.4-.6 1.6 10.4-2.4.6z" stroke-linejoin="round"/></g></svg>';
+const checkIcon = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.3l2.3 2.3 4.7-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const dotIcon = '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="3.5" fill="currentColor"/></svg>';
+
+// Stand-in cover artwork. In the real app this is the cover image from the catalog.
+function wrap(text, max) {
+  const lines = []; let cur = '';
+  for (const w of text.split(' ')) { if ((cur + ' ' + w).trim().length > max && cur) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); }
+  return lines.concat(cur);
+}
+function coverArt(b) {
+  const h = hue(b.title), style = h % 4;
+  const bg = 'hsl(' + h + ' 42% 30%)', fg = 'hsl(' + ((h + 40) % 360) + ' 70% 86%)', mid = 'hsl(' + ((h + 180) % 360) + ' 55% 58%)';
+  const lines = wrap(b.title.toUpperCase(), 11);
+  let art = '';
+  if (style === 0) art = '<circle cx="100" cy="128" r="62" fill="' + mid + '" opacity=".85"/><circle cx="100" cy="128" r="38" fill="' + bg + '"/>';
+  else if (style === 1) art = [0, 1, 2, 3, 4, 5].map(i => '<rect x="0" y="' + (98 + i * 18) + '" width="200" height="9" fill="' + mid + '" opacity="' + (0.9 - i * 0.13) + '"/>').join('');
+  else if (style === 2) art = '<path d="M0 210 L60 120 L95 165 L140 95 L200 190 L200 300 L0 300Z" fill="' + mid + '" opacity=".8"/><circle cx="150" cy="70" r="16" fill="' + fg + '"/>';
+  else art = '<rect x="22" y="22" width="156" height="256" fill="none" stroke="' + fg + '" stroke-width="2"/><path d="M100 90 L140 150 L100 210 L60 150Z" fill="' + mid + '"/>';
+  const titleY = style === 3 ? 238 : style === 2 ? 50 : 232;
+  const text = lines.map((l, i) => '<text x="100" y="' + (titleY + i * 20 - (lines.length - 1) * 10) + '" text-anchor="middle" font-family="Source Serif 4, Georgia, serif" font-weight="600" font-size="17" letter-spacing="1" fill="' + fg + '">' + esc(l) + '</text>').join('');
+  const author = '<text x="100" y="' + (style === 2 ? 282 : 278) + '" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" letter-spacing="1.5" fill="' + fg + '" opacity=".85">' + esc(b.author.toUpperCase()) + '</text>';
+  return '<svg viewBox="0 0 200 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="200" height="300" fill="' + bg + '"/>' + art + text + (style === 3 ? '' : author) + '</svg>';
+}
+
+function stateText(b) {
+  if (b.state === 'reading') return '<span class="state active">Active · p. ' + b.pos + ' / ' + b.total + '</span>';
+  if (b.state === 'paused') return '<span class="state">Inactive · p. ' + b.pos + ' / ' + b.total + '</span>';
+  if (b.state === 'finished') return '<span class="state finished">Finished · ' + fmtDate(b.finished) + '</span>';
+  return '<span class="state">Inactive</span>';
+}
+
+function filtered() {
+  const q = ui.q.trim().toLowerCase();
+  let list = BOOKS.filter(b =>
+    ui.states.includes(group(b)) &&
+    (!ui.owned || b.owned) &&
+    ui.tags.every(t => b.tags.includes(t)) &&
+    (!q || b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q)));
+  const by = {
+    added: (a, b) => b.added.localeCompare(a.added),
+    title: (a, b) => sortTitle(a.title).localeCompare(sortTitle(b.title)),
+    author: (a, b) => a.sortAuthor.localeCompare(b.sortAuthor) || sortTitle(a.title).localeCompare(sortTitle(b.title)),
+    finished: (a, b) => (b.finished || '').localeCompare(a.finished || '') || b.added.localeCompare(a.added)
+  };
+  return list.sort(by[ui.sort]);
+}
+
+function chip(group, value, label, on, cls = '') {
+  return '<button class="chip ' + cls + '" type="button" data-group="' + group + '" data-value="' + esc(value) + '" aria-pressed="' + on + '">' + esc(label) + '</button>';
+}
+
+function render() {
+  $('state-chips').innerHTML = STATES.map(([v, l]) => chip('state', v, l, ui.states.includes(v), 'st')).join('');
+  $('owned').checked = ui.owned;
+  $('tag-chips').innerHTML = TAGS.map(t => chip('tag', t, t, ui.tags.includes(t), 'tag')).join('');
+  $('view-list').setAttribute('aria-pressed', ui.layout === 'list');
+  $('view-grid').setAttribute('aria-pressed', ui.layout === 'grid');
+  const items = filtered();
+  const filtering = ui.states.length !== ALL_STATES.length || ui.owned || ui.tags.length || ui.q.trim();
+  $('count').textContent = filtering ? items.length + ' of ' + BOOKS.length + ' books' : BOOKS.length + ' books';
+  $('clear').hidden = !filtering;
+  if (!items.length) { $('results').innerHTML = '<div class="empty">' + (ui.states.length ? 'No books match these filters.' : 'Select Active, Inactive, or Finished to see books.') + '</div>'; return; }
+  if (ui.layout === 'list') {
+    $('results').innerHTML = '<ul class="list">' + items.map(b =>
+      '<li class="item" tabindex="0" data-id="' + b.id + '">' +
+      '<div class="cover" style="--h:' + hue(b.title) + '" aria-hidden="true">' + initials(b.title) + '</div>' +
+      '<div><div class="title">' + esc(b.title) + '</div><div class="author">' + esc(b.author) + '</div>' +
+      '<div class="sub">' + stateText(b) + b.tags.slice(0, 2).map(t => '<span class="tagtxt">' + esc(t) + '</span>').join('') + '</div></div>' +
+      '<div class="owned" title="' + (b.owned ? 'You own a copy' : '') + '">' + (b.owned ? shelfIcon + '<span class="sr" hidden>Owned</span>' : '') + '</div>' +
+      '</li>').join('') + '</ul>';
+  } else {
+    $('results').innerHTML = '<ul class="grid">' + items.map(b => {
+      const started = b.state === 'reading' || b.state === 'paused';
+      return '<li class="tile" tabindex="0" data-id="' + b.id + '" aria-label="' + esc(b.title + ', ' + b.author) + '">' +
+        '<div class="art">' + coverArt(b) +
+        (b.state === 'finished' ? '<span class="badge done" title="Finished">' + checkIcon + '</span>' : '') +
+        (b.state === 'reading' ? '<span class="badge live" title="Reading">' + dotIcon + '</span>' : '') +
+        (b.owned ? '<span class="badge own" title="Owned">' + shelfIcon + '</span>' : '') + '</div>' +
+        (started ? '<div class="minibar' + (b.state === 'paused' ? ' idle' : '') + '"><span style="width:' + Math.round(100 * b.pos / b.total) + '%"></span></div>' : '') +
+        '<div class="t">' + esc(b.title) + '</div></li>';
+    }).join('') + '</ul>';
+  }
+}
+
+let toastTimer;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2500); }
+
+document.querySelector('.filters').addEventListener('click', e => {
+  const c = e.target.closest('.chip'); if (!c) return;
+  const v = c.dataset.value;
+  if (c.dataset.group === 'state') ui.states = ui.states.includes(v) ? ui.states.filter(x => x !== v) : ui.states.concat(v);
+  else ui.tags = ui.tags.includes(v) ? ui.tags.filter(t => t !== v) : ui.tags.concat(v);
+  render();
+});
+$('owned').addEventListener('change', e => { ui.owned = e.target.checked; render(); });
+$('q').addEventListener('input', e => { ui.q = e.target.value; render(); });
+$('sort').addEventListener('change', e => { ui.sort = e.target.value; render(); });
+$('clear').addEventListener('click', () => { Object.assign(ui, { states: ALL_STATES.slice(), owned: false, tags: [], q: '' }); $('q').value = ''; render(); });
+$('view-list').addEventListener('click', () => { ui.layout = 'list'; render(); });
+$('view-grid').addEventListener('click', () => { ui.layout = 'grid'; render(); });
+$('add').addEventListener('click', () => toast('Adding a book is designed in a later mock.'));
+document.querySelector('.tabbar').addEventListener('click', e => { const t = e.target.closest('[data-tab]'); if (t) toast(t.dataset.tab + ' is a separate mock.'); });
+$('results').addEventListener('click', e => { const it = e.target.closest('[data-id]'); if (it) toast('Opens the detail page for ' + BOOKS.find(b => b.id === it.dataset.id).title + ' (next mock).'); });
+$('results').addEventListener('keydown', e => { if (e.key === 'Enter') { const it = e.target.closest('[data-id]'); if (it) it.click(); } });
+
+render();
+</script>
+</body>
+</html>

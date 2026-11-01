@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mau add book mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: phone-width app column (top bar, search, results, bottom sheet) beside a notes column. */
+  --bg: #eef0f3;
+  --surface: #ffffff;
+  --ink: #16181d;
+  --muted: #626a78;
+  --line: #dde1e8;
+  --accent: #2b54c7;
+  --accent-soft: #e5ebfb;
+  --good: #1f7a4d;
+  --danger: #b4322a;
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-book: "Source Serif 4", Georgia, "Times New Roman", serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1014; --surface: #171a20; --ink: #e8eaee; --muted: #9aa2b1; --line: #2a2f39;
+    --accent: #8aa4ff; --accent-soft: #1e2640; --good: #5cc98f; --danger: #f07a70;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1014; --surface: #171a20; --ink: #e8eaee; --muted: #9aa2b1; --line: #2a2f39;
+  --accent: #8aa4ff; --accent-soft: #1e2640; --good: #5cc98f; --danger: #f07a70;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--font-ui); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.page { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 460px); gap: 32px; justify-content: center; padding: 24px 16px 96px; }
+@media (max-width: 900px) { .page { grid-template-columns: minmax(0, 480px); } }
+
+.app { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; align-self: start; position: relative; min-height: 640px; display: flex; flex-direction: column; }
+.topbar { display: flex; align-items: center; gap: 4px; padding: 10px 10px 4px; }
+.topbar h1 { margin: 0; font: 600 18px var(--font-ui); }
+.ghost { background: none; border: 0; padding: 6px 8px; border-radius: 8px; cursor: pointer; color: var(--accent); }
+.ghost:hover { background: var(--accent-soft); }
+
+.searchbar { display: flex; gap: 8px; padding: 8px 14px 12px; border-bottom: 1px solid var(--line); }
+.search { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.scan-btn { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 14px; }
+.scan-btn svg { display: block; }
+
+.body { flex: 1; }
+.status-line { padding: 10px 16px 0; font-size: 12px; color: var(--muted); }
+.status-line b { color: var(--ink); font-weight: 500; }
+ul.results { list-style: none; margin: 0; padding: 0; }
+.result { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.result:hover { background: var(--bg); }
+.art { aspect-ratio: 2 / 3; border-radius: 3px; overflow: hidden; box-shadow: 0 1px 4px rgb(0 0 0 / .2); }
+.art svg, .art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.title { font: 600 16px/1.25 var(--font-book); }
+.author { color: var(--muted); font-size: 13px; }
+.sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.on-list { font-size: 11px; font-weight: 600; color: var(--good); border: 1px solid currentColor; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.chev { color: var(--muted); }
+.hint-box { padding: 28px 20px; color: var(--muted); text-align: center; display: grid; gap: 6px; }
+.manual-link { padding: 14px 16px 18px; font-size: 14px; color: var(--muted); }
+.link { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.spinner { width: 18px; height: 18px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; margin: 30px auto; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Scanner overlay (simulated) */
+.scanner { position: absolute; inset: 0; background: #0b0d10; color: #fff; z-index: 20; display: grid; grid-template-rows: auto 1fr auto; }
+.scanner[hidden] { display: none; }
+.scanner .top { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; }
+.scanner .top button { background: none; border: 0; color: #fff; cursor: pointer; font-size: 15px; }
+.viewfinder { position: relative; margin: 0 24px; display: grid; place-items: center; }
+.viewfinder .frame { width: 100%; max-width: 300px; aspect-ratio: 3 / 2; border: 2px solid rgb(255 255 255 / .8); border-radius: 14px; position: relative; overflow: hidden; background: repeating-linear-gradient(90deg, rgb(255 255 255 / .06) 0 3px, transparent 3px 7px); }
+.viewfinder .laser { position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; background: #ff5a4f; box-shadow: 0 0 8px #ff5a4f; animation: sweep 1.6s ease-in-out infinite alternate; }
+@keyframes sweep { from { top: 25%; } to { top: 75%; } }
+.scanner .bottom { padding: 16px 18px 22px; display: grid; gap: 10px; text-align: center; font-size: 14px; color: rgb(255 255 255 / .8); }
+.scanner .bottom .btn { justify-self: center; }
+
+/* Bottom sheet */
+.sheet-back { position: absolute; inset: 0; background: rgb(0 0 0 / .35); z-index: 25; display: flex; align-items: flex-end; }
+.sheet-back[hidden] { display: none; }
+.sheet { background: var(--surface); width: 100%; border-radius: 18px 18px 0 0; padding: 8px 16px 16px; display: grid; gap: 12px; max-height: 92%; overflow-y: auto; }
+.grab { width: 40px; height: 4px; border-radius: 2px; background: var(--line); justify-self: center; }
+.sheet-head { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; align-items: center; }
+.field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.field input, .field select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+.note { font-size: 12px; color: var(--muted); margin: 0; }
+.row-end { display: flex; justify-content: flex-end; gap: 8px; }
+.btn { padding: 9px 15px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
+.btn.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); font-weight: 500; }
+.btn.light { background: #fff; color: #111; border-color: #fff; }
+
+.tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tag { display: inline-flex; align-items: center; gap: 2px; padding: 3px 4px 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 13px; }
+.tag::before { content: "#"; opacity: .6; }
+.tag button { background: none; border: 0; color: inherit; cursor: pointer; padding: 0 5px; }
+.tag-box { position: relative; }
+.tag-input { width: 120px; padding: 3px 10px; border: 1px dashed var(--line); border-radius: 999px; background: transparent; font-size: 13px; }
+.suggest { position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 30; list-style: none; margin: 0; padding: 4px; min-width: 200px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgb(0 0 0 / .14); display: grid; gap: 1px; }
+.suggest[hidden] { display: none; }
+.suggest li { padding: 6px 10px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+.suggest li[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+.suggest .hint { color: var(--muted); cursor: default; }
+
+/* Manual form */
+.form { padding: 14px 16px 20px; display: grid; gap: 12px; }
+.authors { display: grid; gap: 8px; }
+.author-row { display: grid; grid-template-columns: minmax(0, 1fr) 120px auto; gap: 6px; align-items: end; }
+.x { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 8px; border-radius: 6px; }
+details.ed { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+details.ed summary { cursor: pointer; font-size: 14px; }
+details.ed .inner { display: grid; gap: 10px; margin-top: 10px; }
+.err { color: var(--danger); font-size: 13px; }
+.similar { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--accent); border-radius: 12px; background: var(--accent-soft); }
+.sim { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; align-items: center; text-align: left; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer; }
+.private { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--muted); background: var(--bg); border-radius: 10px; padding: 10px 12px; }
+
+.toast { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 40; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; border-radius: 12px; background: var(--ink); color: var(--surface); font-size: 14px; }
+.toast[hidden] { display: none; }
+.toast button { background: none; border: 0; color: var(--surface); font-weight: 600; text-decoration: underline; cursor: pointer; padding: 4px 8px; }
+
+.notes { align-self: start; display: grid; gap: 22px; max-width: 62ch; }
+.notes h2 { margin: 0 0 6px; font: 600 13px var(--font-ui); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.notes h1 { margin: 0; font: 600 22px/1.25 var(--font-ui); text-wrap: balance; }
+.notes p { margin: 6px 0 0; color: var(--muted); }
+.notes ul, .notes ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.notes em { font-style: normal; color: var(--muted); }
+.notes code { font-size: 13px; background: var(--surface); border: 1px solid var(--line); padding: 0 4px; border-radius: 4px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <section class="app" aria-label="mau add a book" id="app">
+    <div class="topbar"><button class="ghost" type="button" id="back">‹ Catalog</button><h1 id="screen-title">Add a book</h1></div>
+    <div id="search-screen">
+      <div class="searchbar">
+        <input class="search" id="q" type="search" placeholder="Title, author, or ISBN" aria-label="Search by title, author, or ISBN" autocomplete="off">
+        <button class="scan-btn" id="scan" type="button" aria-label="Scan barcode"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><g fill="currentColor"><rect x="2" y="3" width="1.5" height="12"/><rect x="5" y="3" width="1" height="12"/><rect x="7.5" y="3" width="2" height="12"/><rect x="11" y="3" width="1" height="12"/><rect x="13" y="3" width="1.5" height="12"/><rect x="15.5" y="3" width=".8" height="12"/></g></svg>Scan</button>
+      </div>
+      <div class="body" id="results"></div>
+    </div>
+    <div id="manual-screen" hidden></div>
+
+    <div class="scanner" id="scanner" hidden>
+      <div class="top"><span>Scan the barcode on the back cover</span><button type="button" id="scan-close" aria-label="Close scanner">✕</button></div>
+      <div class="viewfinder"><div class="frame"><div class="laser"></div></div></div>
+      <div class="bottom">
+        <span>Live camera preview appears here. This mock can't use your camera.</span>
+        <button class="btn light" type="button" id="scan-sim">Simulate a scan (A Wizard of Earthsea)</button>
+        <button class="link" type="button" id="scan-type" style="color:#fff">Type the ISBN instead</button>
+      </div>
+    </div>
+
+    <div class="sheet-back" id="sheet-back" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Add book"></div></div>
+    <div class="toast" id="toast" role="status" hidden><span id="toast-msg"></span><button type="button" id="toast-act"></button></div>
+  </section>
+
+  <aside class="notes">
+    <div>
+      <h1>Add a book, mock 2</h1>
+      <p>Opened from the + in the catalog header. Search results are canned examples; the edition names and ISBNs are made up.</p>
+    </div>
+    <div>
+      <h2>Try these</h2>
+      <ul>
+        <li>Type "earthsea" and press Enter, then pick a result to see the confirm sheet.</li>
+        <li>Search "le guin": <em>The Left Hand of Darkness</em> is marked "On your list". Picking it opens "add another copy".</li>
+        <li>Type the ISBN <code>9780000000019</code> to see ISBN detection, which goes straight to one edition.</li>
+        <li>Search "hollow fern" to see the fallback to a second provider.</li>
+        <li>Tap <strong>Scan</strong>, then simulate a scan.</li>
+        <li>Search "zzz", then use <strong>Enter it manually</strong>. Enter the title "Earthsea" with any author and tap Continue to see the similar-titles check.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Approved decisions shown</h2>
+      <ul>
+        <li>One search box for title, author, or ISBN, with Scan beside it and a manual-entry link below the results. Import lives in Settings.</li>
+        <li>Providers are tried in the admin's order; the next is asked only when results are missing or thin.</li>
+        <li>Live camera scanning with a bundled decoder, and typing the ISBN as the fallback.</li>
+        <li>Picking a result opens a confirm sheet: edition, "I own a copy" (format and location), and tags. Add puts the book at the top of your inactive books.</li>
+        <li>Books already on your list are marked, and picking one offers "add another copy".</li>
+        <li>Manual entry: title and author required; more authors, year, cover, and edition details optional. Private to you until an admin promotes it.</li>
+        <li>Search runs only when you press Enter.</li>
+        <li>"I own a copy" is off unless you tick it.</li>
+        <li>All authors are equals. Translator, editor, and illustrator are separate non-author roles, shown alongside (see "hollow fern").</li>
+        <li>Manual entry checks the catalog for similar titles before saving.</li>
+        <li>Also approved: results are works; the edition picker defaults to the scanned ISBN's edition; you stay on the add screen after Add; the scanner doesn't reopen; ISBNs are validated and stored as ISBN-13; no "Start reading now".</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Open questions for this screen</h2>
+      <p>None left from mock 1. Tell me if anything here looks wrong.</p>
+    </div>
+  </aside>
+</div>
+
+<script>
+// Canned catalog. "provider" says which source returned it in this mock.
+const CATALOG = [
+  { id: 'wiz', title: 'A Wizard of Earthsea', authors: ['Ursula K. Le Guin'], year: 1968, provider: 'Open Library',
+    editions: [{ label: 'Bantam paperback, 1975', isbn: '9780000000019', binding: 'Paperback' }, { label: 'Parnassus hardcover, 1968', isbn: '9780000000026', binding: 'Hardcover' }, { label: 'Ebook edition, 2012', isbn: '9780000000033', binding: 'Ebook' }] },
+  { id: 'tomb', title: 'The Tombs of Atuan', authors: ['Ursula K. Le Guin'], year: 1971, provider: 'Open Library',
+    editions: [{ label: 'Bantam paperback, 1975', isbn: '9780000000040', binding: 'Paperback' }, { label: 'Atheneum hardcover, 1971', isbn: '9780000000057', binding: 'Hardcover' }] },
+  { id: 'farshore', title: 'The Farthest Shore', authors: ['Ursula K. Le Guin'], year: 1972, provider: 'Open Library',
+    editions: [{ label: 'Bantam paperback, 1975', isbn: '9780000000064', binding: 'Paperback' }] },
+  { id: 'tales', title: 'Tales from Earthsea', authors: ['Ursula K. Le Guin'], year: 2001, provider: 'Open Library',
+    editions: [{ label: 'Harcourt hardcover, 2001', isbn: '9780000000071', binding: 'Hardcover' }] },
+  { id: 'lhod', title: 'The Left Hand of Darkness', authors: ['Ursula K. Le Guin'], year: 1969, provider: 'Open Library', onList: true,
+    editions: [{ label: 'Ace paperback, 1987', isbn: '9780000000088', binding: 'Paperback' }, { label: 'Penguin Modern Classics, 2018', isbn: '9780000000095', binding: 'Paperback' }] },
+  { id: 'lathe', title: 'The Lathe of Heaven', authors: ['Ursula K. Le Guin'], year: 1971, provider: 'Open Library',
+    editions: [{ label: 'Scribner paperback, 2008', isbn: '9780000000101', binding: 'Paperback' }] },
+  { id: 'hollow', title: 'The Hollow Fern', authors: ['M. Okafor', 'T. Achebe-Ruiz'], others: [{ name: 'J. Lindqvist', role: 'Translator' }], year: 2023, provider: 'Google Books', fallback: true,
+    editions: [{ label: 'Small press paperback, 2023', isbn: '9780000000118', binding: 'Paperback' }] }
+];
+const MY_TAGS = ['sci-fi', 'classics', 'fantasy', 'non-fiction', 'book club', 'favorites', 'short stories', 'to-lend'];
+
+const $ = id => document.getElementById(id);
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function hue(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+function wrap(text, max) { const lines = []; let cur = ''; for (const w of text.split(' ')) { if ((cur + ' ' + w).trim().length > max && cur) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); } return lines.concat(cur); }
+function coverArt(title, author) {
+  const h = hue(title), style = h % 4;
+  const bg = 'hsl(' + h + ' 42% 30%)', fg = 'hsl(' + ((h + 40) % 360) + ' 70% 86%)', mid = 'hsl(' + ((h + 180) % 360) + ' 55% 58%)';
+  const lines = wrap(title.toUpperCase(), 11);
+  let art = '';
+  if (style === 0) art = '<circle cx="100" cy="128" r="62" fill="' + mid + '" opacity=".85"/><circle cx="100" cy="128" r="38" fill="' + bg + '"/>';
+  else if (style === 1) art = [0, 1, 2, 3, 4, 5].map(i => '<rect x="0" y="' + (98 + i * 18) + '" width="200" height="9" fill="' + mid + '" opacity="' + (0.9 - i * 0.13) + '"/>').join('');
+  else if (style === 2) art = '<path d="M0 210 L60 120 L95 165 L140 95 L200 190 L200 300 L0 300Z" fill="' + mid + '" opacity=".8"/><circle cx="150" cy="70" r="16" fill="' + fg + '"/>';
+  else art = '<rect x="22" y="22" width="156" height="256" fill="none" stroke="' + fg + '" stroke-width="2"/><path d="M100 90 L140 150 L100 210 L60 150Z" fill="' + mid + '"/>';
+  const titleY = style === 3 ? 238 : style === 2 ? 50 : 232;
+  const text = lines.map((l, i) => '<text x="100" y="' + (titleY + i * 20 - (lines.length - 1) * 10) + '" text-anchor="middle" font-family="Source Serif 4, Georgia, serif" font-weight="600" font-size="17" letter-spacing="1" fill="' + fg + '">' + esc(l) + '</text>').join('');
+  const by = '<text x="100" y="' + (style === 3 ? 262 : 280) + '" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" letter-spacing="1.5" fill="' + fg + '" opacity=".85">' + esc(author.toUpperCase()) + '</text>';
+  return '<svg viewBox="0 0 200 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="200" height="300" fill="' + bg + '"/><rect x="0" y="0" width="7" height="300" fill="#000" opacity=".18"/>' + art + text + by + '</svg>';
+}
+
+// ISBN helpers: accept ISBN-10 or ISBN-13 (spaces/hyphens ignored), validate, convert to 13.
+function isbnDigits(q) { const d = q.replace(/[\s-]/g, ''); return /^\d{9}[\dXx]$|^\d{13}$/.test(d) ? d.toUpperCase() : null; }
+function valid13(d) { let s = 0; for (let i = 0; i < 12; i++) s += +d[i] * (i % 2 ? 3 : 1); return (10 - s % 10) % 10 === +d[12]; }
+function valid10(d) { let s = 0; for (let i = 0; i < 10; i++) s += (d[i] === 'X' ? 10 : +d[i]) * (10 - i); return s % 11 === 0; }
+function to13(d) { const b = '978' + d.slice(0, 9); let s = 0; for (let i = 0; i < 12; i++) s += +b[i] * (i % 2 ? 3 : 1); return b + ((10 - s % 10) % 10); }
+
+let searchTimer, toastTimer;
+function setResults(html) { $('results').innerHTML = html; }
+
+function runSearch(q) {
+  const raw = q.trim();
+  if (!raw) { setResults('<div class="hint-box"><span>Type a title, author, or ISBN and press Enter.</span><span>Or tap Scan to read a barcode.</span></div>'); return; }
+  const d = isbnDigits(raw);
+  if (d) {
+    const ok = d.length === 13 ? valid13(d) : valid10(d);
+    if (!ok) { setResults('<div class="hint-box"><span class="err">That ISBN\'s check digit doesn\'t match. Check for a typo.</span></div>' + manualLink()); return; }
+    const isbn = d.length === 13 ? d : to13(d);
+    setResults('<div class="spinner" role="status" aria-label="Looking up"></div>');
+    searchTimer = setTimeout(() => {
+      const hit = CATALOG.find(w => w.editions.some(e => e.isbn === isbn));
+      if (!hit) { setResults('<div class="status-line">ISBN ' + isbn + '</div><div class="hint-box">No catalog has this ISBN.</div>' + manualLink()); return; }
+      setResults('<div class="status-line">ISBN ' + isbn + ' · from <b>' + hit.provider + '</b></div>' + resultList([hit]) + manualLink());
+      openSheet(hit.id, isbn);
+    }, 450);
+    return;
+  }
+  setResults('<div class="spinner" role="status" aria-label="Searching"></div>');
+  searchTimer = setTimeout(() => {
+    const l = raw.toLowerCase();
+    const match = w => w.title.toLowerCase().includes(l) || w.authors.some(a => a.toLowerCase().includes(l));
+    const primary = CATALOG.filter(w => !w.fallback && match(w));
+    const fallback = primary.length ? [] : CATALOG.filter(w => w.fallback && match(w));
+    if (!primary.length && !fallback.length) { setResults('<div class="hint-box">No books found for "' + esc(raw) + '".</div>' + manualLink()); return; }
+    const line = primary.length ? 'from <b>Open Library</b>' : 'from <b>Google Books</b> (Open Library had no results)';
+    setResults('<div class="status-line">' + (primary.length || fallback.length) + ' results ' + line + '</div>' + resultList(primary.length ? primary : fallback) + manualLink());
+  }, 450);
+}
+function manualLink() { return '<div class="manual-link">Can\'t find it? <button class="link" type="button" data-act="manual">Enter it manually</button></div>'; }
+function resultList(list) {
+  return '<ul class="results">' + list.map(w =>
+    '<li class="result" tabindex="0" data-id="' + w.id + '"><div class="art">' + coverArt(w.title, w.authors[0]) + '</div>' +
+    '<div><div class="title">' + esc(w.title) + '</div><div class="author">' + esc(w.authors.join(', ')) + '</div>' +
+    '<div class="sub">' + w.year + ' · ' + w.editions.length + (w.editions.length === 1 ? ' edition' : ' editions') + (w.others ? ' · ' + w.others.map(o => o.role.toLowerCase() + ' ' + esc(o.name)).join(', ') : '') + '</div></div>' +
+    (w.onList ? '<span class="on-list">On your list</span>' : '<span class="chev" aria-hidden="true">›</span>') + '</li>').join('') + '</ul>';
+}
+
+/* Confirm sheet */
+let sheet = null; // { id, isbn, tags[] }
+function openSheet(id, isbn) {
+  const w = CATALOG.find(x => x.id === id);
+  sheet = { id, isbn: isbn || null, tags: [], owned: false };
+  drawSheet();
+  $('sheet-back').hidden = false;
+}
+function drawSheet() {
+  const w = CATALOG.find(x => x.id === sheet.id);
+  const copyMode = !!w.onList;
+  const ed = sheet.isbn ? w.editions.find(e => e.isbn === sheet.isbn) : null;
+  $('sheet').innerHTML = '<div class="grab"></div>' +
+    '<div class="sheet-head"><div class="art">' + coverArt(w.title, w.authors[0]) + '</div><div><div class="title">' + esc(w.title) + '</div><div class="author">' + esc(w.authors.join(', ')) + ' · ' + w.year + '</div></div></div>' +
+    (copyMode ? '<p class="note">This book is already on your list. Add another copy, or <button class="link" type="button" data-act="open-detail">open its page</button>.</p>' : '') +
+    '<label class="field" for="sh-ed">Edition<select id="sh-ed">' + (ed ? '' : '<option value="">Not sure / choose later</option>') +
+      w.editions.map(e => '<option value="' + e.isbn + '"' + (ed && ed.isbn === e.isbn ? ' selected' : '') + '>' + esc(e.label) + '</option>').join('') + '</select></label>' +
+    (copyMode ? '' : '<label class="toggle" for="sh-own"><span>I own a copy</span><input type="checkbox" id="sh-own"' + (sheet.owned ? ' checked' : '') + '></label>') +
+    (sheet.owned || copyMode ? '<div class="two"><label class="field" for="sh-format">Format<select id="sh-format">' + ['Hardcover', 'Paperback', 'Ebook', 'Audiobook'].map(f => '<option' + ((ed ? ed.binding : 'Paperback') === f ? ' selected' : '') + '>' + f + '</option>').join('') + '</select></label>' +
+      '<label class="field" for="sh-loc">Location<input id="sh-loc" placeholder="e.g. Office shelf"></label></div>' : '') +
+    (copyMode ? '' : '<div class="field">Tags<div class="tags">' + sheet.tags.map((t, i) => '<span class="tag">' + esc(t) + '<button type="button" data-act="untag" data-i="' + i + '" aria-label="Remove tag ' + esc(t) + '">×</button></span>').join('') +
+      '<span class="tag-box"><input class="tag-input" id="tag-input" placeholder="+ add tag" aria-label="Add tag" autocomplete="off"><ul class="suggest" id="suggest" role="listbox" hidden></ul></span></div></div>') +
+    '<div class="row-end"><button class="btn" type="button" data-act="close-sheet">Cancel</button><button class="btn primary" type="button" data-act="confirm">' + (copyMode ? 'Add copy' : 'Add to my list') + '</button></div>';
+}
+function closeSheet() { $('sheet-back').hidden = true; sheet = null; }
+
+/* Tag autocomplete (verbatim, as approved for the detail page) */
+let sugItems = [], sugIndex = 0;
+function updateSuggest(raw) {
+  const v = raw.trim().replace(/^#/, ''), lv = v.toLowerCase();
+  sugItems = [];
+  if (v) {
+    MY_TAGS.filter(t => !sheet.tags.includes(t) && t.toLowerCase().includes(lv))
+      .sort((a, b) => (b.toLowerCase().startsWith(lv) - a.toLowerCase().startsWith(lv)) || a.localeCompare(b))
+      .forEach(t => sugItems.push({ tag: t, label: '#' + t }));
+    if (sheet.tags.includes(v)) sugItems.push({ hint: true, label: 'Already added #' + v });
+    else if (!MY_TAGS.includes(v)) sugItems.push({ tag: v, label: 'Create new tag #' + v });
+  }
+  sugIndex = 0; drawSuggest();
+}
+function drawSuggest() {
+  const ul = $('suggest'); if (!ul) return;
+  ul.hidden = !sugItems.length;
+  ul.innerHTML = sugItems.map((x, i) => x.hint ? '<li class="hint">' + esc(x.label) + '</li>' : '<li role="option" data-i="' + i + '" aria-selected="' + (i === sugIndex) + '">' + esc(x.label) + '</li>').join('');
+}
+function addTag(t) { if (t && !sheet.tags.includes(t)) sheet.tags.push(t); sugItems = []; keepSheetFields(() => drawSheet()); const i = $('tag-input'); if (i) i.focus(); }
+function keepSheetFields(fn) {
+  const ed = $('sh-ed')?.value, fmt = $('sh-format')?.value, loc = $('sh-loc')?.value;
+  fn();
+  if (ed !== undefined && $('sh-ed')) $('sh-ed').value = ed;
+  if (fmt !== undefined && $('sh-format')) $('sh-format').value = fmt;
+  if (loc !== undefined && $('sh-loc')) $('sh-loc').value = loc;
+}
+
+function toast(msg, actLabel) {
+  $('toast-msg').textContent = msg; $('toast-act').textContent = actLabel || ''; $('toast-act').hidden = !actLabel;
+  $('toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').hidden = true, 10000);
+}
+
+/* Manual entry */
+const ROLES = ['Author', 'Translator', 'Editor', 'Illustrator'];
+let manual = null;
+function openManual() {
+  manual = { authors: [{ name: '', role: 'Author' }], showErr: false, cover: null };
+  $('search-screen').hidden = true; $('manual-screen').hidden = false; $('screen-title').textContent = 'Enter a book';
+  drawManual();
+}
+function closeManual() { $('search-screen').hidden = false; $('manual-screen').hidden = true; $('screen-title').textContent = 'Add a book'; manual = null; }
+function drawManual() {
+  const m = manual;
+  $('manual-screen').innerHTML = '<div class="form">' +
+    '<label class="field" for="m-title">Title (required)<input id="m-title" value="' + esc(m.title || '') + '"></label>' +
+    '<div class="authors">' + m.authors.map((a, i) =>
+      '<div class="author-row"><label class="field" for="m-a' + i + '">' + (i === 0 ? 'Author (required)' : 'Name') + '<input id="m-a' + i + '" data-ai="' + i + '" value="' + esc(a.name) + '"></label>' +
+      (i === 0 ? '<input type="hidden" id="m-r0" value="Author"><span></span>'
+        : '<label class="field" for="m-r' + i + '">Role<select id="m-r' + i + '" data-ri="' + i + '">' + ROLES.map(r => '<option' + (r === a.role ? ' selected' : '') + '>' + r + '</option>').join('') + '</select></label>') +
+      (i ? '<button class="x" type="button" data-act="del-author" data-i="' + i + '" aria-label="Remove this person">×</button>' : '<span></span>') + '</div>').join('') +
+    '<div><button class="link" type="button" data-act="add-author">+ Add another person</button></div></div>' +
+    '<label class="field" for="m-year">First published year<input id="m-year" inputmode="numeric" value="' + esc(m.year || '') + '" placeholder="e.g. 1998"></label>' +
+    '<label class="field" for="m-cover">Cover image (optional; otherwise a cover is generated)<input id="m-cover" type="file" accept="image/*"></label>' +
+    '<details class="ed"><summary>Edition details (optional)</summary><div class="inner">' +
+      '<div class="two"><label class="field" for="m-pub">Publisher<input id="m-pub"></label><label class="field" for="m-bind">Binding<select id="m-bind"><option>Paperback</option><option>Hardcover</option><option>Ebook</option><option>Audiobook</option></select></label></div>' +
+      '<div class="two"><label class="field" for="m-eyear">Edition year<input id="m-eyear" inputmode="numeric"></label><label class="field" for="m-isbn">ISBN<input id="m-isbn" inputmode="numeric"></label></div>' +
+    '</div></details>' +
+    '<div class="private"><span aria-hidden="true">🔒</span><span>Only you will see this book until an admin adds it to the shared catalog.</span></div>' +
+    (m.showErr ? '<div class="err" role="alert">' + m.showErr + '</div>' : '') +
+    (m.similar && m.similar.length ? '<div class="similar"><strong>Is it one of these?</strong><span class="note">These are already in the catalog. Pick one to add it instead, or continue with your own entry.</span>' +
+      m.similar.map(w => '<button class="sim" type="button" data-act="pick-similar" data-id="' + w.id + '"><span class="art">' + coverArt(w.title, w.authors[0]) + '</span><span><span class="title">' + esc(w.title) + '</span><br><span class="author">' + esc(w.authors.join(', ')) + ' · ' + w.year + '</span></span></button>').join('') + '</div>' : '') +
+    '<div class="row-end"><button class="btn" type="button" data-act="cancel-manual">Cancel</button><button class="btn primary" type="button" data-act="save-manual">' + (m.similar && m.similar.length ? 'No, add my book' : 'Continue') + '</button></div></div>';
+}
+// Before saving a manual entry, look for catalog works with a similar title.
+function similarTitles(title) {
+  const t = title.toLowerCase().replace(/^(the|a|an) /, '');
+  const words = t.split(/\W+/).filter(w => w.length >= 5);
+  return CATALOG.filter(w => { const c = w.title.toLowerCase().replace(/^(the|a|an) /, ''); return c.includes(t) || t.includes(c) || words.some(x => c.split(/\W+/).includes(x)); }).slice(0, 4);
+}
+function readManual() {
+  const m = manual;
+  m.title = $('m-title').value; m.year = $('m-year').value;
+  m.authors.forEach((a, i) => { a.name = $('m-a' + i).value; a.role = $('m-r' + i).value; });
+}
+
+/* Events */
+$('q').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(searchTimer); runSearch(e.target.value); } });
+$('scan').addEventListener('click', () => { $('scanner').hidden = false; });
+$('scan-close').addEventListener('click', () => { $('scanner').hidden = true; });
+$('scan-type').addEventListener('click', () => { $('scanner').hidden = true; $('q').focus(); });
+$('scan-sim').addEventListener('click', () => { $('scanner').hidden = true; $('q').value = '9780000000019'; runSearch('9780000000019'); });
+$('back').addEventListener('click', () => { if (manual) closeManual(); else toast('Back to the catalog (separate mock).'); });
+$('toast-act').addEventListener('click', () => toast('Opens the book\'s detail page (separate mock).'));
+
+$('app').addEventListener('click', e => {
+  const r = e.target.closest('.result');
+  if (r) { openSheet(r.dataset.id, null); return; }
+  if (e.target === $('sheet-back')) { closeSheet(); return; }
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  switch (t.dataset.act) {
+    case 'manual': openManual(); break;
+    case 'close-sheet': closeSheet(); break;
+    case 'open-detail': closeSheet(); toast('Opens the book\'s detail page (separate mock).'); break;
+    case 'untag': sheet.tags.splice(+t.dataset.i, 1); keepSheetFields(drawSheet); break;
+    case 'confirm': {
+      const w = CATALOG.find(x => x.id === sheet.id);
+      const owned = w.onList || ($('sh-own') && $('sh-own').checked);
+      const msg = w.onList ? 'Added another copy of ' + w.title : 'Added ' + w.title + ' to the top of your inactive books' + (owned ? ', with a copy' : '');
+      closeSheet(); toast(msg, 'View'); break;
+    }
+    case 'add-author': readManual(); manual.authors.push({ name: '', role: 'Author' }); drawManual(); break;
+    case 'del-author': readManual(); manual.authors.splice(+t.dataset.i, 1); drawManual(); break;
+    case 'cancel-manual': closeManual(); break;
+    case 'save-manual': {
+      readManual();
+      const isbnRaw = $('m-isbn').value.trim();
+      if (!manual.title.trim() || !manual.authors[0].name.trim()) { manual.showErr = 'Enter at least a title and an author.'; drawManual(); return; }
+      if (isbnRaw) { const d = isbnDigits(isbnRaw); if (!d || !(d.length === 13 ? valid13(d) : valid10(d))) { manual.showErr = 'That ISBN doesn\'t look right. Check for a typo, or leave it empty.'; drawManual(); return; } }
+      const title = manual.title.trim();
+      const similar = manual.checked ? [] : similarTitles(title);
+      if (similar.length) { manual.checked = true; manual.similar = similar; drawManual(); return; }
+      closeManual();
+      toast('Added ' + title + ' (private to you) to the top of your inactive books', 'View');
+      break;
+    }
+    case 'pick-similar': { const id = t.dataset.id; closeManual(); openSheet(id, null); break; }
+  }
+});
+$('app').addEventListener('change', e => { if (e.target.id === 'sh-own') { sheet.owned = e.target.checked; keepSheetFields(drawSheet); } });
+$('app').addEventListener('input', e => { if (e.target.id === 'tag-input') updateSuggest(e.target.value); });
+$('app').addEventListener('keydown', e => {
+  if (e.target.classList && e.target.classList.contains('result') && e.key === 'Enter') openSheet(e.target.dataset.id, null);
+  if (e.target.id === 'tag-input') {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sugIndex = Math.max(0, Math.min(sugItems.length - 1, sugIndex + (e.key === 'ArrowDown' ? 1 : -1))); drawSuggest(); }
+    if (e.key === 'Enter') { e.preventDefault(); if (sugItems[sugIndex] && !sugItems[sugIndex].hint) addTag(sugItems[sugIndex].tag); }
+  }
+  if (e.key === 'Escape') { if (!$('scanner').hidden) $('scanner').hidden = true; else if (sheet) closeSheet(); }
+});
+$('app').addEventListener('pointerdown', e => { const li = e.target.closest('#suggest li[data-i]'); if (li) { e.preventDefault(); addTag(sugItems[+li.dataset.i].tag); } });
+
+runSearch('');
+</script>
+</body>
+</html>

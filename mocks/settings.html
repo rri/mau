@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mau settings mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: phone-width app column (top bar, section page, tab bar) beside a notes column. */
+  --bg: #eef0f3;
+  --surface: #ffffff;
+  --ink: #16181d;
+  --muted: #626a78;
+  --line: #dde1e8;
+  --accent: #2b54c7;
+  --accent-soft: #e5ebfb;
+  --good: #1f7a4d;
+  --warn: #9a6200;
+  --danger: #b4322a;
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1014; --surface: #171a20; --ink: #e8eaee; --muted: #9aa2b1; --line: #2a2f39;
+    --accent: #8aa4ff; --accent-soft: #1e2640; --good: #5cc98f; --warn: #e6b44c; --danger: #f07a70;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1014; --surface: #171a20; --ink: #e8eaee; --muted: #9aa2b1; --line: #2a2f39;
+  --accent: #8aa4ff; --accent-soft: #1e2640; --good: #5cc98f; --warn: #e6b44c; --danger: #f07a70;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--font-ui); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.page { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 460px); gap: 32px; justify-content: center; padding: 24px 16px 96px; }
+@media (max-width: 900px) { .page { grid-template-columns: minmax(0, 480px); } }
+
+.app { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; align-self: start; position: relative; min-height: 680px; display: flex; flex-direction: column; }
+.topbar { display: flex; align-items: center; gap: 4px; padding: 10px 10px 6px; min-height: 52px; }
+.topbar h1 { margin: 0 0 0 6px; font: 600 19px var(--font-ui); }
+.ghost { background: none; border: 0; padding: 6px 8px; border-radius: 8px; cursor: pointer; color: var(--accent); }
+.ghost:hover { background: var(--accent-soft); }
+.content { flex: 1; padding: 0 0 18px; }
+
+.list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.nav-item { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 13px 18px; border: 0; border-bottom: 1px solid var(--line); background: none; text-align: left; cursor: pointer; }
+.nav-item:hover { background: var(--bg); }
+.nav-item small { display: block; color: var(--muted); font-size: 12px; }
+.nav-item .val { color: var(--muted); font-size: 13px; }
+.chev { color: var(--muted); }
+.group-label { padding: 18px 18px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.badge { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: var(--surface); }
+
+.sec { padding: 6px 18px 14px; display: grid; gap: 12px; }
+.sec + .sec { border-top: 1px solid var(--line); padding-top: 14px; }
+.sec h2 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.field input, .field select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); }
+.help { font-size: 12px; color: var(--muted); margin: 0; }
+.row-end { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.btn { padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
+.btn.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); font-weight: 500; }
+.btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); font-weight: 500; }
+.btn.danger-ghost { color: var(--danger); }
+.btn.sm { padding: 4px 10px; font-size: 13px; border-radius: 8px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.link { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font-size: 13px; }
+
+.cards { display: grid; gap: 8px; }
+.card { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 4px; }
+.card .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.card .name { font-weight: 500; }
+.card .meta { font-size: 12px; color: var(--muted); }
+.card .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.tagpill { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.tagpill.good { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+.tagpill.warn { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
+.tagpill.bad { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+.tagpill.acc { background: var(--accent-soft); color: var(--accent); }
+
+.codes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; padding: 12px; border: 1px dashed var(--line); border-radius: 12px; font: 500 15px var(--font-mono); letter-spacing: .04em; }
+.codes .used { text-decoration: line-through; color: var(--muted); }
+.meter { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.meter span { display: block; height: 100%; background: var(--accent); }
+
+.radio-list { display: grid; gap: 6px; }
+.radio { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.radio input { margin-top: 3px; accent-color: var(--accent); }
+.radio small { display: block; color: var(--muted); font-size: 12px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+
+.review-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 13px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.imp-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.imp-row .src { font-size: 12px; color: var(--muted); }
+.imp-row select { font-size: 13px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); max-width: 170px; }
+.map-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; font-size: 13px; }
+.map-row code { font-family: var(--font-mono); font-size: 12px; background: var(--bg); padding: 2px 6px; border-radius: 5px; }
+.map-row select { padding: 5px 7px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; }
+
+.prov { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.prov .ord { display: grid; gap: 2px; }
+.prov .ord button { background: none; border: 1px solid var(--line); border-radius: 6px; width: 26px; height: 22px; cursor: pointer; font-size: 11px; color: var(--muted); }
+.prov .ord button:disabled { opacity: .35; cursor: default; }
+.prov input[type="password"] { width: 100%; margin-top: 6px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; }
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.stat { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--muted); }
+.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; font-size: 13px; }
+.log li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.log time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.notice { display: flex; gap: 8px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--warn) 12%, transparent); font-size: 13px; }
+
+.tabbar { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); background: var(--surface); }
+.tab { display: grid; justify-items: center; gap: 2px; padding: 8px 0 10px; font-size: 12px; color: var(--muted); background: none; border: 0; cursor: pointer; }
+.tab[aria-current="page"] { color: var(--accent); font-weight: 600; }
+
+.modal-back { position: absolute; inset: 0; background: rgb(0 0 0 / .4); display: grid; place-items: center; padding: 20px; z-index: 30; }
+.modal-back[hidden] { display: none; }
+.modal { background: var(--surface); border-radius: 14px; padding: 18px; display: grid; gap: 12px; width: 100%; max-width: 350px; }
+.modal h3 { margin: 0; font-size: 17px; }
+.modal p { margin: 0; color: var(--muted); font-size: 14px; }
+.pk-prompt { display: grid; justify-items: center; gap: 8px; padding: 14px; border-radius: 12px; background: var(--bg); text-align: center; font-size: 14px; }
+.pk-prompt svg { color: var(--accent); }
+
+.toast { position: absolute; left: 12px; right: 12px; bottom: 70px; z-index: 40; padding: 10px 14px; border-radius: 12px; background: var(--ink); color: var(--surface); font-size: 14px; }
+.toast[hidden] { display: none; }
+
+.notes { align-self: start; display: grid; gap: 22px; max-width: 62ch; }
+.notes h2 { margin: 0 0 6px; font: 600 13px var(--font-ui); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.notes h1 { margin: 0; font: 600 22px/1.25 var(--font-ui); text-wrap: balance; }
+.notes p { margin: 6px 0 0; color: var(--muted); }
+.notes ul, .notes ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.notes em { font-style: normal; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <section class="app" aria-label="mau settings">
+    <div class="topbar" id="topbar"></div>
+    <div class="content" id="content"></div>
+    <nav class="tabbar" aria-label="Main">
+      <button class="tab" type="button" data-tab="Reading">Reading</button>
+      <button class="tab" type="button" data-tab="Catalog">Catalog</button>
+      <button class="tab" type="button" aria-current="page">Settings</button>
+    </nav>
+    <div class="modal-back" id="modal-back" hidden><div class="modal" id="modal" role="dialog" aria-modal="true"></div></div>
+    <div class="toast" id="toast" role="status" hidden></div>
+  </section>
+
+  <aside class="notes">
+    <div>
+      <h1>Settings, mock 4</h1>
+      <p>You're signed in as an admin, so the Admin group shows. Passkey prompts are simulated, since the mock can't call your authenticator.</p>
+    </div>
+    <div>
+      <h2>Try these</h2>
+      <ul>
+        <li><strong>Passkeys:</strong> add one, rename one, and try removing them all. The last can't be removed.</li>
+        <li><strong>Recovery codes:</strong> regenerate. It asks for a passkey, then shows the new codes once.</li>
+        <li><strong>Import &amp; export:</strong> pick Goodreads and "choose" a file to see the review step. Pick Generic CSV to see column mapping.</li>
+        <li><strong>Sharing:</strong> share #book-club, then make a new link for it.</li>
+        <li><strong>Admin → Review queue:</strong> merge or promote a suggested entry.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Approved decisions shown</h2>
+      <ul>
+        <li>Settings is a list of sections, each its own page. Admin appears only for admins.</li>
+        <li>Several named passkeys; the last can't be removed. Sessions last 30 days and can be revoked.</li>
+        <li>Ten single-use recovery codes, regenerable (voids the old set), with the remaining count shown. An admin-issued recovery link is shown to the user afterwards.</li>
+        <li>Username rules: 3–30 characters (a–z, 0–9, _ and -), changeable, old name reserved for 30 days.</li>
+        <li>Sharing per item (finished, active, a tag, whole catalog). Each item is either Private (not shared) or Public: listed on your public profile (/u/username, with an optional short bio), also reachable by its own link, and indexable by search engines. Sharing with specific people is postponed. Ratings optional, notes never.</li>
+        <li>Import from Goodreads, StoryGraph, LibraryThing, or any CSV, with review before commit. Unfinished books come in inactive. Export as full JSON or simple CSV.</li>
+        <li>Self-service account deletion: type your username, confirm with a passkey, export offered first.</li>
+        <li>Admin: users (promote, suspend, delete, recovery link), signup mode and invites, catalog providers in order, review queue, shared catalog edits, audit log, stats.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Open questions for this screen</h2>
+      <p>None. The public profile page itself is a separate small screen; I can mock it with the sign-in screens.</p>
+    </div>
+  </aside>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function randCode() { const a = 'abcdefghjkmnpqrstuvwxyz23456789'; let s = ''; for (let i = 0; i < 10; i++) { s += a[Math.floor(Math.random() * a.length)]; if (i === 4) s += '-'; } return s; }
+
+const S = {
+  me: { username: 'rri', display: 'R. Reader', admin: true, bio: 'Slow reader of long novels. Mostly Le Guin and the Russians.' },
+  passkeys: [
+    { name: 'YubiKey 5C', created: 'Nov 1, 2026', last: 'Today' },
+    { name: 'KeePassXC on desktop', created: 'Nov 1, 2026', last: '3 days ago' },
+    { name: 'Bitwarden', created: 'Nov 2, 2026', last: 'Never' }
+  ],
+  sessions: [
+    { dev: 'Firefox on Linux', last: 'Active now', current: true },
+    { dev: 'Firefox on Android', last: '2 hours ago' },
+    { dev: 'Chrome on macOS', last: '12 days ago' }
+  ],
+  codes: Array.from({ length: 10 }, (_, i) => ({ code: randCode(), used: i < 2 })),
+  recoveryEvents: [{ when: 'Oct 3, 2026', what: 'An admin (sam) issued a one-time enrollment link for your account. A passkey "Firefox on Android" was added with it.' }],
+  shares: [{ what: 'Finished books', audience: 'public', people: [], ratings: true, link: 'mau.example.com/s/k3v9…' }],
+  signup: 'invite', inviteWho: 'admins', inviteLimit: 5,
+  invites: [{ link: 'mau.example.com/invite/q7d2…', by: 'rri', expires: 'in 5 days' }],
+  providers: [
+    { name: 'Open Library', on: true, key: false, builtIn: true },
+    { name: 'Google Books', on: true, key: true, keySet: true },
+    { name: 'Hardcover', on: false, key: true, keySet: false },
+    { name: 'ISBNdb (paid)', on: false, key: true, keySet: false }
+  ],
+  users: [
+    { name: 'rri', display: 'R. Reader', role: 'admin', status: 'active', books: 214 },
+    { name: 'sam', display: 'Sam', role: 'admin', status: 'active', books: 88 },
+    { name: 'juno', display: 'Juno P.', role: 'user', status: 'active', books: 41 },
+    { name: 'kit', display: 'Kit', role: 'user', status: 'suspended', books: 7 }
+  ],
+  queue: [
+    { title: 'The Hollow Fern', authors: 'M. Okafor, T. Achebe-Ruiz', by: 'juno', ed: 'Small press paperback, 2023 · ISBN 9780000000118', dupe: null },
+    { title: 'Earthsea Revisited', authors: 'Ursula K. Le Guin', by: 'kit', ed: 'Unknown edition', dupe: 'Earthsea Revisioned (1993)' }
+  ],
+  audit: [
+    { t: 'Nov 1, 09:12', a: 'rri changed signup mode to Invite only' },
+    { t: 'Oct 29, 18:40', a: 'sam suspended kit' },
+    { t: 'Oct 3, 21:05', a: 'sam issued a recovery enrollment link for rri' },
+    { t: 'Sep 30, 10:00', a: 'rri promoted sam to admin' }
+  ]
+};
+let nav = ['home'];
+let tmp = {};
+
+const pkIcon = '<svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="9" cy="8" r="4"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.4 0 2.7.4 3.7 1.1"/><circle cx="17.5" cy="14.5" r="2.5"/><path d="M17.5 17v4.5M17.5 19.5h2"/></g></svg>';
+
+function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 4000); }
+function go(p) { nav.push(p); tmp = {}; render(); }
+function back() { if (nav.length > 1) nav.pop(); tmp = {}; render(); }
+
+// Simulated passkey confirmation, then run fn.
+function withPasskey(why, fn) {
+  modal('<h3>Confirm it\'s you</h3><p>' + esc(why) + '</p><div class="pk-prompt">' + pkIcon + '<span>Your browser would now ask for a passkey.</span></div>' +
+    '<div class="row-end"><button class="btn" type="button" data-m="cancel">Cancel</button><button class="btn primary" type="button" data-m="ok">Simulate passkey</button></div>', fn);
+}
+let modalOk = null;
+function modal(html, ok) { $('modal').innerHTML = html; $('modal-back').hidden = false; modalOk = ok || null; }
+function closeModal() { $('modal-back').hidden = true; modalOk = null; }
+$('modal').addEventListener('click', e => {
+  const b = e.target.closest('[data-m]'); if (!b) return;
+  if (b.dataset.m === 'cancel') return closeModal();
+  const fn = modalOk; closeModal(); if (fn) fn(b);
+});
+
+const TITLES = { home: 'Settings', account: 'Account', passkeys: 'Passkeys', sessions: 'Sessions', codes: 'Recovery codes', sharing: 'Sharing', io: 'Import & export',
+  admin: 'Admin', users: 'Users', signup: 'Signup & invites', providers: 'Catalog providers', queue: 'Review queue', catalog: 'Shared catalog', audit: 'Audit log', stats: 'Instance stats' };
+
+function render() {
+  const p = nav[nav.length - 1];
+  $('topbar').innerHTML = (nav.length > 1 ? '<button class="ghost" type="button" data-act="back">‹ ' + esc(TITLES[nav[nav.length - 2]]) + '</button>' : '') + '<h1>' + esc(TITLES[p]) + '</h1>';
+  $('content').innerHTML = (PAGES[p] || (() => ''))();
+}
+
+function item(page, label, sub, val, badge) {
+  return '<li><button class="nav-item" type="button" data-go="' + page + '"><span>' + esc(label) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' +
+    (badge ? '<span class="badge">' + badge + '</span>' : '<span class="val">' + esc(val || '') + '</span>') + '<span class="chev">›</span></button></li>';
+}
+const left = () => S.codes.filter(c => !c.used).length;
+
+const PAGES = {
+  home() {
+    return '<ul class="list">' +
+      item('account', S.me.display, '@' + S.me.username, '') +
+      item('passkeys', 'Passkeys', '', S.passkeys.length + '') +
+      item('sessions', 'Sessions', '', S.sessions.length + ' active') +
+      item('codes', 'Recovery codes', '', left() + ' of 10 left') +
+      item('sharing', 'Sharing', '', S.shares.length ? S.shares.length + ' shared' : 'Nothing shared') +
+      item('io', 'Import & export', '', '') + '</ul>' +
+      (S.me.admin ? '<div class="group-label">Admin</div><ul class="list">' +
+        item('users', 'Users', '', S.users.length + '') +
+        item('signup', 'Signup & invites', '', { open: 'Open', invite: 'Invite only', closed: 'Closed' }[S.signup]) +
+        item('providers', 'Catalog providers', '', S.providers.filter(x => x.on).length + ' enabled') +
+        item('queue', 'Review queue', '', '', S.queue.length || '') +
+        item('catalog', 'Shared catalog', 'Fix records for everyone', '') +
+        item('audit', 'Audit log', '', '') +
+        item('stats', 'Instance stats', '', '') + '</ul>' : '') +
+      '<div class="sec" style="padding-top:18px"><button class="btn" type="button" data-act="signout">Sign out</button></div>';
+  },
+  account() {
+    return '<div class="sec"><h2>Profile</h2>' +
+      '<label class="field" for="a-display">Display name<input id="a-display" value="' + esc(S.me.display) + '"></label>' +
+      '<label class="field" for="a-bio">Short bio (shown on your public profile)<textarea id="a-bio" rows="3" maxlength="280" style="padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);font:inherit;resize:vertical">' + esc(S.me.bio || '') + '</textarea></label>' +
+      '<label class="field" for="a-user">Username<input id="a-user" value="' + esc(S.me.username) + '" autocapitalize="none" spellcheck="false"></label>' +
+      '<p class="help">3–30 characters: a–z, 0–9, _ and -. If you change it, your profile moves to the new address right away and the old address stops working. Item links keep working. Your old username stays reserved for you for 30 days.</p>' +
+      (tmp.err ? '<p class="help" style="color:var(--danger)">' + tmp.err + '</p>' : '') +
+      '<div class="row-end"><button class="btn primary" type="button" data-act="save-account">Save</button></div></div>' +
+      '<div class="sec"><h2>Delete account</h2><p class="help">Deletes your account and everything in it: books, readings, ratings, notes, copies, tags, shares, and passkeys. This can\'t be undone.</p>' +
+      '<div class="row-end"><button class="btn" type="button" data-go="io">Export my data first</button><button class="btn danger-ghost" type="button" data-act="delete-account">Delete account…</button></div></div>';
+  },
+  passkeys() {
+    const only = S.passkeys.length === 1;
+    return '<div class="sec"><p class="help">Passkeys are how you sign in. Add one for each device or password manager you use.</p><div class="cards">' +
+      S.passkeys.map((k, i) => '<div class="card"><div class="top"><span class="name">' + esc(k.name) + '</span></div>' +
+        '<div class="meta">Added ' + k.created + ' · Last used ' + k.last + '</div>' +
+        '<div class="acts"><button class="btn sm" type="button" data-act="rename-pk" data-i="' + i + '">Rename</button>' +
+        '<button class="btn sm danger-ghost" type="button" data-act="del-pk" data-i="' + i + '"' + (only ? ' disabled title="You need at least one passkey"' : '') + '>Remove</button></div></div>').join('') +
+      '</div>' + (only ? '<p class="help">This is your only passkey, so it can\'t be removed. Add another first.</p>' : '') +
+      '<div class="row-end"><button class="btn primary" type="button" data-act="add-pk">Add a passkey</button></div></div>';
+  },
+  sessions() {
+    return '<div class="sec"><p class="help">Signed-in browsers. Each stays signed in for 30 days after its last visit.</p><div class="cards">' +
+      S.sessions.map((s, i) => '<div class="card"><div class="top"><span class="name">' + esc(s.dev) + '</span>' + (s.current ? '<span class="tagpill acc">This device</span>' : '') + '</div>' +
+        '<div class="meta">' + s.last + '</div>' + (s.current ? '' : '<div class="acts"><button class="btn sm danger-ghost" type="button" data-act="revoke" data-i="' + i + '">Sign out</button></div>') + '</div>').join('') +
+      '</div>' + (S.sessions.length > 1 ? '<div class="row-end"><button class="btn" type="button" data-act="revoke-all">Sign out all other sessions</button></div>' : '') + '</div>';
+  },
+  codes() {
+    const n = left();
+    if (tmp.newCodes) {
+      return '<div class="sec"><h2>Your new recovery codes</h2><p class="help">Save these somewhere safe now. They won\'t be shown again. Each works once. Your old codes no longer work.</p>' +
+        '<div class="codes">' + S.codes.map(c => '<span>' + c.code + '</span>').join('') + '</div>' +
+        '<div class="row-end"><button class="btn" type="button" data-act="copy-codes">Copy all</button><button class="btn primary" type="button" data-act="codes-done">I\'ve saved them</button></div></div>';
+    }
+    return '<div class="sec"><p class="help">If you lose all your passkeys, a recovery code lets you sign in once to add a new one.</p>' +
+      '<div><b style="font-size:22px">' + n + '</b> <span class="help">of 10 codes left</span></div><div class="meter"><span style="width:' + n * 10 + '%"></span></div>' +
+      (n <= 3 ? '<div class="notice">⚠ Only ' + n + ' left. Generate a new set soon.</div>' : '') +
+      '<p class="help">Codes are only shown when they\'re created. Generating a new set replaces all remaining codes.</p>' +
+      '<div class="row-end"><button class="btn primary" type="button" data-act="regen">Generate new codes</button></div></div>' +
+      '<div class="sec"><h2>Recovery activity</h2>' + (S.recoveryEvents.length ? '<ul class="log">' + S.recoveryEvents.map(e => '<li><time>' + e.when + '</time><span>' + esc(e.what) + '</span></li>').join('') + '</ul>' : '<p class="help">None.</p>') + '</div>';
+  },
+  sharing() {
+    const f = tmp.form;
+    return '<div class="sec"><p class="help">Everything is private unless you share it here. Shared items are public: they\'re listed on your profile at mau.example.com/u/' + esc(S.me.username) + ', each has its own link, and search engines may index them. Notes are never shared.</p><div class="cards">' +
+      (S.shares.length ? S.shares.map((s, i) => '<div class="card"><div class="top"><span class="name">' + esc(s.what) + '</span><span class="tagpill ' + (s.audience === 'public' ? 'warn' : 'acc') + '">' + (s.audience === 'public' ? 'Public' : 'Specific people') + '</span></div>' +
+        '<div class="meta">' + (s.audience === 'people' ? 'With ' + s.people.map(x => '@' + x).join(', ') + ' · ' : '') + (s.ratings ? 'Includes ratings' : 'No ratings') + (s.audience === 'public' ? ' · <span style="font-family:var(--font-mono)">' + esc(s.link) + '</span>' : '') + '</div>' +
+        '<div class="acts">' + (s.audience === 'public' ? '<button class="btn sm" type="button" data-act="copy-link">Copy link</button><button class="btn sm" type="button" data-act="new-link" data-i="' + i + '">Make a new link</button>' : '') + '<button class="btn sm danger-ghost" type="button" data-act="unshare" data-i="' + i + '">Stop sharing</button></div></div>').join('') : '<p class="help">You\'re not sharing anything.</p>') +
+      '</div>' +
+      (f ? '<div class="card" style="gap:10px"><label class="field" for="sh-what">What to share<select id="sh-what"><option>Finished books</option><option>Currently active</option><option value="tag">A tag…</option><option>Whole catalog</option></select></label>' +
+        '<label class="field" for="sh-tag" id="sh-tag-wrap" hidden>Tag<select id="sh-tag"><option>book club</option><option>favorites</option><option>sci-fi</option><option>classics</option></select></label>' +
+        '<p class="help">Anyone can view it, no sign-in needed. It appears on your public profile.</p>' +
+        '<label class="check" for="sh-ratings"><input type="checkbox" id="sh-ratings"> Include my ratings</label>' +
+        '<div class="row-end"><button class="btn" type="button" data-act="cancel-share">Cancel</button><button class="btn primary" type="button" data-act="save-share">Share</button></div></div>'
+        : '<div class="row-end"><button class="btn primary" type="button" data-act="new-share">Share something</button></div>') + '</div>';
+  },
+  io() {
+    const st = tmp.imp;
+    let imp;
+    if (!st) {
+      imp = '<label class="field" for="imp-src">Import from<select id="imp-src"><option>Goodreads (CSV)</option><option>StoryGraph (CSV)</option><option>LibraryThing (TSV or JSON)</option><option value="csv">Other CSV (map columns)</option></select></label>' +
+        '<label class="field" for="imp-file">File<input id="imp-file" type="file"></label><p class="help">Nothing changes until you review and confirm. Books you haven\'t finished come in as inactive.</p>' +
+        '<div class="row-end"><button class="btn primary" type="button" data-act="imp-read">Read file</button></div>';
+    } else if (st.step === 'map') {
+      const cols = ['Book Title', 'Writer(s)', 'ISBN13', 'Status', 'Date Done', 'Stars', 'Labels', 'Have it'];
+      const opts = ['(ignore)', 'Title', 'Authors', 'ISBN', 'State', 'Finished date', 'Rating', 'Tags', 'Owned'];
+      const guess = ['Title', 'Authors', 'ISBN', 'State', 'Finished date', 'Rating', 'Tags', 'Owned'];
+      imp = '<p class="help">Match your file\'s columns to mau fields. Needs Title and Authors, or ISBN.</p>' +
+        cols.map((c, i) => '<div class="map-row"><code>' + c + '</code><select aria-label="mau field for ' + c + '">' + opts.map(o => '<option' + (o === guess[i] ? ' selected' : '') + '>' + o + '</option>').join('') + '</select></div>').join('') +
+        '<p class="help">Values in State: "done" → finished; anything else → inactive.</p>' +
+        '<div class="row-end"><button class="btn" type="button" data-act="imp-cancel">Cancel</button><button class="btn primary" type="button" data-act="imp-match">Continue</button></div>';
+    } else {
+      const R = st.rows, tab = st.tab;
+      const counts = { matched: 0, uncertain: 0, unmatched: 0, dupe: 0 }; R.forEach(r => counts[r.kind]++);
+      const labels = { matched: 'Matched', uncertain: 'Check match', unmatched: 'Not found', dupe: 'Already on list' };
+      imp = '<p class="help">' + R.length + ' books in the file. Review, then import.</p><div class="review-tabs">' +
+        Object.keys(labels).map(k => '<button class="chip" type="button" data-act="imp-tab" data-k="' + k + '" aria-pressed="' + (tab === k) + '">' + labels[k] + ' ' + counts[k] + '</button>').join('') + '</div>' +
+        '<div>' + R.filter(r => r.kind === tab).map(r => '<div class="imp-row"><div>' + esc(r.title) + '<div class="src">' + esc(r.author) + ' · ' + esc(r.state) + (r.tags ? ' · #' + r.tags.join(' #') : '') + '</div></div>' +
+          (r.kind === 'uncertain' ? '<select aria-label="Choose match"><option>' + esc(r.cand[0]) + '</option><option>' + esc(r.cand[1]) + '</option><option>Not this book: enter manually</option><option>Skip</option></select>'
+            : r.kind === 'unmatched' ? '<select aria-label="What to do"><option>Add as manual entry</option><option>Skip</option></select>'
+            : r.kind === 'dupe' ? '<span class="tagpill">Skipped</span>' : '<span class="tagpill good">Ready</span>') + '</div>').join('') + '</div>' +
+        '<div class="row-end"><button class="btn" type="button" data-act="imp-cancel">Cancel</button><button class="btn primary" type="button" data-act="imp-go">Import ' + (R.length - counts.dupe) + ' books</button></div>';
+    }
+    return '<div class="sec"><h2>Import</h2>' + imp + '</div>' +
+      '<div class="sec"><h2>Export</h2><p class="help">Full export has everything and can be imported back into mau. The spreadsheet has one row per book.</p>' +
+      '<div class="row-end"><button class="btn" type="button" data-act="export" data-k="CSV">Spreadsheet (CSV)</button><button class="btn primary" type="button" data-act="export" data-k="JSON">Full export (JSON)</button></div></div>';
+  },
+  admin() { return ''; },
+  users() {
+    const admins = S.users.filter(u => u.role === 'admin' && u.status === 'active').length;
+    return '<div class="sec"><div class="cards">' + S.users.map((u, i) => {
+      const lastAdmin = u.role === 'admin' && admins === 1;
+      return '<div class="card"><div class="top"><span class="name">' + esc(u.display) + ' <span class="meta">@' + u.name + '</span></span><span>' +
+        (u.role === 'admin' ? '<span class="tagpill acc">Admin</span> ' : '') + (u.status === 'suspended' ? '<span class="tagpill bad">Suspended</span>' : '') + '</span></div>' +
+        '<div class="meta">' + u.books + ' books</div><div class="acts">' +
+        '<button class="btn sm" type="button" data-act="role" data-i="' + i + '"' + (lastAdmin ? ' disabled title="The last admin can\'t be demoted"' : '') + '>' + (u.role === 'admin' ? 'Remove admin' : 'Make admin') + '</button>' +
+        '<button class="btn sm" type="button" data-act="suspend" data-i="' + i + '"' + (lastAdmin ? ' disabled' : '') + '>' + (u.status === 'suspended' ? 'Unsuspend' : 'Suspend') + '</button>' +
+        '<button class="btn sm" type="button" data-act="rec-link" data-i="' + i + '">Recovery link</button>' +
+        '<button class="btn sm danger-ghost" type="button" data-act="del-user" data-i="' + i + '"' + (lastAdmin ? ' disabled' : '') + '>Delete</button></div></div>';
+    }).join('') + '</div></div>';
+  },
+  signup() {
+    const r = (v, l, s) => '<label class="radio"><input type="radio" name="mode" value="' + v + '"' + (S.signup === v ? ' checked' : '') + '><span>' + l + '<small>' + s + '</small></span></label>';
+    return '<div class="sec"><h2>Who can sign up</h2><div class="radio-list">' + r('open', 'Open', 'Anyone who can reach this site can create an account.') + r('invite', 'Invite only', 'People need an invite link.') + r('closed', 'Closed', 'No new accounts, even with an invite.') + '</div></div>' +
+      '<div class="sec"><h2>Who can invite</h2><div class="radio-list">' +
+      '<label class="radio"><input type="radio" name="who" value="admins"' + (S.inviteWho === 'admins' ? ' checked' : '') + '><span>Admins only</span></label>' +
+      '<label class="radio"><input type="radio" name="who" value="all"' + (S.inviteWho === 'all' ? ' checked' : '') + '><span>Every user<small>Each can have up to <input id="inv-limit" type="number" min="1" value="' + S.inviteLimit + '" style="width:56px;padding:2px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface)" aria-label="Invite limit per user"> pending invites.</small></span></label></div></div>' +
+      '<div class="sec"><h2>Invites</h2><p class="help">Each link creates one account and expires after 7 days.</p><div class="cards">' +
+      S.invites.map((v, i) => '<div class="card"><div class="top"><span class="name" style="font-family:var(--font-mono);font-size:13px">' + esc(v.link) + '</span></div><div class="meta">Created by ' + v.by + ' · expires ' + v.expires + '</div>' +
+        '<div class="acts"><button class="btn sm" type="button" data-act="copy-link">Copy</button><button class="btn sm danger-ghost" type="button" data-act="revoke-inv" data-i="' + i + '">Revoke</button></div></div>').join('') +
+      '</div><div class="row-end"><button class="btn primary" type="button" data-act="new-invite">Create invite link</button></div></div>';
+  },
+  providers() {
+    return '<div class="sec"><p class="help">mau asks enabled providers in this order, moving to the next only when results are missing or thin.</p><div class="cards">' +
+      S.providers.map((p, i) => '<div class="prov"><div class="ord"><button type="button" data-act="up" data-i="' + i + '"' + (i === 0 ? ' disabled' : '') + ' aria-label="Move up">▲</button><button type="button" data-act="down" data-i="' + i + '"' + (i === S.providers.length - 1 ? ' disabled' : '') + ' aria-label="Move down">▼</button></div>' +
+        '<div><b style="font-weight:500">' + esc(p.name) + '</b>' + (p.builtIn ? ' <span class="tagpill">Built in</span>' : '') +
+        (p.key ? '<input type="password" aria-label="API key for ' + esc(p.name) + '" placeholder="API key" value="' + (p.keySet ? 'xxxxxxxxxxxx' : '') + '">' : '<div class="meta">No API key needed</div>') + '</div>' +
+        '<label class="check"><input type="checkbox" data-act="prov-on" data-i="' + i + '"' + (p.on ? ' checked' : '') + (p.key && !p.keySet ? ' disabled' : '') + '> On</label></div>').join('') +
+      '</div><p class="help">A provider that needs a key can be turned on once its key is saved.</p></div>';
+  },
+  queue() {
+    if (!S.queue.length) return '<div class="sec"><p class="help">No suggestions waiting.</p></div>';
+    return '<div class="sec"><p class="help">Books that users entered by hand and suggested for the shared catalog. You see the book details only, never their reading data.</p><div class="cards">' +
+      S.queue.map((q, i) => '<div class="card"><div class="top"><span class="name">' + esc(q.title) + '</span><span class="meta">from @' + q.by + '</span></div>' +
+        '<div class="meta">' + esc(q.authors) + '<br>' + esc(q.ed) + '</div>' +
+        (q.dupe ? '<div class="notice">Possibly the same as <b>' + esc(q.dupe) + '</b> already in the catalog.</div>' : '') +
+        '<div class="acts"><button class="btn sm" type="button" data-act="q-edit">Edit</button>' + (q.dupe ? '<button class="btn sm" type="button" data-act="q-merge" data-i="' + i + '">Merge into existing</button>' : '') +
+        '<button class="btn sm primary" type="button" data-act="q-promote" data-i="' + i + '">Add to shared catalog</button><button class="btn sm danger-ghost" type="button" data-act="q-reject" data-i="' + i + '">Decline</button></div></div>').join('') + '</div></div>';
+  },
+  catalog() {
+    return '<div class="sec"><p class="help">Fix a book\'s details for everyone. People who changed details for themselves keep their own version.</p>' +
+      '<label class="field" for="cat-q">Find a book<input id="cat-q" type="search" placeholder="Title, author, or ISBN" value="wizard of earthsea"></label>' +
+      '<div class="card"><div class="top"><span class="name">A Wizard of Earthsea</span><span class="meta">Work · 3 editions</span></div>' +
+      '<label class="field" for="cat-title">Title<input id="cat-title" value="A Wizard of Earthsea"></label>' +
+      '<label class="field" for="cat-auth">Authors<input id="cat-auth" value="Ursula K. Le Guin"></label>' +
+      '<label class="field" for="cat-year">First published<input id="cat-year" value="1968"></label>' +
+      '<label class="field" for="cat-cover">Replace cover<input id="cat-cover" type="file" accept="image/*"></label>' +
+      '<div class="row-end"><button class="btn" type="button" data-act="toast" data-msg="Editions open the same form (separate step).">Editions…</button><button class="btn primary" type="button" data-act="toast" data-msg="Saved for everyone. Recorded in the audit log.">Save</button></div></div></div>';
+  },
+  audit() { return '<div class="sec"><ul class="log">' + S.audit.map(e => '<li><time>' + e.t + '</time><span>' + esc(e.a) + '</span></li>').join('') + '</ul></div>'; },
+  stats() {
+    const st = [['Users', S.users.length], ['Books on lists', '1,284'], ['Shared catalog works', '1,031'], ['Uploaded covers', '38 MB']];
+    return '<div class="sec"><div class="stats">' + st.map(s => '<div class="stat"><b>' + s[1] + '</b><span>' + s[0] + '</span></div>').join('') + '</div></div>';
+  }
+};
+
+const SAMPLE_IMPORT = [
+  { title: 'Piranesi', author: 'Susanna Clarke', state: 'read Oct 20, 2026', kind: 'matched', tags: ['fantasy'] },
+  { title: 'Middlemarch', author: 'George Eliot', state: 'currently-reading → inactive', kind: 'dupe' },
+  { title: 'The Overstory', author: 'Richard Powers', state: 'to-read → inactive', kind: 'matched' },
+  { title: 'Dune', author: 'Frank Herbert', state: 'read (date unknown)', kind: 'uncertain', cand: ['Dune (1965)', 'Dune: The Graphic Novel (2020)'] },
+  { title: 'Zine Collection Vol. 2', author: 'Various', state: 'read Mar 2, 2025', kind: 'unmatched', tags: ['zines'] },
+  { title: 'Kindred', author: 'Octavia E. Butler', state: 'read Jan 9, 2026', kind: 'matched', tags: ['book club', 'favorites'] },
+  { title: 'Solaris', author: 'Stanisław Lem', state: 'currently-reading → inactive', kind: 'uncertain', cand: ['Solaris (1961), Kilmartin & Cox translation', 'Solaris (1961), Bill Johnston translation'] }
+];
+
+document.querySelector('.app').addEventListener('click', e => {
+  const g = e.target.closest('[data-go]'); if (g) { go(g.dataset.go); return; }
+  const tabB = e.target.closest('[data-tab]'); if (tabB) { toast(tabB.dataset.tab + ' is a separate mock.'); return; }
+  const t = e.target.closest('[data-act]'); if (!t || t.disabled) return;
+  const i = +t.dataset.i;
+  switch (t.dataset.act) {
+    case 'back': back(); break;
+    case 'signout': toast('Signed out (in the app you\'d see the sign-in screen).'); break;
+    case 'toast': toast(t.dataset.msg); break;
+    case 'save-account': {
+      const u = $('a-user').value.trim().toLowerCase(), d = $('a-display').value.trim();
+      if (!/^[a-z0-9_-]{3,30}$/.test(u)) { tmp.err = 'Usernames are 3–30 characters: a–z, 0–9, _ and -.'; render(); break; }
+      if (['admin', 'api', 'u', 's', 'invite', 'settings'].includes(u)) { tmp.err = '"' + u + '" is reserved.'; render(); break; }
+      const apply = () => { S.me.bio = $('a-bio').value; const old = S.me.username; S.me.username = u; S.me.display = d || S.me.display; tmp = {}; render(); toast(u !== old ? 'Username changed. @' + old + ' stays reserved for you for 30 days.' : 'Saved'); };
+      if (u !== S.me.username) withPasskey('Changing your username needs a passkey.', apply); else apply();
+      break;
+    }
+    case 'delete-account':
+      modal('<h3>Delete your account?</h3><p>Everything in it is deleted right away and can\'t be recovered. Consider exporting first.</p><label class="field" for="del-confirm">Type your username, ' + esc(S.me.username) + ', to confirm<input id="del-confirm" autocapitalize="none"></label>' +
+        '<div class="row-end"><button class="btn" type="button" data-m="cancel">Cancel</button><button class="btn danger" type="button" data-m="ok">Delete…</button></div>', () => {
+          if (($('del-confirm')?.value || '') !== S.me.username) { toast('The username didn\'t match. Nothing was deleted.'); return; }
+        });
+      // Validate before the modal closes
+      $('modal').querySelector('[data-m="ok"]').addEventListener('click', ev => {
+        const v = $('del-confirm').value;
+        ev.stopPropagation();
+        if (v !== S.me.username) { $('del-confirm').style.borderColor = 'var(--danger)'; return; }
+        closeModal(); withPasskey('Deleting your account needs a passkey.', () => toast('Account deleted (mock). In the app you\'d land on the sign-in screen.'));
+      }, { once: true });
+      break;
+    case 'add-pk':
+      withPasskey('Your browser will ask which authenticator to use for the new passkey.', () => {
+        modal('<h3>Name this passkey</h3><label class="field" for="pk-name">Name<input id="pk-name" value="Firefox on Linux"></label><div class="row-end"><button class="btn primary" type="button" data-m="ok">Save</button></div>', () => {
+          S.passkeys.push({ name: $('pk-name') ? $('pk-name').value : 'New passkey', created: 'Today', last: 'Never' }); render(); toast('Passkey added');
+        });
+        const inp = $('pk-name'); const saveBtn = $('modal').querySelector('[data-m="ok"]');
+        saveBtn.addEventListener('click', ev => { ev.stopPropagation(); S.passkeys.push({ name: inp.value.trim() || 'Passkey', created: 'Today', last: 'Never' }); closeModal(); render(); toast('Passkey added'); }, { once: true });
+      });
+      break;
+    case 'rename-pk': {
+      modal('<h3>Rename passkey</h3><label class="field" for="pk-re">Name<input id="pk-re" value="' + esc(S.passkeys[i].name) + '"></label><div class="row-end"><button class="btn" type="button" data-m="cancel">Cancel</button><button class="btn primary" type="button" data-m="ok">Save</button></div>');
+      $('modal').querySelector('[data-m="ok"]').addEventListener('click', ev => { ev.stopPropagation(); S.passkeys[i].name = $('pk-re').value.trim() || S.passkeys[i].name; closeModal(); render(); }, { once: true });
+      break;
+    }
+    case 'del-pk': withPasskey('Removing "' + S.passkeys[i].name + '" needs one of your other passkeys.', () => { const n = S.passkeys.splice(i, 1)[0]; render(); toast('Removed ' + n.name); }); break;
+    case 'revoke': { const s = S.sessions.splice(i, 1)[0]; render(); toast('Signed out ' + s.dev); break; }
+    case 'revoke-all': S.sessions = S.sessions.filter(s => s.current); render(); toast('Signed out all other sessions'); break;
+    case 'regen': withPasskey('Generating new codes needs a passkey. Your remaining codes will stop working.', () => { S.codes = Array.from({ length: 10 }, () => ({ code: randCode(), used: false })); tmp.newCodes = true; render(); }); break;
+    case 'copy-codes': navigator.clipboard?.writeText(S.codes.map(c => c.code).join('\n')).then(() => toast('Copied'), () => toast('Copy was blocked here; select the codes instead.')); break;
+    case 'codes-done': tmp = {}; render(); break;
+    case 'new-share': tmp.form = true; render(); break;
+    case 'cancel-share': tmp = {}; render(); break;
+    case 'save-share': {
+      const w = $('sh-what').value, what = w === 'tag' ? 'Tag #' + $('sh-tag').value : w;
+      S.shares.push({ what, audience: 'public', people: [], ratings: $('sh-ratings').checked, link: 'mau.example.com/s/' + randCode().slice(0, 4) + '…' });
+      tmp = {}; render(); toast('Shared ' + what); break;
+    }
+    case 'copy-link': toast('Link copied'); break;
+    case 'new-link': S.shares[i].link = 'mau.example.com/s/' + randCode().slice(0, 4) + '…'; render(); toast('New link made. The old link no longer works.'); break;
+    case 'unshare': { const s = S.shares.splice(i, 1)[0]; render(); toast('Stopped sharing ' + s.what); break; }
+    case 'imp-read': {
+      const src = $('imp-src').value;
+      tmp.imp = src === 'csv' ? { step: 'map' } : { step: 'review', tab: 'matched', rows: SAMPLE_IMPORT };
+      render(); break;
+    }
+    case 'imp-match': tmp.imp = { step: 'review', tab: 'matched', rows: SAMPLE_IMPORT }; render(); break;
+    case 'imp-tab': tmp.imp.tab = t.dataset.k; render(); break;
+    case 'imp-cancel': tmp = {}; render(); break;
+    case 'imp-go': tmp = {}; render(); toast('Imported 6 books. Unfinished ones are at the top of your inactive books.'); break;
+    case 'export': toast(t.dataset.k + ' export would download now. Downloads are blocked in this mock.'); break;
+    case 'role': { const u = S.users[i]; u.role = u.role === 'admin' ? 'user' : 'admin'; S.audit.unshift({ t: 'Just now', a: S.me.username + (u.role === 'admin' ? ' promoted ' : ' removed admin from ') + u.name }); render(); break; }
+    case 'suspend': { const u = S.users[i]; u.status = u.status === 'suspended' ? 'active' : 'suspended'; S.audit.unshift({ t: 'Just now', a: S.me.username + (u.status === 'suspended' ? ' suspended ' : ' unsuspended ') + u.name }); render(); break; }
+    case 'rec-link': {
+      const u = S.users[i];
+      modal('<h3>Recovery link for @' + esc(u.name) + '</h3><p>Use this only if they\'ve lost all passkeys and recovery codes. The link works once, for 24 hours, and lets them add a new passkey. They\'ll be told it was used, and it\'s recorded in the audit log.</p>' +
+        '<div class="row-end"><button class="btn" type="button" data-m="cancel">Cancel</button><button class="btn primary" type="button" data-m="ok">Create link</button></div>', () => {
+          S.audit.unshift({ t: 'Just now', a: S.me.username + ' issued a recovery enrollment link for ' + u.name }); toast('Recovery link created and copied (mock).');
+        });
+      break;
+    }
+    case 'del-user': {
+      const u = S.users[i];
+      modal('<h3>Delete @' + esc(u.name) + '?</h3><p>Deletes their account and all ' + u.books + ' books with their history. This can\'t be undone. Suspending keeps their data.</p><div class="row-end"><button class="btn" type="button" data-m="cancel">Cancel</button><button class="btn danger" type="button" data-m="ok">Delete</button></div>', () => {
+        S.users.splice(i, 1); S.audit.unshift({ t: 'Just now', a: S.me.username + ' deleted ' + u.name }); render();
+      });
+      break;
+    }
+    case 'new-invite': S.invites.unshift({ link: 'mau.example.com/invite/' + randCode().slice(0, 4) + '…', by: S.me.username, expires: 'in 7 days' }); render(); toast('Invite link created'); break;
+    case 'revoke-inv': S.invites.splice(i, 1); render(); toast('Invite revoked'); break;
+    case 'up': case 'down': { const j = t.dataset.act === 'up' ? i - 1 : i + 1; [S.providers[i], S.providers[j]] = [S.providers[j], S.providers[i]]; render(); break; }
+    case 'q-edit': toast('Opens the same form as Shared catalog edits.'); break;
+    case 'q-merge': { const q = S.queue.splice(i, 1)[0]; render(); toast('Merged into ' + q.dupe + '. @' + q.by + '\'s book now links to it.'); break; }
+    case 'q-promote': { const q = S.queue.splice(i, 1)[0]; render(); toast(q.title + ' is now in the shared catalog.'); break; }
+    case 'q-reject': { const q = S.queue.splice(i, 1)[0]; render(); toast('Declined. It stays private to @' + q.by + '.'); break; }
+  }
+});
+document.querySelector('.app').addEventListener('change', e => {
+  if (e.target.name === 'mode') { S.signup = e.target.value; S.audit.unshift({ t: 'Just now', a: S.me.username + ' changed signup mode to ' + { open: 'Open', invite: 'Invite only', closed: 'Closed' }[S.signup] }); toast('Signup mode saved'); }
+  if (e.target.name === 'who') { S.inviteWho = e.target.value; toast('Saved'); }
+  if (e.target.id === 'sh-what') $('sh-tag-wrap').hidden = e.target.value !== 'tag';
+  if (e.target.dataset && e.target.dataset.act === 'prov-on') { S.providers[+e.target.dataset.i].on = e.target.checked; }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal-back').hidden) closeModal(); });
+
+render();
+</script>
+</body>
+</html>

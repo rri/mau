@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mau style board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,500;7..72,600&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=EB+Garamond:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: controls bar, then a grid of typeface cards each rendering the same compact rows. */
+  --bg: #f4efe6;
+  --surface: #fbf8f2;
+  --ink: #23201b;
+  --muted: #6e6658;
+  --line: #e2dacb;
+  --accent: #2f5d46;
+  --accent-soft: #e3ece4;
+  --good: #2f5d46;
+  color-scheme: light;
+}
+:root.dark {
+  --bg: #1b1915; --surface: #23201b; --ink: #ece4d6; --muted: #a99f8f; --line: #3a352d;
+  --accent-soft: #2a3a30;
+  color-scheme: dark;
+}
+:root[data-accent="bottle"] { --accent: #2f5d46; }
+:root[data-accent="fern"] { --accent: #4a6b2f; }
+:root[data-accent="teal"] { --accent: #1f5e5b; }
+:root.dark[data-accent="bottle"] { --accent: #8fc3a5; }
+:root.dark[data-accent="fern"] { --accent: #a9c483; }
+:root.dark[data-accent="teal"] { --accent: #7fc4bf; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 "Source Serif 4", Georgia, serif; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 24px 16px 80px; display: grid; gap: 20px; }
+header h1 { margin: 0; font-size: 26px; font-weight: 600; text-wrap: balance; }
+header p { margin: 6px 0 0; color: var(--muted); max-width: 70ch; }
+.controls { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.controls fieldset { border: 0; padding: 0; margin: 0; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.controls legend { float: left; margin-right: 8px; font-size: 13px; color: var(--muted); }
+.seg { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; font-size: 14px; display: inline-flex; gap: 6px; align-items: center; }
+.seg[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.sw { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.card .label { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.card .label b { font-size: 15px; }
+.card .label span { font-size: 12px; color: var(--muted); }
+.card .body { font-family: var(--f); }
+.apphead { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 14px 8px; }
+.apphead h2 { margin: 0; font-weight: 600; font-size: 22px; letter-spacing: .01em; }
+.apphead .b { font-size: 12px; color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
+.row { display: grid; grid-template-columns: 14px 32px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 7px 12px 7px 8px; border-top: 1px solid var(--line); min-height: 60px; position: relative; }
+.row.active::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--accent); }
+.grip { width: 14px; height: 24px; color: var(--muted); opacity: .6; }
+.cov { width: 32px; height: 46px; border-radius: 2px; box-shadow: 0 1px 3px rgb(0 0 0 / .25); }
+.t { font-weight: 600; font-size: 15px; line-height: 1.2; }
+.a { font-size: 12.5px; color: var(--muted); }
+.bar { height: 3px; background: var(--line); margin: 5px 0 3px; border-radius: 2px; overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--accent); }
+.row.idle .bar span { background: var(--muted); }
+.row.idle .t, .row.idle .cov { opacity: .7; }
+.m { display: flex; gap: 10px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums lining-nums; }
+.m b { color: var(--ink); font-weight: 500; }
+.m .td { color: var(--accent); font-weight: 500; }
+.acts { display: flex; gap: 6px; align-items: center; }
+.plus { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--accent); color: var(--surface); font-size: 24px; line-height: 1; display: grid; place-items: center; }
+.play { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--accent); display: grid; place-items: center; }
+.pause { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted); display: grid; place-items: center; }
+.sample { padding: 12px 14px 14px; border-top: 1px solid var(--line); display: grid; gap: 6px; }
+.sample .para { font-size: 15px; margin: 0; max-width: 60ch; }
+.sample .nums { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums lining-nums; }
+.sample .stars { color: var(--accent); letter-spacing: 2px; }
+
+.foot { color: var(--muted); font-size: 14px; max-width: 75ch; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>mau style board: Paper and print</h1>
+    <p>The same compact progress rows set in four serif typefaces. Switch the accent and light or dark to compare. Pick one typeface and one accent.</p>
+  </header>
+  <div class="controls">
+    <fieldset><legend>Accent</legend>
+      <button class="seg" type="button" data-accent="bottle"><span class="sw" style="background:#2f5d46"></span>Bottle green</button>
+      <button class="seg" type="button" data-accent="fern"><span class="sw" style="background:#4a6b2f"></span>Fern</button>
+      <button class="seg" type="button" data-accent="teal"><span class="sw" style="background:#1f5e5b"></span>Deep teal</button>
+    </fieldset>
+    <fieldset><legend>Mode</legend>
+      <button class="seg" type="button" data-mode="light">Light</button>
+      <button class="seg" type="button" data-mode="dark">Dark</button>
+    </fieldset>
+  </div>
+  <div class="grid" id="grid"></div>
+  <p class="foot">Covers here are flat color placeholders; real covers come from the catalog. The + is a 44px circle in compact density. Row height is 60px. All four typefaces are free (SIL Open Font License) and can be self-hosted with the app.</p>
+</div>
+
+<script>
+const FACES = [
+  { name: 'Literata', f: '"Literata", Georgia, serif', note: 'Designed for long-form e-reading. Sturdy at small sizes.' },
+  { name: 'Newsreader', f: '"Newsreader", Georgia, serif', note: 'Editorial, slightly condensed. Fits long titles.' },
+  { name: 'EB Garamond', f: '"EB Garamond", Garamond, Georgia, serif', note: 'Classic book face. Elegant, lighter, smaller x-height.' },
+  { name: 'Source Serif 4', f: '"Source Serif 4", Georgia, serif', note: 'Neutral and crisp. Closest to the current mocks.' }
+];
+const ROWS = [
+  { t: 'The Left Hand of Darkness', a: 'Ursula K. Le Guin', p: 140, n: 304, today: 12, active: true, c: '#5b4a7a' },
+  { t: 'Middlemarch', a: 'George Eliot', p: 299, n: 880, today: 0, active: true, c: '#8a5a3c', when: 'yesterday' },
+  { t: 'The Brothers Karamazov', a: 'Fyodor Dostoevsky', p: 310, n: 796, active: false, c: '#3d5a6e', when: '3 weeks ago' }
+];
+const grip = '<svg class="grip" viewBox="0 0 10 16" aria-hidden="true"><g fill="currentColor"><circle cx="3" cy="3" r="1.3"/><circle cx="7" cy="3" r="1.3"/><circle cx="3" cy="8" r="1.3"/><circle cx="7" cy="8" r="1.3"/><circle cx="3" cy="13" r="1.3"/><circle cx="7" cy="13" r="1.3"/></g></svg>';
+const pause = '<svg width="11" height="11" viewBox="0 0 14 14" aria-hidden="true"><rect x="3" y="2" width="3" height="10" rx="1" fill="currentColor"/><rect x="8" y="2" width="3" height="10" rx="1" fill="currentColor"/></svg>';
+const play = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.5v11a.6.6 0 0 0 .9.5l9-5.5a.6.6 0 0 0 0-1l-9-5.5a.6.6 0 0 0-.9.5z" fill="currentColor"/></svg>';
+
+document.getElementById('grid').innerHTML = FACES.map(face =>
+  '<section class="card" style="--f:' + face.f.replace(/"/g, '&quot;') + '"><div class="label"><b>' + face.name + '</b><span>' + face.note + '</span></div><div class="body">' +
+  '<div class="apphead"><h2>Reading</h2><span class="b">mau</span></div>' +
+  ROWS.map(r => '<div class="row ' + (r.active ? 'active' : 'idle') + '">' + grip + '<div class="cov" style="background:' + r.c + '"></div>' +
+    '<div><div class="t">' + r.t + '</div><div class="a">' + r.a + '</div><div class="bar"><span style="width:' + Math.round(100 * r.p / r.n) + '%"></span></div>' +
+    '<div class="m"><b>p. ' + r.p + ' / ' + r.n + '</b>' + (r.today ? '<span class="td">+' + r.today + ' pages today</span>' : '<span>last read ' + r.when + '</span>') + '</div></div>' +
+    '<div class="acts">' + (r.active ? '<span class="pause">' + pause + '</span><span class="plus">+</span>' : '<span class="play">' + play + '</span>') + '</div></div>').join('') +
+  '<div class="sample"><p class="para">Better the second time. The chapter structure alternating Anarres and Urras clicked on the re-read.</p>' +
+  '<div class="nums">Finished Mar 11, 2026 · 387 pages · 0123456789 · <span class="stars">★★★★★</span></div></div>' +
+  '</div></section>').join('');
+
+const root = document.documentElement;
+function sync() {
+  document.querySelectorAll('[data-accent]').forEach(b => { if (b.tagName === 'BUTTON') b.setAttribute('aria-pressed', b.dataset.accent === root.dataset.accent); });
+  document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', (b.dataset.mode === 'dark') === root.classList.contains('dark')));
+}
+document.querySelector('.controls').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.accent) root.dataset.accent = b.dataset.accent;
+  if (b.dataset.mode) root.classList.toggle('dark', b.dataset.mode === 'dark');
+  sync();
+});
+root.dataset.accent = 'bottle';
+if (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) root.classList.add('dark');
+sync();
+</script>
+</body>
+</html>

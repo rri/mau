@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mau progress view mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: phone-width app column beside a notes column; stacks on narrow screens. */
+  /* Paper and print: warm paper, Newsreader throughout, deep teal accent. */
+  --bg: #f4efe6;
+  --surface: #fbf8f2;
+  --ink: #23201b;
+  --muted: #6e6658;
+  --line: #e2dacb;
+  --accent: #1f5e5b;
+  --accent-soft: #e0ecea;
+  --good: #1f5e5b;
+  --good-soft: #e0ecea;
+  --font-ui: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-book: "Newsreader", Georgia, "Times New Roman", serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1b1915; --surface: #23201b; --ink: #ece4d6; --muted: #a99f8f; --line: #3a352d;
+    --accent: #7fc4bf; --accent-soft: #24393a; --good: #7fc4bf; --good-soft: #24393a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1b1915; --surface: #23201b; --ink: #ece4d6; --muted: #a99f8f; --line: #3a352d;
+  --accent: #7fc4bf; --accent-soft: #24393a; --good: #7fc4bf; --good-soft: #24393a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.45 var(--font-ui); font-variant-numeric: lining-nums; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.page { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 460px); gap: 32px; justify-content: center; padding: 24px 16px 96px; }
+@media (max-width: 900px) { .page { grid-template-columns: minmax(0, 480px); } }
+
+.app { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; align-self: start; position: relative; }
+.app-head { display: flex; align-items: baseline; justify-content: space-between; padding: 18px 18px 10px; border-bottom: 1px solid var(--line); }
+.app-head h1 { margin: 0; font: 600 23px/1.2 var(--font-ui); letter-spacing: .005em; }
+.app-head .brand { letter-spacing: .14em; text-transform: uppercase; font-size: 12px; }
+.app-head .brand { color: var(--muted); font-size: 13px; }
+.placeholder-link { color: var(--muted); font-size: 13px; border: 1px dashed var(--line); padding: 2px 8px; border-radius: 999px; }
+
+.list-wrap { position: relative; }
+ul.list { list-style: none; margin: 0; padding: 0; }
+.row { display: grid; grid-template-columns: 18px 32px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 60px; padding: 7px 12px 7px 6px; border-bottom: 1px solid var(--line); position: relative; background: var(--surface); transition: background-color .4s; }
+.row.active::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--accent); }
+.row.idle .title, .row.idle .cover { opacity: .72; }
+.row.bump { background: var(--accent-soft); }
+.row.done { background: var(--good-soft); }
+.row.dragging { z-index: 5; box-shadow: 0 8px 24px rgb(0 0 0 / .18); transition: none; }
+
+.handle { width: 18px; height: 40px; display: grid; place-items: center; border: 0; background: none; color: var(--muted); cursor: grab; touch-action: none; border-radius: 6px; padding: 0; }
+.handle:hover { color: var(--ink); background: var(--bg); }
+.row.dragging .handle { cursor: grabbing; }
+.drop-line { position: absolute; left: 8px; right: 8px; height: 3px; border-radius: 2px; background: var(--accent); pointer-events: none; z-index: 6; }
+.drop-line.inert { background: var(--muted); opacity: .5; }
+.drop-line[hidden] { display: none; }
+.drop-line span { position: absolute; right: 0; top: -22px; font-size: 12px; font-weight: 500; color: var(--surface); background: var(--accent); padding: 1px 7px; border-radius: 6px; white-space: nowrap; }
+.drop-line.inert span { background: var(--muted); }
+
+.cover { width: 32px; height: 46px; border-radius: 2px; box-shadow: 0 1px 3px rgb(0 0 0 / .25); display: grid; place-items: center; font: 600 13px var(--font-book); color: #fff; background: hsl(var(--h) 38% 42%); }
+.title { font: 600 15.5px/1.2 var(--font-book); text-wrap: balance; }
+.author { color: var(--muted); font-size: 13px; line-height: 1.25; }
+.bar { height: 3px; border-radius: 2px; background: var(--line); margin: 5px 0 3px; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .3s; }
+.row.idle .bar > span { background: var(--muted); }
+.row.done .bar > span { background: var(--good); }
+.bar.empty { background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 10px); }
+.meta { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: center; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pos { background: none; border: 0; padding: 2px 6px; margin-left: -6px; border-radius: 6px; color: var(--ink); font-weight: 500; cursor: text; text-decoration: underline dotted var(--muted); text-underline-offset: 3px; }
+.pos:hover { background: var(--accent-soft); }
+.pos-edit { width: 76px; padding: 2px 6px; border: 1px solid var(--accent); border-radius: 6px; background: var(--surface); }
+.of { color: var(--ink); }
+.link { background: none; border: 0; padding: 2px 4px; color: var(--accent); text-decoration: underline; cursor: pointer; font-size: 13px; }
+.today { color: var(--good); font-weight: 500; }
+.done-label { color: var(--good); font-weight: 600; }
+
+.actions { display: flex; gap: 6px; align-items: center; }
+.plus, .play { width: 44px; height: 44px; border-radius: 50%; cursor: pointer; display: grid; place-items: center; }
+.plus { border: 0; background: var(--accent); color: var(--surface); font-size: 25px; line-height: 1; }
+.play { border: 1px solid var(--line); background: transparent; color: var(--accent); }
+.plus:active, .play:active { transform: scale(.94); }
+.pause { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+.pause:hover { color: var(--ink); border-color: var(--muted); }
+
+.setup { grid-column: 2 / -1; display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.setup-title { font-size: 13px; font-weight: 600; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.seg button { flex: 1; padding: 7px 0; border: 0; background: transparent; cursor: pointer; font-size: 14px; }
+.seg button[aria-checked="true"] { background: var(--accent); color: var(--surface); }
+.fields label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); max-width: 200px; }
+.fields input { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-variant-numeric: tabular-nums; }
+.setup .hint { font-size: 13px; color: var(--muted); margin: 0; }
+.setup .err { color: #c0392b; font-size: 13px; }
+.setup-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.btn { padding: 8px 14px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
+.btn.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); font-weight: 500; }
+
+.toast { position: sticky; bottom: 12px; margin: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 14px; border-radius: 12px; background: var(--ink); color: var(--surface); font-size: 14px; overflow: hidden; }
+.toast[hidden] { display: none; }
+.toast button { background: transparent; border: 0; color: var(--surface); font-weight: 600; text-decoration: underline; cursor: pointer; padding: 4px 8px; }
+.toast .timer { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--accent); width: 100%; transform-origin: left; }
+.toast.run .timer { animation: drain 10s linear forwards; }
+@keyframes drain { to { transform: scaleX(0); } }
+.empty-state { padding: 32px 18px; color: var(--muted); text-align: center; }
+
+.notes { align-self: start; display: grid; gap: 22px; max-width: 62ch; }
+.notes h2 { margin: 0 0 6px; font: 600 13px var(--font-ui); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.notes h1 { margin: 0; font: 600 22px/1.25 var(--font-ui); text-wrap: balance; }
+.notes p { margin: 6px 0 0; color: var(--muted); }
+.notes ul, .notes ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.notes em { font-style: normal; color: var(--muted); }
+.notes .reset { justify-self: start; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+.edit-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.edit-group .pos-edit { width: 70px; }
+.btn.small { padding: 3px 10px; font-size: 13px; }
+.hint-fill { justify-self: start; padding: 0; }
+.fields label { max-width: 260px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <section class="app" aria-label="mau progress view">
+    <header class="app-head">
+      <div><div class="brand">mau</div><h1>Reading</h1></div>
+      <span class="placeholder-link" title="Navigation is not designed yet">Catalog</span>
+    </header>
+    <div class="list-wrap">
+      <ul class="list" id="list"></ul>
+      <div class="drop-line" id="drop-line" hidden><span id="drop-label"></span></div>
+    </div>
+    <div class="toast" id="toast" role="status" hidden><span id="toast-msg"></span><button id="toast-undo" type="button">Undo</button><div class="timer"></div></div>
+  </section>
+
+  <aside class="notes">
+    <div>
+      <h1>Progress view, styled</h1>
+      <p>The approved behavior in the chosen look: Paper and print, Newsreader, deep teal, compact rows, "page 140 of 304". Follows your system's light or dark mode.</p>
+    </div>
+    <div>
+      <h2>Try these</h2>
+      <ul>
+        <li>Tap <strong>+</strong> on <em>Middlemarch</em> a few times. Each tap is one page, and the row stays put.</li>
+        <li>Tap the page numbers on <em>Gödel, Escher, Bach</em>. Edit the current page, the total, or both.</li>
+        <li>Tap play on <em>Station Eleven</em> (not started). Setup asks for the page count.</li>
+        <li>Drag <em>Pale Fire</em> up between two inactive books. It stays inactive in its new spot.</li>
+        <li>Drag <em>The Brothers Karamazov</em> up between two active books. It becomes active there.</li>
+        <li>Drop an inactive book right below the last active book. It stays inactive, at the top of the inactive books.</li>
+        <li>Drag an active book down into the inactive books. It stays active and goes to the end of the active list.</li>
+        <li>Tap <strong>+</strong> on <em>A Wizard of Earthsea</em> (page 182 of 183) to finish it.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Approved decisions shown</h2>
+      <ul>
+        <li>One continuous list: active books first, then all other unfinished books.</li>
+        <li>Progress is always in pages. <strong>+</strong> appears only on active rows and adds 1 page.</li>
+        <li>The first activation of a book asks for its total pages, inline. Confirming starts it at page 0.</li>
+        <li>Tapping the progress edits the current page and the total pages as two separate fields.</li>
+        <li>Active books keep the order you drag them into. Play puts a book at the end of the active books.</li>
+        <li>The whole list is in one manual order, active books first. Nothing reorders itself: editing pages, including on inactive books, never moves a row.</li>
+        <li>Pausing puts a book at the top of the inactive books.</li>
+        <li>Every row has a drag handle. Dropping an inactive book between active books activates it there. Dragging an active book down leaves it active and moves it to the end of the active list. Dropping at the edge between active and inactive changes nothing about either.</li>
+        <li>The undo toast stays up for 10 seconds.</li>
+        <li>Reaching the total finishes the book with an undo toast, and it leaves the list.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Open questions for this screen</h2>
+      <ol>
+        <li>Should setup suggest the catalog's page count? <em>Mock: shows "Catalog lists 333 pages" as a button that fills the field; the field starts empty.</em></li>
+        <li>Lowering the total to or below the current page. <em>Mock: the current page is capped at the new total and the book finishes, with undo.</em></li>
+        <li>Dragging an unstarted book into the active area. <em>Mock: opens setup, and the book lands where you dropped it once you confirm.</em></li>
+        <li>Where does a newly added book go in this list? <em>Not in the mock; options are the top or the bottom of the inactive books.</em></li>
+        <li>A finished book's row: leave immediately, or stay until you reload the view? <em>Mock: leaves immediately.</em></li>
+        <li>Show "+N pages today" on rows? <em>Mock: yes.</em></li>
+        <li>Covers: real thumbnails, generated tiles, or none? <em>Mock: generated tiles.</em></li>
+        <li>Header: title only, or a daily summary or streak? <em>Mock: title only.</em></li>
+        <li>Navigation to the catalog: bottom tab bar or a header link? <em>Not designed yet.</em></li>
+        <li>How are active and inactive rows told apart? <em>Mock: active rows have a blue edge bar, pause, and a solid +; inactive rows have a dimmed title and a play button.</em></li>
+      </ol>
+    </div>
+    <button class="btn reset" id="reset" type="button">Reset mock data</button>
+  </aside>
+</div>
+
+<script>
+const HOUR = 36e5, DAY = 24 * HOUR;
+const TOAST_MS = 10000;
+
+function seed() {
+  const n = Date.now();
+  return {
+    order: ['lhod', 'mm', 'wiz', 'geb', 'se', 'bk', 'tfs', 'pf'],
+    books: [
+      { id: 'lhod', title: 'The Left Hand of Darkness', author: 'Ursula K. Le Guin', total: 304, pos: 140, catalogPages: 304, active: true, last: n - 2 * HOUR, started: true, today: 12 },
+      { id: 'mm', title: 'Middlemarch', author: 'George Eliot', total: 880, pos: 299, catalogPages: 904, active: true, last: n - DAY - 3 * HOUR, started: true, today: 0 },
+      { id: 'wiz', title: 'A Wizard of Earthsea', author: 'Ursula K. Le Guin', total: 183, pos: 182, catalogPages: 183, active: true, last: n - 2 * DAY, started: true, today: 0 },
+      { id: 'geb', title: 'Gödel, Escher, Bach', author: 'Douglas Hofstadter', total: 777, pos: 212, catalogPages: 824, active: true, last: n - 4 * DAY, started: true, today: 0 },
+      { id: 'se', title: 'Station Eleven', author: 'Emily St. John Mandel', total: null, pos: 0, catalogPages: 333, active: false, last: n - 5 * DAY, started: false, today: 0 },
+      { id: 'bk', title: 'The Brothers Karamazov', author: 'Fyodor Dostoevsky', total: 796, pos: 310, catalogPages: 796, active: false, last: n - 21 * DAY, started: true, today: 0 },
+      { id: 'tfs', title: 'Thinking, Fast and Slow', author: 'Daniel Kahneman', total: 499, pos: 160, catalogPages: 512, active: false, last: n - 63 * DAY, started: true, today: 0 },
+      { id: 'pf', title: 'Pale Fire', author: 'Vladimir Nabokov', total: null, pos: 0, catalogPages: null, active: false, last: n - 120 * DAY, started: false, today: 0 }
+    ]
+  };
+}
+
+let state = seed();
+let editingId = null;
+let setup = null; // { id, insertAt, error }
+let bumpId = null;
+let toastTimer = null, undoSnapshot = null;
+let drag = null;
+
+const $list = document.getElementById('list');
+const $toast = document.getElementById('toast');
+const $toastMsg = document.getElementById('toast-msg');
+const $drop = document.getElementById('drop-line');
+const $dropLabel = document.getElementById('drop-label');
+
+const clone = x => JSON.parse(JSON.stringify(x));
+const find = id => state.books.find(b => b.id === id);
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function hue(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+function initials(t) { return t.replace(/^(The|A|An) /, '').split(/\s+/).slice(0, 2).map(w => w[0]).join(''); }
+function fmtPos(pos, total) { return 'page ' + pos + ' of ' + total; }
+function pages(n) { return n + (n === 1 ? ' page' : ' pages'); }
+function ago(t) {
+  const d = Date.now() - t;
+  if (d < HOUR) return 'just now';
+  if (d < DAY) { const h = Math.round(d / HOUR); return h + (h === 1 ? ' hour ago' : ' hours ago'); }
+  const days = Math.round(d / DAY);
+  if (days === 1) return 'yesterday';
+  if (days < 14) return days + ' days ago';
+  if (days < 60) return Math.round(days / 7) + ' weeks ago';
+  return Math.round(days / 30) + ' months ago';
+}
+
+// One manual order for the whole list; active books always come first.
+function ordered() { return state.order.map(find); }
+function activeCount(excludeId) { return state.order.filter(id => id !== excludeId && find(id).active).length; }
+
+const playIcon = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11a.6.6 0 0 0 .9.5l9-5.5a.6.6 0 0 0 0-1l-9-5.5a.6.6 0 0 0-.9.5z" fill="currentColor"/></svg>';
+const pauseIcon = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="3" y="2" width="3" height="10" rx="1" fill="currentColor"/><rect x="8" y="2" width="3" height="10" rx="1" fill="currentColor"/></svg>';
+const gripIcon = '<svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true"><g fill="currentColor"><circle cx="3" cy="3" r="1.4"/><circle cx="7" cy="3" r="1.4"/><circle cx="3" cy="8" r="1.4"/><circle cx="7" cy="8" r="1.4"/><circle cx="3" cy="13" r="1.4"/><circle cx="7" cy="13" r="1.4"/></g></svg>';
+
+function setupHTML(b) {
+  return '<div class="setup">' +
+    '<div class="fields"><label for="setup-total">How many pages does your copy have?' +
+    '<input id="setup-total" type="number" inputmode="numeric" min="1" placeholder="Total pages"></label></div>' +
+    (b.catalogPages ? '<button class="link hint-fill" type="button" data-act="use-catalog" data-pages="' + b.catalogPages + '">Catalog lists ' + b.catalogPages + ' pages</button>' : '') +
+    (setup.error ? '<div class="err" role="alert">' + setup.error + '</div>' : '') +
+    '<div class="setup-actions"><button class="btn" type="button" data-act="cancel-setup">Cancel</button>' +
+    '<button class="btn primary" type="button" data-act="save-setup" data-id="' + b.id + '">Start reading</button></div></div>';
+}
+
+function rowHTML(b) {
+  const pct = b.started ? Math.round(100 * b.pos / b.total) : 0;
+  const cls = ['row', b.active ? 'active' : 'idle', b.justFinished ? 'done' : '', bumpId === b.id ? 'bump' : ''].join(' ');
+  const inSetup = setup && setup.id === b.id;
+  let meta;
+  if (b.justFinished) {
+    meta = '<span class="done-label">Finished</span>';
+  } else if (!b.started) {
+    meta = '<span>Not started</span><span>added ' + ago(b.last) + '</span>';
+  } else if (editingId === b.id) {
+    meta = '<span class="edit-group" data-id="' + b.id + '"><span class="of">page</span>' +
+      '<input class="pos-edit" id="pos-' + b.id + '" type="number" inputmode="numeric" min="0" value="' + b.pos + '" aria-label="Current page">' +
+      '<span class="of">of</span>' +
+      '<input class="pos-edit" id="total-' + b.id + '" type="number" inputmode="numeric" min="1" value="' + b.total + '" aria-label="Total pages">' +
+      '<button class="btn small primary" type="button" data-act="save-edit" data-id="' + b.id + '">Save</button></span>';
+  } else {
+    const posEl = '<button class="pos" type="button" data-act="edit" data-id="' + b.id + '" aria-label="Edit pages, currently ' + fmtPos(b.pos, b.total) + '">' + fmtPos(b.pos, b.total) + '</button>';
+    const when = b.pos === 0 && b.today === 0 ? '<span>no progress yet</span>'
+      : b.today > 0 ? '<span class="today">+' + pages(b.today) + ' today</span>'
+      : '<span>last read ' + ago(b.last) + '</span>';
+    meta = posEl + when;
+  }
+  let actions = '';
+  if (b.justFinished || inSetup) actions = '';
+  else if (b.active) actions =
+    '<button class="pause" type="button" data-act="pause" data-id="' + b.id + '" aria-label="Pause ' + esc(b.title) + '" title="Pause">' + pauseIcon + '</button>' +
+    '<button class="plus" type="button" data-act="plus" data-id="' + b.id + '" aria-label="' + esc('Add 1 page to ' + b.title) + '">+</button>';
+  else actions =
+    '<button class="play" type="button" data-act="play" data-id="' + b.id + '" aria-label="' + esc((b.started ? 'Resume ' : 'Start ') + b.title) + '" title="' + (b.started ? 'Resume' : 'Start') + '">' + playIcon + '</button>';
+
+  return '<li class="' + cls + '" data-id="' + b.id + '">' +
+    '<button class="handle" type="button" aria-label="Drag to reorder ' + esc(b.title) + '" title="Drag to reorder">' + gripIcon + '</button>' +
+    '<div class="cover" style="--h:' + hue(b.title) + '" aria-hidden="true">' + initials(b.title) + '</div>' +
+    '<div class="main"><div class="title">' + esc(b.title) + '</div><div class="author">' + esc(b.author) + '</div>' +
+    '<div class="bar' + (b.started ? '' : ' empty') + '"><span style="width:' + pct + '%"></span></div>' +
+    '<div class="meta">' + meta + '</div></div>' +
+    '<div class="actions">' + actions + '</div>' + (inSetup ? setupHTML(b) : '') + '</li>';
+}
+
+function render() {
+  const rows = ordered();
+  $list.innerHTML = rows.length ? rows.map(rowHTML).join('') : '<li class="empty-state">Nothing in progress. Everything on your list is finished.</li>';
+  if (editingId) { const i = document.getElementById('pos-' + editingId); if (i) { i.focus(); i.select(); } }
+  if (setup && document.activeElement === document.body) { const t = document.getElementById('setup-total'); if (t) t.focus(); }
+}
+
+function snapshot() { return clone(state); }
+function toast(msg, snap) {
+  undoSnapshot = snap;
+  $toastMsg.textContent = msg;
+  $toast.hidden = false;
+  $toast.classList.remove('run'); void $toast.offsetWidth; $toast.classList.add('run');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { $toast.hidden = true; undoSnapshot = null; }, TOAST_MS);
+}
+function flashBump(id) {
+  bumpId = id;
+  setTimeout(() => { if (bumpId === id) { bumpId = null; render(); } }, 700);
+}
+
+function placeAt(id, index) {
+  state.order = state.order.filter(x => x !== id);
+  state.order.splice(index, 0, id);
+}
+function activateAt(b, index) {
+  const n = activeCount(b.id);
+  b.active = true; b.last = Date.now();
+  placeAt(b.id, Math.max(0, Math.min(index, n)));
+  flashBump(b.id);
+}
+function deactivate(b) {
+  const n = activeCount(b.id);
+  b.active = false; b.last = Date.now();
+  placeAt(b.id, n); // top of the inactive books
+}
+function finish(b) {
+  b.finished = true; b.justFinished = true;
+  setTimeout(() => {
+    const x = find(b.id);
+    if (x && x.justFinished) { delete x.justFinished; x.active = false; state.order = state.order.filter(id => id !== b.id); render(); }
+  }, 1400);
+}
+function moveTo(b, to, snap, msg) {
+  b.today = Math.max(0, b.today + (to - b.pos));
+  b.pos = to; b.last = Date.now();
+  if (b.pos >= b.total) { finish(b); toast('Finished ' + b.title, snap); }
+  else toast(msg, snap);
+}
+
+function plus(id) {
+  const b = find(id), snap = snapshot();
+  moveTo(b, Math.min(b.total, b.pos + 1), snap, '+1 page on ' + b.title);
+  render();
+}
+function play(id, insertAt = Infinity) {
+  const b = find(id);
+  if (!b.started) { setup = { id, insertAt, error: null }; editingId = null; render(); return; }
+  const snap = snapshot();
+  activateAt(b, insertAt);
+  toast('Resumed ' + b.title + ' at ' + fmtPos(b.pos, b.total), snap);
+  render();
+}
+function pause(id) {
+  const b = find(id), snap = snapshot();
+  deactivate(b);
+  toast('Paused ' + b.title, snap);
+  render();
+}
+
+function saveSetup(id) {
+  const b = find(id);
+  const total = parseInt(document.getElementById('setup-total').value, 10);
+  if (!(total > 0)) { setup.error = 'Enter the number of pages in your copy.'; render(); return; }
+  const snap = snapshot();
+  Object.assign(b, { total, started: true, pos: 0, today: 0 });
+  const at = setup.insertAt;
+  setup = null;
+  activateAt(b, at);
+  toast('Started ' + b.title + ', ' + pages(total), snap);
+  render();
+}
+
+function commitEdit(id) {
+  const b = find(id);
+  const posEl = document.getElementById('pos-' + id), totEl = document.getElementById('total-' + id);
+  if (!posEl || !totEl) { editingId = null; render(); return; }
+  const posRaw = parseInt(posEl.value, 10);
+  const totRaw = parseInt(totEl.value, 10);
+  editingId = null;
+  const total = totRaw > 0 ? totRaw : b.total;
+  const pos = Number.isNaN(posRaw) ? b.pos : Math.max(0, Math.min(total, posRaw));
+  if (pos === b.pos && total === b.total) { render(); return; }
+  const snap = snapshot();
+  const parts = [];
+  if (pos !== b.pos) parts.push((pos < b.pos ? 'moved back to page ' : 'moved to page ') + pos);
+  if (total !== b.total) parts.push('total ' + b.total + ' → ' + total);
+  const msg = parts.join(', ');
+  b.total = total;
+  moveTo(b, pos, snap, msg.charAt(0).toUpperCase() + msg.slice(1));
+  render();
+}
+
+/* Clicks */
+$list.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]');
+  if (!t) return;
+  const id = t.dataset.id;
+  switch (t.dataset.act) {
+    case 'plus': plus(id); break;
+    case 'pause': pause(id); break;
+    case 'play': play(id); break;
+    case 'edit': editingId = id; setup = null; render(); break;
+    case 'save-edit': commitEdit(id); break;
+    case 'use-catalog': { const i = document.getElementById('setup-total'); i.value = t.dataset.pages; i.focus(); break; }
+    case 'cancel-setup': setup = null; render(); break;
+    case 'save-setup': saveSetup(id); break;
+  }
+});
+
+$list.addEventListener('keydown', e => {
+  if (e.target.classList.contains('pos-edit')) {
+    if (e.key === 'Enter') { e.preventDefault(); commitEdit(editingId); }
+    if (e.key === 'Escape') { editingId = null; render(); }
+  }
+  if (e.target.id === 'setup-total' && e.key === 'Enter') { e.preventDefault(); saveSetup(setup.id); }
+});
+// Commit when focus leaves the pair of page fields (moving between them doesn't commit).
+$list.addEventListener('focusout', e => {
+  const group = e.target.closest && e.target.closest('.edit-group');
+  if (!group || !editingId) return;
+  if (e.relatedTarget && group.contains(e.relatedTarget)) return;
+  commitEdit(editingId);
+});
+
+/* Drag to reorder */
+$list.addEventListener('pointerdown', e => {
+  const h = e.target.closest('.handle');
+  if (!h || e.button > 0) return;
+  e.preventDefault();
+  const li = h.closest('.row');
+  const id = li.dataset.id;
+  const others = [...$list.querySelectorAll('.row')].filter(r => r !== li).map(r => ({ id: r.dataset.id, top: r.offsetTop, h: r.offsetHeight }));
+  const nActive = others.filter(o => find(o.id).active).length;
+  drag = { id, li, startY: e.clientY, others, nActive, index: null };
+  h.setPointerCapture(e.pointerId);
+  li.classList.add('dragging');
+});
+$list.addEventListener('pointermove', e => {
+  if (!drag) return;
+  drag.li.style.transform = 'translateY(' + (e.clientY - drag.startY) + 'px)';
+  const y = e.clientY - $list.getBoundingClientRect().top;
+  let i = drag.others.findIndex(o => y < o.top + o.h / 2);
+  if (i === -1) i = drag.others.length;
+  drag.index = i;
+  const last = drag.others[drag.others.length - 1];
+  const lineY = i < drag.others.length ? drag.others[i].top : (last ? last.top + last.h : 0);
+  $drop.style.top = (lineY - 1) + 'px';
+  $drop.hidden = false;
+  const b = find(drag.id);
+  const bounce = b.active && i > drag.nActive;
+  $drop.classList.toggle('inert', bounce);
+  $dropLabel.textContent = bounce ? 'Stays active: goes to end of active'
+    : (!b.active && i < drag.nActive) ? (b.started ? 'Activate here' : 'Start here')
+    : 'Move here';
+});
+function endDrag(cancelled) {
+  if (!drag) return;
+  const { id, li, index, nActive } = drag;
+  drag = null;
+  li.style.transform = '';
+  li.classList.remove('dragging');
+  $drop.hidden = true;
+  if (cancelled || index === null) { render(); return; }
+  const b = find(id);
+  const cur = state.order.indexOf(id);
+  if (!b.active && index < nActive) { play(id, index); return; } // dropped among active books: activate there
+  const at = b.active ? Math.min(index, nActive) : Math.max(index, nActive);
+  if (at === cur) { render(); return; }
+  const snap = snapshot();
+  placeAt(id, at);
+  toast(b.active && index > nActive ? b.title + ' is still active, moved to the end of the active list' : 'Moved ' + b.title, snap);
+  render();
+}
+$list.addEventListener('pointerup', () => endDrag(false));
+$list.addEventListener('pointercancel', () => endDrag(true));
+
+document.getElementById('toast-undo').addEventListener('click', () => {
+  if (!undoSnapshot) return;
+  state = undoSnapshot; undoSnapshot = null;
+  $toast.hidden = true; clearTimeout(toastTimer);
+  editingId = null; setup = null;
+  render();
+});
+document.getElementById('reset').addEventListener('click', () => {
+  state = seed(); editingId = null; setup = null; $toast.hidden = true; render();
+});
+
+render();
+</script>
+</body>
+</html>

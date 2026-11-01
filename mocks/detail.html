@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mau book detail mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: phone-width app column (top bar, header, stacked sections, tab bar) beside a notes column. */
+  --bg: #eef0f3;
+  --surface: #ffffff;
+  --ink: #16181d;
+  --muted: #626a78;
+  --line: #dde1e8;
+  --accent: #2b54c7;
+  --accent-soft: #e5ebfb;
+  --good: #1f7a4d;
+  --danger: #b4322a;
+  --star: #c98a0b;
+  /* Sequential heatmap ramp (one hue, light to dark) */
+  --h0: #e8ebf0; --h1: #c3d0f2; --h2: #8ea6e6; --h3: #5076d4; --h4: #2445a8;
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-book: "Source Serif 4", Georgia, "Times New Roman", serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1014; --surface: #171a20; --ink: #e8eaee; --muted: #9aa2b1; --line: #2a2f39;
+    --accent: #8aa4ff; --accent-soft: #1e2640; --good: #5cc98f; --danger: #f07a70; --star: #f0b43c;
+    --h0: #232832; --h1: #263a6e; --h2: #3654a8; --h3: #5f82e6; --h4: #a9bdff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1014; --surface: #171a20; --ink: #e8eaee; --muted: #9aa2b1; --line: #2a2f39;
+  --accent: #8aa4ff; --accent-soft: #1e2640; --good: #5cc98f; --danger: #f07a70; --star: #f0b43c;
+  --h0: #232832; --h1: #263a6e; --h2: #3654a8; --h3: #5f82e6; --h4: #a9bdff;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--font-ui); }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.page { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 460px); gap: 32px; justify-content: center; padding: 24px 16px 96px; }
+@media (max-width: 900px) { .page { grid-template-columns: minmax(0, 480px); } }
+
+.app { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; align-self: start; position: relative; }
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 10px 4px; position: relative; }
+.ghost { background: none; border: 0; padding: 6px 8px; border-radius: 8px; cursor: pointer; color: var(--accent); }
+.ghost:hover { background: var(--accent-soft); }
+.menu { position: absolute; right: 10px; top: 46px; z-index: 10; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 28px rgb(0 0 0 / .16); display: grid; min-width: 190px; padding: 4px; }
+.menu[hidden] { display: none; }
+.menu button { text-align: left; background: none; border: 0; padding: 9px 12px; border-radius: 8px; cursor: pointer; }
+.menu button:hover { background: var(--bg); }
+.menu .danger { color: var(--danger); }
+
+.head { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; padding: 4px 18px 18px; align-items: end; }
+.art { aspect-ratio: 2 / 3; border-radius: 4px; overflow: hidden; box-shadow: 0 2px 10px rgb(0 0 0 / .22); background: var(--bg); }
+.art svg, .art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.head h1 { margin: 0; font: 600 22px/1.2 var(--font-book); text-wrap: balance; }
+.head .by { color: var(--muted); margin-top: 2px; }
+.head .pub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.override { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.override button { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font-size: 12px; }
+
+section.block { padding: 14px 18px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
+section.block h2 { margin: 0; font: 600 12px var(--font-ui); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+
+.status { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.pill.active { background: var(--accent-soft); color: var(--accent); }
+.pill.finished { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+.bar { height: 6px; border-radius: 3px; background: var(--line); margin: 8px 0 6px; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--accent); }
+.status.idle .bar > span { background: var(--muted); }
+.status.finished .bar > span { background: var(--good); }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pos { background: none; border: 0; padding: 2px 6px; margin-left: -6px; border-radius: 6px; color: var(--ink); font-weight: 500; cursor: text; text-decoration: underline dotted var(--muted); text-underline-offset: 3px; }
+.pos:hover { background: var(--accent-soft); }
+.edit-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.num { width: 70px; padding: 2px 6px; border: 1px solid var(--accent); border-radius: 6px; background: var(--surface); }
+.actions { display: flex; gap: 6px; align-items: center; }
+.plus, .play { min-width: 52px; height: 52px; border-radius: 14px; cursor: pointer; display: grid; place-items: center; }
+.plus { border: 0; background: var(--accent); color: var(--surface); font-size: 28px; line-height: 1; }
+.play { border: 1px solid var(--line); background: var(--accent-soft); color: var(--accent); padding: 0 12px; font-size: 14px; font-weight: 500; display: flex; gap: 6px; }
+.pause { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+
+.stars { display: flex; gap: 2px; }
+.star { background: none; border: 0; padding: 2px; cursor: pointer; color: var(--line); }
+.star.on { color: var(--star); }
+.star svg { display: block; }
+textarea { width: 100%; min-height: 80px; resize: vertical; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); line-height: 1.45; }
+.saved { font-size: 12px; color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+.tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tag { display: inline-flex; align-items: center; gap: 2px; padding: 3px 4px 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 13px; }
+.tag::before { content: "#"; opacity: .6; }
+.tag button { background: none; border: 0; color: inherit; cursor: pointer; padding: 0 5px; border-radius: 50%; line-height: 1.2; }
+.tag-box { position: relative; }
+.suggest { position: absolute; left: 0; top: calc(100% + 4px); z-index: 15; list-style: none; margin: 0; padding: 4px; min-width: 210px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgb(0 0 0 / .14); display: grid; gap: 1px; }
+.suggest[hidden] { display: none; }
+.suggest li { padding: 6px 10px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+.suggest li[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+.suggest .hint { color: var(--muted); font-size: 12px; cursor: default; }
+.suggest .new { color: var(--muted); }
+.tag-input { width: 110px; padding: 3px 10px; border: 1px dashed var(--line); border-radius: 999px; background: transparent; font-size: 13px; }
+
+.copies { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.copy { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.copy b { font-weight: 500; }
+.copy span { color: var(--muted); }
+.copy .ed { font-size: 12px; color: var(--muted); }
+.x { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+.x:hover { color: var(--danger); background: var(--bg); }
+.form { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.form label { display: grid; gap: 3px; font-size: 13px; color: var(--muted); }
+.form input, .form select { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.form .row { display: flex; justify-content: flex-end; gap: 8px; }
+.btn { padding: 7px 13px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
+.btn.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); font-weight: 500; }
+.btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); font-weight: 500; }
+.small-link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font-size: 13px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.empty-note { color: var(--muted); font-size: 13px; margin: 0; }
+
+.heat-wrap { overflow-x: auto; padding-bottom: 4px; position: relative; }
+.heat { display: grid; grid-auto-flow: column; grid-template-rows: 14px repeat(7, 11px); gap: 2px; width: max-content; }
+.heat .lbl { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: visible; width: 11px; }
+.cell { width: 11px; height: 11px; border-radius: 2px; background: var(--h0); }
+.cell.l1 { background: var(--h1); } .cell.l2 { background: var(--h2); } .cell.l3 { background: var(--h3); } .cell.l4 { background: var(--h4); }
+.cell.future { background: transparent; }
+.cell.today { outline: 1.5px solid var(--ink); outline-offset: 0; }
+.year { display: grid; gap: 3px; }
+.year-head { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.year-head b { color: var(--ink); font-weight: 600; }
+.months { display: grid; grid-template-columns: repeat(var(--w), 1fr); font-size: 9px; color: var(--muted); height: 12px; }
+.ygrid { display: grid; grid-template-columns: repeat(var(--w), 1fr); grid-template-rows: repeat(7, auto); grid-auto-flow: column; gap: 1.5px; }
+.ygrid .cell { width: auto; height: auto; aspect-ratio: 1; border-radius: 1.5px; }
+.cell.out { background: transparent; }
+.legend { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); justify-content: flex-end; }
+.legend .cell { display: inline-block; }
+.tip { position: fixed; pointer-events: none; z-index: 20; background: var(--ink); color: var(--surface); font-size: 12px; padding: 4px 8px; border-radius: 6px; white-space: nowrap; }
+.tip[hidden] { display: none; }
+.stats { display: flex; gap: 14px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stats b { color: var(--ink); font-weight: 600; }
+
+details.reading { border: 1px solid var(--line); border-radius: 10px; }
+details.reading summary { cursor: pointer; padding: 8px 12px; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; list-style: none; }
+details.reading summary::-webkit-details-marker { display: none; }
+details.reading summary::before { content: "›"; display: inline-block; width: 12px; color: var(--muted); transition: transform .15s; }
+details.reading[open] summary::before { transform: rotate(90deg); }
+details.reading summary span:first-of-type { flex: 1; font-weight: 500; }
+details.reading summary .when { color: var(--muted); font-size: 13px; }
+.days { list-style: none; margin: 0; padding: 0 12px 10px 24px; display: grid; gap: 2px; font-size: 13px; font-variant-numeric: tabular-nums; max-height: 240px; overflow-y: auto; }
+.days li { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 8px; }
+.days .d { color: var(--muted); }
+.days .delta { color: var(--good); font-weight: 500; }
+.days .back { color: var(--muted); font-style: italic; }
+
+.tabbar { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); background: var(--surface); }
+.tab { display: grid; justify-items: center; gap: 2px; padding: 8px 0 10px; font-size: 12px; color: var(--muted); background: none; border: 0; cursor: pointer; }
+.tab[aria-current="page"] { color: var(--accent); font-weight: 600; }
+
+.toast { position: sticky; bottom: 70px; margin: 0 12px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 14px; border-radius: 12px; background: var(--ink); color: var(--surface); font-size: 14px; }
+.toast[hidden] { display: none; }
+.toast button { background: transparent; border: 0; color: var(--surface); font-weight: 600; text-decoration: underline; cursor: pointer; padding: 4px 8px; }
+
+.dialog-back { position: absolute; inset: 0; background: rgb(0 0 0 / .4); display: grid; place-items: center; padding: 20px; z-index: 30; }
+.dialog-back[hidden] { display: none; }
+.dialog { background: var(--surface); border-radius: 14px; padding: 18px; display: grid; gap: 12px; max-width: 340px; }
+.dialog h3 { margin: 0; font-size: 17px; }
+.dialog p { margin: 0; color: var(--muted); font-size: 14px; }
+.dialog .row { display: flex; justify-content: flex-end; gap: 8px; }
+.removed { padding: 60px 24px; text-align: center; color: var(--muted); display: grid; gap: 12px; justify-items: center; }
+
+.notes { align-self: start; display: grid; gap: 22px; max-width: 62ch; }
+.notes h2 { margin: 0 0 6px; font: 600 13px var(--font-ui); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.notes h1 { margin: 0; font: 600 22px/1.25 var(--font-ui); text-wrap: balance; }
+.notes p { margin: 6px 0 0; color: var(--muted); }
+.notes ul, .notes ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.notes em { font-style: normal; color: var(--muted); }
+.switch { display: flex; gap: 8px; flex-wrap: wrap; }
+.switch .btn[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <section class="app" aria-label="mau book detail" id="app"></section>
+
+  <aside class="notes">
+    <div>
+      <h1>Book detail, mock 3</h1>
+      <p>Opened by tapping a book in the catalog. The visual style is a placeholder.</p>
+    </div>
+    <div>
+      <h2>Example book</h2>
+      <div class="switch" id="switch">
+        <button class="btn" type="button" data-book="lhod">Active: The Left Hand of Darkness</button>
+        <button class="btn" type="button" data-book="disp">Finished twice: The Dispossessed</button>
+      </div>
+    </div>
+    <div>
+      <h2>Try these</h2>
+      <ul>
+        <li>Tap <strong>+</strong> and watch today's square in the activity calendar darken.</li>
+        <li>Set a rating, then tap the same star again to clear it.</li>
+        <li>Type "fa" in the tag field. It suggests #fantasy and #favorites; Enter picks the highlighted one. Typing a tag that doesn't exist offers "Create new tag" exactly as typed.</li>
+        <li>Add and remove copies, choosing an edition. "Owned" follows from having a copy.</li>
+        <li>On <em>The Dispossessed</em>, tap <strong>Re-read</strong> to start a third reading.</li>
+        <li>Open the ⋯ menu for <strong>Edit details</strong> (including a cover upload) and <strong>Remove from list</strong>.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Approved decisions shown</h2>
+      <ul>
+        <li>One 1–5 star rating and one notes field per book. Tapping the current star clears it.</li>
+        <li>Copies record format and location only. No lending.</li>
+        <li>One activity calendar for the whole book: one row per year with reading, skipping empty years. Legend is just Less … More. Daily summaries below.</li>
+        <li>Each copy shows its edition.</li>
+        <li>The tag field autocompletes existing tags as you type. No fuzzy matching or correction: tags match verbatim.</li>
+        <li>Section order, autosaving notes, Edit details fields (title, author, cover), the remove confirmation, and the header line are approved as mocked.</li>
+        <li>The same activate, pause, +, and page-edit controls as the progress view.</li>
+        <li>Activating a finished book starts a re-read at page 0 with the same total.</li>
+        <li>Edit details is a personal override, including uploading your own cover.</li>
+        <li>Removing a book deletes it permanently after confirmation.</li>
+        <li>No cover image falls back to a generated book cover with the title and author.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Open questions for this screen</h2>
+      <ol>
+        <li>Format and edition overlap: an edition is usually already a paperback, hardcover, or ebook. Should picking an edition fill in the format automatically, with format chosen by hand only for "Unknown edition"? <em>Mock: both chosen separately.</em></li>
+        <li>What a copy's edition line shows. <em>Mock: publisher, binding, and year. ISBN could be added. The edition names here are made-up examples.</em></li>
+        <li>Where the list of editions in "Add copy" comes from. <em>Proposal: editions of this work from the online catalog, plus any added by ISBN scan or by hand. Belongs with the add-book flow.</em></li>
+        <li>Tags are saved exactly as typed, so "Sci-Fi" and "sci-fi" are different tags. Autocomplete finds existing tags regardless of case, so you'd normally pick the existing one. <em>As mocked.</em></li>
+      </ol>
+    </div>
+  </aside>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+const DAY = 864e5;
+const TODAY = (() => { const d = new Date(); d.setHours(12, 0, 0, 0); return d; })();
+const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const parse = s => new Date(s + 'T12:00:00');
+const fmt = (s, withYear = true) => parse(s).toLocaleDateString('en-US', withYear ? { month: 'short', day: 'numeric', year: 'numeric' } : { month: 'short', day: 'numeric' });
+
+// Deterministic pseudo-random daily logs for the examples.
+function rng(seed) { return () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }; }
+function makeLog(start, endPos, endDate, seed, extra) {
+  const r = rng(seed), days = [];
+  let pos = 0, d = parse(start);
+  const end = parse(endDate);
+  while (pos < endPos && d <= end) {
+    if (r() < 0.62) {
+      const remainingDays = Math.max(1, Math.round((end - d) / DAY));
+      const n = Math.max(2, Math.min(endPos - pos, Math.round((endPos - pos) / remainingDays * (0.6 + r() * 1.6))));
+      days.push({ date: iso(d), from: pos, to: pos + n }); pos += n;
+    }
+    d = new Date(+d + DAY);
+  }
+  if (pos < endPos) { days.push({ date: endDate, from: pos, to: endPos }); }
+  if (extra) extra(days);
+  return days;
+}
+
+function seed() {
+  const t = iso(TODAY);
+  const lhodStart = iso(new Date(+TODAY - 27 * DAY));
+  const lhodLog = makeLog(lhodStart, 128, iso(new Date(+TODAY - DAY)), 7, days => {
+    const i = Math.floor(days.length / 2);
+    const back = { date: days[i].date, from: days[i].to, to: days[i].to - 8, rewind: true };
+    days.splice(i + 1, 0, back);
+    for (let k = i + 2; k < days.length; k++) { days[k].from -= 8; days[k].to -= 8; }
+    const last = days[days.length - 1];
+    days.push({ date: iso(new Date(+TODAY - DAY)) === last.date ? iso(new Date(+TODAY - DAY)) : last.date, from: last.to, to: 128 });
+  });
+  lhodLog.push({ date: t, from: 128, to: 140 });
+  const done = (start, total, end, seedN) => { const log = makeLog(start, total, end, seedN); return { start, finish: log[log.length - 1].date, total, pos: total, log }; };
+  return {
+    lhod: {
+      title: 'The Left Hand of Darkness', author: 'Ursula K. Le Guin', year: 1969, override: null,
+      state: 'active', rating: 0, notes: '', tags: ['sci-fi', 'classics'],
+      editions: ['Ace paperback, 1987', 'Ace hardcover, 2000', 'Penguin Modern Classics, 2018'],
+      copies: [{ format: 'Paperback', location: 'Living room, shelf 3', edition: 'Ace paperback, 1987' }],
+      readings: [{ start: lhodStart, finish: null, total: 304, pos: 140, log: lhodLog }]
+    },
+    disp: {
+      title: 'The Dispossessed', author: 'Ursula K. Le Guin', year: 1974, override: null,
+      state: 'finished', rating: 5, notes: 'Better the second time. The chapter structure alternating Anarres and Urras clicked on the re-read.', tags: ['sci-fi', 'classics'],
+      editions: ['Harper Voyager paperback, 2002', 'Avon paperback, 1975', 'Ebook edition, 2014'],
+      copies: [{ format: 'Paperback', location: 'Bedroom', edition: 'Harper Voyager paperback, 2002' }, { format: 'Ebook', location: 'Kobo', edition: 'Ebook edition, 2014' }],
+      readings: [
+        done('2019-05-06', 387, '2019-06-20', 11),
+        done('2026-02-02', 387, '2026-03-11', 23)
+      ]
+    }
+  };
+}
+
+let all = seed();
+let current = 'lhod';
+let ui = { menu: false, editPages: false, addCopy: false, editDetails: false, confirmRemove: false, removed: false, saved: false };
+let undoSnap = null, toastTimer = null;
+
+const $app = document.getElementById('app');
+const $tip = document.getElementById('tip');
+const book = () => all[current];
+const reading = () => book().readings[book().readings.length - 1];
+const clone = x => JSON.parse(JSON.stringify(x));
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function hue(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+
+// Generated cover: looks like a book jacket with title and author.
+function wrap(text, max) {
+  const lines = []; let cur = '';
+  for (const w of text.split(' ')) { if ((cur + ' ' + w).trim().length > max && cur) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); }
+  return lines.concat(cur);
+}
+function coverArt(title, author) {
+  const h = hue(title), style = h % 4;
+  const bg = 'hsl(' + h + ' 42% 30%)', fg = 'hsl(' + ((h + 40) % 360) + ' 70% 86%)', mid = 'hsl(' + ((h + 180) % 360) + ' 55% 58%)';
+  const lines = wrap(title.toUpperCase(), 11);
+  let art = '';
+  if (style === 0) art = '<circle cx="100" cy="128" r="62" fill="' + mid + '" opacity=".85"/><circle cx="100" cy="128" r="38" fill="' + bg + '"/>';
+  else if (style === 1) art = [0, 1, 2, 3, 4, 5].map(i => '<rect x="0" y="' + (98 + i * 18) + '" width="200" height="9" fill="' + mid + '" opacity="' + (0.9 - i * 0.13) + '"/>').join('');
+  else if (style === 2) art = '<path d="M0 210 L60 120 L95 165 L140 95 L200 190 L200 300 L0 300Z" fill="' + mid + '" opacity=".8"/><circle cx="150" cy="70" r="16" fill="' + fg + '"/>';
+  else art = '<rect x="22" y="22" width="156" height="256" fill="none" stroke="' + fg + '" stroke-width="2"/><path d="M100 90 L140 150 L100 210 L60 150Z" fill="' + mid + '"/>';
+  const titleY = style === 3 ? 238 : style === 2 ? 50 : 232;
+  const text = lines.map((l, i) => '<text x="100" y="' + (titleY + i * 20 - (lines.length - 1) * 10) + '" text-anchor="middle" font-family="Source Serif 4, Georgia, serif" font-weight="600" font-size="17" letter-spacing="1" fill="' + fg + '">' + esc(l) + '</text>').join('');
+  const by = '<text x="100" y="' + (style === 3 ? 262 : 280) + '" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" letter-spacing="1.5" fill="' + fg + '" opacity=".85">' + esc(author.toUpperCase()) + '</text>';
+  return '<svg viewBox="0 0 200 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="200" height="300" fill="' + bg + '"/><rect x="0" y="0" width="7" height="300" fill="#000" opacity=".18"/>' + art + text + by + '</svg>';
+}
+
+const icons = {
+  pause: '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="3" y="2" width="3" height="10" rx="1" fill="currentColor"/><rect x="8" y="2" width="3" height="10" rx="1" fill="currentColor"/></svg>',
+  play: '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11a.6.6 0 0 0 .9.5l9-5.5a.6.6 0 0 0 0-1l-9-5.5a.6.6 0 0 0-.9.5z" fill="currentColor"/></svg>',
+  star: '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.2l-5.7 3.1 1.2-6.4L2.8 9.5l6.4-.8z" fill="currentColor"/></svg>'
+};
+
+function shown() { const b = book(); return { title: b.override?.title || b.title, author: b.override?.author || b.author, cover: b.override?.cover || null }; }
+
+function statusHTML() {
+  const b = book(), r = reading();
+  const pct = Math.round(100 * r.pos / r.total);
+  const label = b.state === 'active' ? 'Active' : b.state === 'finished' ? 'Finished' : 'Inactive';
+  let meta;
+  if (ui.editPages) {
+    meta = '<span class="edit-group"><span>p.</span><input class="num" id="ep-pos" type="number" inputmode="numeric" min="0" value="' + r.pos + '" aria-label="Current page"><span>/</span>' +
+      '<input class="num" id="ep-total" type="number" inputmode="numeric" min="1" value="' + r.total + '" aria-label="Total pages">' +
+      '<button class="btn primary" type="button" data-act="save-pages">Save</button><button class="btn" type="button" data-act="cancel-pages">Cancel</button></span>';
+  } else if (b.state === 'finished') {
+    meta = '<span>Finished ' + fmt(r.finish) + '</span>';
+  } else {
+    const today = r.log.filter(x => x.date === iso(new Date())).reduce((s, x) => s + (x.to - x.from), 0);
+    meta = '<button class="pos" type="button" data-act="edit-pages" aria-label="Edit pages">p. ' + r.pos + ' / ' + r.total + '</button>' + (today > 0 ? '<span style="color:var(--good);font-weight:500">+' + today + ' pages today</span>' : '');
+  }
+  let actions = '';
+  if (b.state === 'active') actions = '<button class="pause" type="button" data-act="pause" aria-label="Pause" title="Pause">' + icons.pause + '</button><button class="plus" type="button" data-act="plus" aria-label="Add 1 page">+</button>';
+  else if (b.state === 'finished') actions = '<button class="play" type="button" data-act="reread">' + icons.play + 'Re-read</button>';
+  else actions = '<button class="play" type="button" data-act="play" aria-label="Activate">' + icons.play + '</button>';
+  return '<section class="block"><div class="status ' + (b.state === 'active' ? '' : b.state) + (b.state === 'inactive' ? ' idle' : '') + '"><div>' +
+    '<span class="pill ' + b.state + '">' + label + '</span>' +
+    '<div class="bar"><span style="width:' + pct + '%"></span></div><div class="meta">' + meta + '</div></div>' +
+    '<div class="actions">' + (ui.editPages ? '' : actions) + '</div></div></section>';
+}
+
+function ratingHTML() {
+  const b = book();
+  return '<section class="block"><h2>Rating and notes <span class="saved" id="saved">' + (ui.saved ? 'Saved' : '') + '</span></h2>' +
+    '<div class="stars" role="radiogroup" aria-label="Rating">' + [1, 2, 3, 4, 5].map(n =>
+      '<button class="star' + (n <= b.rating ? ' on' : '') + '" type="button" role="radio" aria-checked="' + (n === b.rating) + '" data-act="rate" data-n="' + n + '" aria-label="' + n + (n === 1 ? ' star' : ' stars') + '">' + icons.star + '</button>').join('') + '</div>' +
+    '<label for="notes" class="saved" style="display:none">Notes</label><textarea id="notes" placeholder="Private notes about this book">' + esc(b.notes) + '</textarea></section>';
+}
+
+function tagsHTML() {
+  const b = book();
+  return '<section class="block"><h2>Tags</h2><div class="tags">' + b.tags.map((t, i) =>
+    '<span class="tag">' + esc(t) + '<button type="button" data-act="untag" data-i="' + i + '" aria-label="Remove tag ' + esc(t) + '">×</button></span>').join('') +
+    '<span class="tag-box"><input class="tag-input" id="tag-input" placeholder="+ add tag" aria-label="Add tag" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="suggest"><ul class="suggest" id="suggest" role="listbox" hidden></ul></span></div></section>';
+}
+
+function copiesHTML() {
+  const b = book();
+  const list = b.copies.length
+    ? '<ul class="copies">' + b.copies.map((c, i) => '<li class="copy"><div><b>' + esc(c.format) + '</b> · <span>' + esc(c.location || 'No location') + '</span><div class="ed">' + esc(c.edition || 'Unknown edition') + '</div></div><button class="x" type="button" data-act="del-copy" data-i="' + i + '" aria-label="Remove this copy">×</button></li>').join('') + '</ul>'
+    : '<p class="empty-note">You don\'t own a copy. Add one to mark this book as owned.</p>';
+  const form = ui.addCopy ? '<div class="form"><label for="cf-format">Format<select id="cf-format"><option>Hardcover</option><option selected>Paperback</option><option>Ebook</option><option>Audiobook</option></select></label>' +
+    '<label for="cf-ed">Edition<select id="cf-ed">' + b.editions.map(e => '<option>' + esc(e) + '</option>').join('') + '<option value="">Unknown edition</option></select></label>' +
+    '<label for="cf-loc">Location<input id="cf-loc" placeholder="e.g. Office, top shelf"></label>' +
+    '<div class="row"><button class="btn" type="button" data-act="cancel-copy">Cancel</button><button class="btn primary" type="button" data-act="save-copy">Add copy</button></div></div>' : '';
+  return '<section class="block"><h2><span>Copies' + (b.copies.length ? ' · owned' : '') + '</span>' + (ui.addCopy ? '' : '<button class="small-link" type="button" data-act="add-copy">+ Add copy</button>') + '</h2>' + list + form + '</section>';
+}
+
+function level(p) { return p <= 0 ? 0 : p < 10 ? 1 : p < 25 ? 2 : p < 50 ? 3 : 4; }
+function activityHTML() {
+  const b = book();
+  const perDay = {};
+  b.readings.forEach(r => r.log.forEach(x => { if (!x.rewind && x.to > x.from) perDay[x.date] = (perDay[x.date] || 0) + (x.to - x.from); }));
+  const now = new Date(); now.setHours(12, 0, 0, 0);
+  // One row per year that has reading activity (plus the current year while a reading is open). Empty years are skipped.
+  const years = new Set(Object.keys(perDay).map(k => +k.slice(0, 4)));
+  if (b.readings.some(r => !r.finish)) years.add(now.getFullYear());
+  const MONTHS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+  const yearRows = [...years].sort((a, c) => c - a).map(y => {
+    const jan1 = new Date(y, 0, 1, 12), dec31 = new Date(y, 11, 31, 12);
+    const start = new Date(+jan1 - ((jan1.getDay() + 6) % 7) * DAY);
+    const cells = [], months = [];
+    let col = 0, yearPages = 0;
+    for (let w = new Date(start); w <= dec31; w = new Date(+w + 7 * DAY), col++) {
+      for (let d = 0; d < 7; d++) {
+        const day = new Date(+w + d * DAY);
+        if (day.getFullYear() !== y) { cells.push('<div class="cell out"></div>'); continue; }
+        if (day.getDate() === 1) months.push('<span style="grid-column:' + (col + 1) + '">' + MONTHS[day.getMonth()] + '</span>');
+        if (day > now) { cells.push('<div class="cell future"></div>'); continue; }
+        const k = iso(day), p = perDay[k] || 0;
+        yearPages += p;
+        cells.push('<div class="cell l' + level(p) + (k === iso(now) ? ' today' : '') + '" data-tip="' + fmt(k) + ': ' + (p ? p + (p === 1 ? ' page' : ' pages') : 'no reading') + '"></div>');
+      }
+    }
+    return '<div class="year" style="--w:' + col + '"><div class="year-head"><b>' + y + '</b><span>' + yearPages + ' pages</span></div>' +
+      '<div class="months" aria-hidden="true">' + months.join('') + '</div>' +
+      '<div class="ygrid" role="img" aria-label="Pages read per day in ' + y + '">' + cells.join('') + '</div></div>';
+  }).join('');
+  const totalPages = Object.values(perDay).reduce((a, c) => a + c, 0);
+  const daysRead = Object.keys(perDay).length;
+  const legend = '<div class="legend">Less <span class="cell"></span><span class="cell l1"></span><span class="cell l2"></span><span class="cell l3"></span><span class="cell l4"></span> More</div>';
+
+  const readings = b.readings.map((r, i) => {
+    const isLast = i === b.readings.length - 1;
+    const byDay = [];
+    r.log.forEach(x => {
+      const prev = byDay[byDay.length - 1];
+      if (!x.rewind && prev && prev.date === x.date && !prev.rewind) { prev.to = x.to; }
+      else byDay.push(Object.assign({}, x));
+    });
+    const lines = byDay.slice().reverse().map(x => x.rewind
+      ? '<li><span class="d">' + fmt(x.date, false) + '</span><span class="back">moved back p. ' + x.from + ' → ' + x.to + '</span><span></span></li>'
+      : '<li><span class="d">' + fmt(x.date, false) + '</span><span>p. ' + x.from + ' → ' + x.to + '</span><span class="delta">+' + (x.to - x.from) + '</span></li>').join('');
+    const when = fmt(r.start) + ' – ' + (r.finish ? fmt(r.finish) : 'now');
+    return '<details class="reading"' + (isLast ? ' open' : '') + '><summary><span>Reading ' + (i + 1) + (r.finish ? ' · finished' : '') + '</span><span class="when">' + when + '</span></summary>' +
+      '<ul class="days">' + (lines || '<li><span class="d"></span><span class="back">No progress yet</span><span></span></li>') + '</ul></details>';
+  }).reverse().join('');
+
+  return '<section class="block"><h2>Reading activity</h2>' +
+    '<div class="stats"><span><b>' + daysRead + '</b> days read</span><span><b>' + totalPages + '</b> pages</span><span><b>' + b.readings.length + '</b> ' + (b.readings.length === 1 ? 'reading' : 'readings') + '</span></div>' +
+    yearRows + legend + readings + '</section>';
+}
+
+function detailsFormHTML() {
+  const s = shown();
+  return '<section class="block"><h2>Edit details (only for you)</h2><div class="form">' +
+    '<label for="ed-title">Title<input id="ed-title" value="' + esc(s.title) + '"></label>' +
+    '<label for="ed-author">Author<input id="ed-author" value="' + esc(s.author) + '"></label>' +
+    '<label for="ed-cover">Cover image<input id="ed-cover" type="file" accept="image/*"></label>' +
+    '<div class="row"><button class="btn" type="button" data-act="cancel-details">Cancel</button><button class="btn primary" type="button" data-act="save-details">Save</button></div></div></section>';
+}
+
+function render() {
+  const b = book(), s = shown();
+  document.querySelectorAll('#switch .btn').forEach(x => x.setAttribute('aria-pressed', x.dataset.book === current));
+  if (ui.removed) {
+    $app.innerHTML = '<div class="removed"><strong>Removed from your list.</strong><span>In the app you\'d be back in the catalog now.</span><button class="btn" type="button" data-act="restore-demo">Reset mock</button></div>';
+    return;
+  }
+  const r = reading();
+  $app.innerHTML =
+    '<div class="topbar"><button class="ghost" type="button" data-act="back">‹ Catalog</button>' +
+    '<button class="ghost" type="button" data-act="menu" aria-haspopup="true" aria-expanded="' + ui.menu + '" aria-label="More actions">⋯</button>' +
+    '<div class="menu" ' + (ui.menu ? '' : 'hidden') + '><button type="button" data-act="edit-details">Edit details</button><button type="button" class="danger" data-act="ask-remove">Remove from list</button></div></div>' +
+    '<div class="head"><div class="art">' + (s.cover ? '<img src="' + s.cover + '" alt="">' : coverArt(s.title, s.author)) + '</div>' +
+    '<div><h1>' + esc(s.title) + '</h1><div class="by">' + esc(s.author) + '</div><div class="pub">First published ' + b.year + '</div>' +
+    (b.override ? '<div class="override">You\'ve edited these details. <button type="button" data-act="reset-override">Reset to catalog</button></div>' : '') + '</div></div>' +
+    (ui.editDetails ? detailsFormHTML() : '') +
+    statusHTML() + ratingHTML() + tagsHTML() + copiesHTML() + activityHTML() +
+    '<div class="toast" id="toast" role="status" hidden><span id="toast-msg"></span><button type="button" data-act="undo">Undo</button></div>' +
+    '<nav class="tabbar" aria-label="Main"><button class="tab" type="button" data-act="tab">Reading</button><button class="tab" type="button" aria-current="page">Catalog</button><button class="tab" type="button" data-act="tab">Settings</button></nav>' +
+    '<div class="dialog-back" ' + (ui.confirmRemove ? '' : 'hidden') + '><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-h"><h3 id="dlg-h">Remove ' + esc(s.title) + '?</h3>' +
+    '<p>This permanently deletes ' + b.readings.length + (b.readings.length === 1 ? ' reading' : ' readings') + ' with their activity, your rating, notes, ' + b.copies.length + (b.copies.length === 1 ? ' copy' : ' copies') + ' and ' + b.tags.length + (b.tags.length === 1 ? ' tag' : ' tags') + '. This can\'t be undone.</p>' +
+    '<div class="row"><button class="btn" type="button" data-act="cancel-remove">Cancel</button><button class="btn danger" type="button" data-act="remove">Remove</button></div></div></div>';
+  if (ui.editPages) { const i = document.getElementById('ep-pos'); i.focus(); i.select(); }
+  if (toastMsg) showToast();
+}
+
+let toastMsg = null;
+function toast(msg, snap) { toastMsg = msg; undoSnap = snap; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastMsg = null; undoSnap = null; const t = document.getElementById('toast'); if (t) t.hidden = true; }, 10000); showToast(); }
+function showToast() { const t = document.getElementById('toast'); if (!t) return; document.getElementById('toast-msg').textContent = toastMsg; t.hidden = false; }
+
+function logMove(r, to) {
+  const t = iso(new Date());
+  r.log.push(to < r.pos ? { date: t, from: r.pos, to, rewind: true } : { date: t, from: r.pos, to });
+  r.pos = to;
+  if (r.pos >= r.total) { r.finish = t; book().state = 'finished'; return true; }
+  return false;
+}
+
+$app.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]');
+  if (!t) { if (ui.menu) { ui.menu = false; render(); } return; }
+  const b = book(), r = reading();
+  const act = t.dataset.act;
+  if (act !== 'menu' && ui.menu && act !== 'edit-details' && act !== 'ask-remove') ui.menu = false;
+  switch (act) {
+    case 'menu': ui.menu = !ui.menu; break;
+    case 'back': case 'tab': toast('That screen is a separate mock.', null); return;
+    case 'plus': { const snap = clone(all); const done = logMove(r, Math.min(r.total, r.pos + 1)); toast(done ? 'Finished ' + shown().title : '+1 page', snap); break; }
+    case 'pause': { const snap = clone(all); b.state = 'inactive'; toast('Paused', snap); break; }
+    case 'play': { const snap = clone(all); b.state = 'active'; toast('Activated. It\'s at the end of your active books.', snap); break; }
+    case 'reread': { const snap = clone(all); b.readings.push({ start: iso(new Date()), finish: null, total: r.total, pos: 0, log: [] }); b.state = 'active'; toast('Started reading ' + (b.readings.length) + ' at page 0', snap); break; }
+    case 'edit-pages': ui.editPages = true; break;
+    case 'cancel-pages': ui.editPages = false; break;
+    case 'save-pages': {
+      const p = parseInt(document.getElementById('ep-pos').value, 10), tot = parseInt(document.getElementById('ep-total').value, 10);
+      const snap = clone(all);
+      if (tot > 0) r.total = tot;
+      const to = Number.isNaN(p) ? r.pos : Math.max(0, Math.min(r.total, p));
+      ui.editPages = false;
+      const done = to !== r.pos ? logMove(r, to) : (r.pos >= r.total ? logMove(r, r.total) : false);
+      toast(done ? 'Finished ' + shown().title : 'Pages updated', snap);
+      break;
+    }
+    case 'rate': { const n = +t.dataset.n; b.rating = b.rating === n ? 0 : n; break; }
+    case 'untag': b.tags.splice(+t.dataset.i, 1); break;
+    case 'add-copy': ui.addCopy = true; break;
+    case 'cancel-copy': ui.addCopy = false; break;
+    case 'save-copy': b.copies.push({ format: document.getElementById('cf-format').value, edition: document.getElementById('cf-ed').value, location: document.getElementById('cf-loc').value.trim() }); ui.addCopy = false; break;
+    case 'del-copy': { const snap = clone(all); b.copies.splice(+t.dataset.i, 1); toast('Copy removed', snap); break; }
+    case 'edit-details': ui.menu = false; ui.editDetails = true; break;
+    case 'cancel-details': ui.editDetails = false; break;
+    case 'save-details': {
+      const title = document.getElementById('ed-title').value.trim(), author = document.getElementById('ed-author').value.trim();
+      const file = document.getElementById('ed-cover').files[0];
+      const apply = cover => {
+        const o = {};
+        if (title && title !== b.title) o.title = title;
+        if (author && author !== b.author) o.author = author;
+        if (cover) o.cover = cover; else if (b.override?.cover) o.cover = b.override.cover;
+        b.override = Object.keys(o).length ? o : null;
+        ui.editDetails = false; render();
+      };
+      if (file) { const fr = new FileReader(); fr.onload = () => apply(fr.result); fr.readAsDataURL(file); return; }
+      apply(null); return;
+    }
+    case 'reset-override': b.override = null; break;
+    case 'ask-remove': ui.menu = false; ui.confirmRemove = true; break;
+    case 'cancel-remove': ui.confirmRemove = false; break;
+    case 'remove': ui.confirmRemove = false; ui.removed = true; toastMsg = null; break;
+    case 'restore-demo': all = seed(); ui.removed = false; break;
+    case 'undo': if (undoSnap) { all = undoSnap; undoSnap = null; toastMsg = null; clearTimeout(toastTimer); } break;
+  }
+  render();
+});
+
+let saveTimer;
+// Tag suggestions: plain autocomplete. Existing tags containing the typed text are offered
+// (starts-with first). No correction: a new tag is saved exactly as typed.
+const MY_TAGS = ['sci-fi', 'classics', 'fantasy', 'non-fiction', 'book club', 'favorites', 'short stories', 'to-lend'];
+let sugItems = [], sugIndex = 0;
+function updateSuggest(raw) {
+  const v = raw.trim().replace(/^#/, ''), lv = v.toLowerCase();
+  const have = book().tags;
+  sugItems = [];
+  if (!v) { drawSuggest(); return; }
+  const known = MY_TAGS.concat(have).filter((t, i, a) => a.indexOf(t) === i);
+  known.filter(t => !have.includes(t) && t.toLowerCase().includes(lv))
+    .sort((a, b) => (b.toLowerCase().startsWith(lv) - a.toLowerCase().startsWith(lv)) || a.localeCompare(b))
+    .forEach(t => sugItems.push({ tag: t, label: '#' + t }));
+  if (have.includes(v)) sugItems.push({ hint: true, label: 'Already tagged #' + v });
+  else if (!known.includes(v)) sugItems.push({ tag: v, label: 'Create new tag #' + v, isNew: true });
+  sugIndex = 0;
+  drawSuggest();
+}
+function drawSuggest() {
+  const ul = document.getElementById('suggest'), input = document.getElementById('tag-input');
+  if (!ul) return;
+  ul.hidden = !sugItems.length; input.setAttribute('aria-expanded', String(!!sugItems.length));
+  ul.innerHTML = sugItems.map((x, i) => x.hint ? '<li class="hint">' + esc(x.label) + '</li>'
+    : '<li role="option" data-i="' + i + '" class="' + (x.isNew ? 'new' : '') + '" aria-selected="' + (i === sugIndex) + '">' + esc(x.label) + '</li>').join('');
+}
+function addTag(t) {
+  if (t && !book().tags.includes(t)) book().tags.push(t);
+  sugItems = [];
+  render(); const i = document.getElementById('tag-input'); if (i) i.focus();
+}
+$app.addEventListener('pointerdown', e => { const li = e.target.closest('#suggest li[data-i]'); if (li) { e.preventDefault(); addTag(sugItems[+li.dataset.i].tag); } });
+$app.addEventListener('input', e => {
+  if (e.target.id === 'tag-input') { updateSuggest(e.target.value); return; }
+  if (e.target.id === 'notes') {
+    book().notes = e.target.value;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => { const s = document.getElementById('saved'); if (s) s.textContent = 'Saved'; }, 600);
+    const s = document.getElementById('saved'); if (s) s.textContent = '';
+  }
+});
+$app.addEventListener('keydown', e => {
+  if (e.target.id === 'tag-input') {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sugIndex = Math.max(0, Math.min(sugItems.length - 1, sugIndex + (e.key === 'ArrowDown' ? 1 : -1))); drawSuggest(); }
+    if (e.key === 'Enter') { e.preventDefault(); if (sugItems[sugIndex]) addTag(sugItems[sugIndex].tag); }
+    if (e.key === 'Escape') { e.stopPropagation(); sugItems = []; drawSuggest(); }
+  }
+  if ((e.target.id === 'ep-pos' || e.target.id === 'ep-total') && e.key === 'Enter') { e.preventDefault(); $app.querySelector('[data-act="save-pages"]').click(); }
+  if (e.key === 'Escape') { ui.editPages = false; ui.menu = false; ui.confirmRemove = false; render(); }
+});
+$app.addEventListener('pointerover', e => {
+  const c = e.target.closest('[data-tip]');
+  if (!c) { $tip.hidden = true; return; }
+  $tip.textContent = c.dataset.tip; $tip.hidden = false;
+  const r = c.getBoundingClientRect();
+  $tip.style.left = Math.max(8, r.left + r.width / 2 - $tip.offsetWidth / 2) + 'px';
+  $tip.style.top = (r.top - $tip.offsetHeight - 6) + 'px';
+});
+$app.addEventListener('pointerleave', () => { $tip.hidden = true; });
+
+document.getElementById('switch').addEventListener('click', e => {
+  const t = e.target.closest('[data-book]'); if (!t) return;
+  current = t.dataset.book;
+  ui = { menu: false, editPages: false, addCopy: false, editDetails: false, confirmRemove: false, removed: false, saved: false };
+  toastMsg = null; undoSnap = null;
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
