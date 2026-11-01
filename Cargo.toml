@@ -13,7 +13,9 @@ anyhow = "1"
 argon2 = "0.5"
 base64 = "0.22"
 axum = "0.8"
+futures = "0.3"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
+csv = "1"
 clap = { version = "4", features = ["derive", "env"] }
 mime_guess = "2"
 rand = "0.9"

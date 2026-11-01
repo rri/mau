@@ -135,42 +135,23 @@ async fn on_list(state: &AppState, user_id: &str, c: &Candidate) -> sqlx::Result
     Ok(None)
 }
 
-/// `GET /api/catalog/search?q=…`: asks enabled providers in order, moving on
-/// only when results are missing or thin.
-pub async fn search(
-    State(state): State<AppState>,
-    Authed(s): Authed,
-    Query(q): Query<SearchQuery>,
-) -> ApiResult<Json<SearchResponse>> {
-    let query = q.q.trim();
-    if query.is_empty() {
-        return Err(ApiError::bad_request(
-            "empty",
-            "Type a title, author, or ISBN.",
-        ));
-    }
-    let isbn = if mau_core::isbn::looks_like_isbn(query) {
-        Some(mau_core::isbn::normalize(query).ok_or_else(|| {
-            ApiError::bad_request(
-                "bad_isbn",
-                "That ISBN's check digit doesn't match. Check for a typo.",
-            )
-        })?)
-    } else {
-        None
-    };
-    state.limits.check("search", &s.user.id, 30)?;
-
+/// Asks enabled providers in order (see the module docs), returning
+/// de-duplicated candidates, the providers that contributed, and failures.
+pub async fn find_candidates(
+    state: &AppState,
+    query: &str,
+    isbn: Option<&str>,
+) -> ApiResult<(Vec<Candidate>, Vec<String>, Vec<String>)> {
     let mut results: Vec<Candidate> = Vec::new();
     let mut seen = HashSet::new();
     let mut sources = Vec::new();
     let mut errors = Vec::new();
     for p in providers::enabled(&state.db).await? {
-        let found = match &isbn {
-            Some(i) => provider_isbn(&state, &p, i)
+        let found = match isbn {
+            Some(i) => provider_isbn(state, &p, i)
                 .await
                 .map(|c| c.into_iter().collect::<Vec<_>>()),
-            None => provider_search(&state, &p, query).await,
+            None => provider_search(state, &p, query).await,
         };
         match found {
             Ok(list) => {
@@ -198,10 +179,41 @@ pub async fn search(
             break;
         }
     }
+    for c in &results {
+        cache_candidate(state, c).await;
+    }
+    Ok((results, sources, errors))
+}
+
+/// `GET /api/catalog/search?q=…`: asks enabled providers in order, moving on
+/// only when results are missing or thin.
+pub async fn search(
+    State(state): State<AppState>,
+    Authed(s): Authed,
+    Query(q): Query<SearchQuery>,
+) -> ApiResult<Json<SearchResponse>> {
+    let query = q.q.trim();
+    if query.is_empty() {
+        return Err(ApiError::bad_request(
+            "empty",
+            "Type a title, author, or ISBN.",
+        ));
+    }
+    let isbn = if mau_core::isbn::looks_like_isbn(query) {
+        Some(mau_core::isbn::normalize(query).ok_or_else(|| {
+            ApiError::bad_request(
+                "bad_isbn",
+                "That ISBN's check digit doesn't match. Check for a typo.",
+            )
+        })?)
+    } else {
+        None
+    };
+    state.limits.check("search", &s.user.id, 30)?;
+    let (results, sources, errors) = find_candidates(&state, query, isbn.as_deref()).await?;
 
     let mut out = Vec::with_capacity(results.len());
     for c in results {
-        cache_candidate(&state, &c).await;
         let book_id = on_list(&state, &s.user.id, &c).await?;
         out.push(SearchResult {
             candidate: c,
@@ -299,7 +311,19 @@ pub async fn ensure(
     Json(req): Json<EnsureRequest>,
 ) -> ApiResult<Json<WorkRow>> {
     let c = cached_candidate(&state, &req.provider, &req.source_id).await?;
-    let wanted_isbn = req.isbn.as_deref().and_then(mau_core::isbn::normalize);
+    Ok(Json(
+        ensure_candidate(&state, &c, req.isbn.as_deref()).await?,
+    ))
+}
+
+/// Finds or adds a provider's work in the shared catalog, with up to
+/// `MAX_EDITIONS` editions and its cover.
+pub async fn ensure_candidate(
+    state: &AppState,
+    c: &Candidate,
+    isbn: Option<&str>,
+) -> ApiResult<WorkRow> {
+    let wanted_isbn = isbn.and_then(mau_core::isbn::normalize);
 
     // Already in the shared catalog, by source or by the wanted ISBN?
     let existing: Option<String> = sqlx::query_scalar(
@@ -322,7 +346,7 @@ pub async fn ensure(
         _ => None,
     };
 
-    let mut editions = all_editions(&state, &c).await;
+    let mut editions = all_editions(state, c).await;
     merge_editions(&mut editions, &c.editions);
     // Keep the wanted edition, then editions with an ISBN.
     editions.sort_by_key(|e| {
@@ -334,7 +358,7 @@ pub async fn ensure(
     editions.truncate(MAX_EDITIONS);
 
     let cover = match &c.cover_url {
-        Some(url) => crate::covers::fetch_and_store(&state, url).await,
+        Some(url) => crate::covers::fetch_and_store(state, url).await,
         None => None,
     };
 
@@ -428,7 +452,7 @@ pub async fn ensure(
         .await?
         .ok_or_else(|| ApiError::internal("work vanished"))?;
     tx.commit().await?;
-    Ok(Json(work))
+    Ok(work)
 }
 
 /// `GET /api/catalog/works/{id}`: a shared work, or the user's own private one.

@@ -1,6 +1,7 @@
 //! Domain logic for mau, independent of HTTP and storage.
 
 pub mod hlc;
+pub mod import;
 pub mod isbn;
 pub mod progress;
 pub mod rank;

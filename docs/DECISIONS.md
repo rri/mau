@@ -220,3 +220,45 @@ Newest entries at the bottom of each section.
   (only the creator sees the private work anyway).
 - **"Add another copy" mode** (the book is already on your list) always
   records a copy; "I own a copy" isn't shown.
+
+## Milestone 6: settings, sharing, import, export
+
+- **Import parsing lives in `mau-core::import`** and is unit-tested with sample
+  files. Column names follow each service's current export format.
+- **What imports bring in:** title, authors, ISBN, pages, year, publisher,
+  rating (rounded to whole stars), finished readings with their dates, tags,
+  owned (one copy, with the file's binding, else Paperback), and notes.
+  Notes combine the review and private notes (Goodreads: "My Review" and
+  "Private Notes"; LibraryThing: review and comments).
+- **Goodreads shelves** other than read/currently-reading/to-read become tags.
+  A "Read Count" above 1 adds undated earlier readings.
+- **LibraryThing:** books in the "Your library" collection (or in no
+  collection) count as owned; "Read but unowned", "Wishlist", and "To read"
+  don't.
+- **Generic CSV:** a state value of read/finished/done/complete/yes/true/1/x,
+  or a finished date, means finished; an owned value of yes/true/1/x/owned, or
+  a positive number, means owned.
+- **Unknown finish dates** are stored as `0000-01-01` and shown as "date
+  unknown".
+- **Imported finished readings** have total = the file's page count, else the
+  catalog's, else 1, and no daily history (no progress events), so they don't
+  add to calendars. mau's own JSON export restores the full history.
+- **Matching an import row:** already on the list (same ISBN, or same title and
+  author surname) → skipped; ISBN already in the shared catalog → matched to it;
+  ISBN found by a provider → matched; else a title + first-author search, where
+  an exact title and author match → matched, other results → "check match"
+  with up to 3 candidates, none → "not found" (default: add as a private manual
+  entry). Three rows are matched at a time.
+- **Imported books go to the top of the inactive books**, in file order. A mau
+  JSON import keeps books active if they were active with an unfinished reading.
+- **Import jobs live in server memory** for up to 6 hours; at most 5,000 books
+  and 30 MB per file, 5 imports a minute.
+- **mau's JSON export** (`format: "mau-export", version: 1`) includes each
+  book's work data (title, people, year, editions), overrides, rank, active,
+  rating, notes, tags, copies (with edition ISBN), and readings with all
+  progress events. Re-importing it reuses shared works by ISBN and otherwise
+  creates private manual entries.
+- **CSV export columns:** Title, Authors, State, Current page, Total pages,
+  Started, Finished, Rating, Tags, Owned, Copies, ISBN, Notes.
+- **Share links** are `/s/<22-character token>` (128 bits). Each kind of share
+  (finished, active, the whole catalog, or a given tag) can exist once.

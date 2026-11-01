@@ -31,6 +31,10 @@ pub struct AppState {
     /// Outgoing HTTP (catalog providers, cover downloads).
     pub http: reqwest::Client,
     pub limits: Arc<RateLimits>,
+    /// Import jobs in progress.
+    pub imports: Arc<crate::importer::Jobs>,
+    /// The server's own clock, for changes it makes (imports).
+    pub clock: Arc<Mutex<mau_core::hlc::Clock>>,
 }
 
 impl AppState {
@@ -46,6 +50,8 @@ impl AppState {
         Ok(Self {
             http,
             limits: Arc::new(RateLimits::default()),
+            imports: Arc::new(crate::importer::Jobs::default()),
+            clock: Arc::new(Mutex::new(mau_core::hlc::Clock::new("srv"))),
             webauthn: Arc::new(crate::auth::build_webauthn(&config)?),
             db,
             config: Arc::new(config),
@@ -54,6 +60,9 @@ impl AppState {
         })
     }
 }
+
+/// Import files can be larger than ordinary requests.
+const IMPORT_LIMIT: usize = 30 * 1024 * 1024;
 
 pub fn router(state: AppState) -> Router {
     let api = Router::new()
@@ -105,6 +114,28 @@ pub fn router(state: AppState) -> Router {
         .route("/catalog/thumb", get(crate::covers::thumb))
         .route("/catalog/works/{id}", get(crate::catalog::work))
         .route("/catalog/works/{id}/suggest", post(crate::catalog::suggest))
+        // Sharing, import, export
+        .route(
+            "/shares",
+            get(crate::shares::list).post(crate::shares::create),
+        )
+        .route(
+            "/shares/{id}",
+            patch(crate::shares::update).delete(crate::shares::delete),
+        )
+        .route("/export.json", get(crate::export::json))
+        .route("/export.csv", get(crate::export::csv))
+        .route(
+            "/import/preview",
+            post(crate::importer::preview)
+                .layer(axum::extract::DefaultBodyLimit::max(IMPORT_LIMIT)),
+        )
+        .route(
+            "/import",
+            post(crate::importer::start).layer(axum::extract::DefaultBodyLimit::max(IMPORT_LIMIT)),
+        )
+        .route("/import/{job}", get(crate::importer::status))
+        .route("/import/{job}/commit", post(crate::importer::commit))
         .route(
             "/covers",
             post(crate::covers::upload).layer(axum::extract::DefaultBodyLimit::max(
