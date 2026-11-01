@@ -1,0 +1,16 @@
+# mau configuration. Copy to /etc/mau/mau.toml (or pass --config).
+# Any key can be overridden with an environment variable: MAU_LISTEN,
+# MAU_PUBLIC_URL, MAU_DATA_DIR, MAU_TRUSTED_PROXIES (comma-separated).
+
+# Plain HTTP address mau listens on. Put a reverse proxy in front for HTTPS.
+listen = "127.0.0.1:8370"
+
+# The address people use to reach mau. Passkeys are tied to this host name,
+# so changing it later means everyone has to add new passkeys.
+public_url = "https://books.example.com"
+
+# Database, covers, and backups live here.
+data_dir = "/var/lib/mau"
+
+# Reverse proxies whose X-Forwarded-For / X-Forwarded-Proto headers are trusted.
+trusted_proxies = ["127.0.0.1", "::1"]
