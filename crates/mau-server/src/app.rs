@@ -1,32 +1,93 @@
 //! Router and shared application state.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-use axum::routing::get;
+use axum::extract::{Request, State};
+use axum::http::{Method, header};
+use axum::middleware::{self, Next};
+use axum::response::Response;
+use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use serde::Serialize;
 use sqlx::SqlitePool;
 use tower_http::trace::TraceLayer;
+use webauthn_rs::prelude::Webauthn;
 
+use crate::auth::ceremony::Ceremonies;
+use crate::auth::{handlers as auth, manage};
 use crate::config::Config;
+use crate::error::ApiError;
 use crate::web;
 
 #[derive(Clone)]
-#[expect(dead_code, reason = "handlers start using these in milestone 2")]
 pub struct AppState {
     pub db: SqlitePool,
     pub config: Arc<Config>,
+    pub webauthn: Arc<Webauthn>,
+    pub ceremonies: Arc<Ceremonies>,
+    /// One-time link for creating the first admin; `None` once an admin exists.
+    pub setup_token: Arc<Mutex<Option<String>>>,
+}
+
+impl AppState {
+    pub fn new(db: SqlitePool, config: Config) -> anyhow::Result<Self> {
+        Ok(Self {
+            webauthn: Arc::new(crate::auth::build_webauthn(&config)?),
+            db,
+            config: Arc::new(config),
+            ceremonies: Arc::new(Ceremonies::default()),
+            setup_token: Arc::new(Mutex::new(None)),
+        })
+    }
 }
 
 pub fn router(state: AppState) -> Router {
     let api = Router::new()
         .route("/health", get(health))
-        .fallback(api_not_found);
+        // Sign-up, sign-in, recovery
+        .route("/auth/status", get(auth::status))
+        .route("/auth/username-available", post(auth::username_available))
+        .route("/auth/invite/{token}", get(auth::invite_info))
+        .route("/auth/setup-check", post(auth::setup_check))
+        .route("/auth/register/start", post(auth::register_start))
+        .route("/auth/register/finish", post(auth::register_finish))
+        .route("/auth/login/start", post(auth::login_start))
+        .route("/auth/login/finish", post(auth::login_finish))
+        .route("/auth/logout", post(auth::logout))
+        .route("/auth/recovery", post(auth::recovery_sign_in))
+        .route("/auth/enroll/{token}", get(auth::enroll_info).post(auth::enroll_use))
+        .route("/auth/reauth/start", post(auth::reauth_start))
+        .route("/auth/reauth/finish", post(auth::reauth_finish))
+        // Account settings
+        .route("/account", patch(manage::update_account).delete(manage::delete_account))
+        .route("/passkeys", get(manage::list_passkeys))
+        .route("/passkeys/start", post(auth::passkey_add_start))
+        .route("/passkeys/finish", post(auth::passkey_add_finish))
+        .route("/passkeys/{id}", patch(manage::rename_passkey).delete(manage::delete_passkey))
+        .route("/sessions", get(manage::list_sessions))
+        .route("/sessions/revoke-others", post(manage::revoke_other_sessions))
+        .route("/sessions/{id}", delete(manage::revoke_session))
+        .route("/recovery-codes", get(manage::recovery_status))
+        .route("/recovery-codes/regenerate", post(manage::regenerate_codes))
+        .fallback(api_not_found)
+        .layer(middleware::from_fn_with_state(state.clone(), check_origin));
     Router::new()
         .nest("/api", api)
         .fallback(web::serve)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
+}
+
+/// Rejects state-changing API requests from other sites. SameSite cookies
+/// already block most of these; this also covers older browsers.
+async fn check_origin(State(state): State<AppState>, req: Request, next: Next) -> Result<Response, ApiError> {
+    if !matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS) {
+        let origin = req.headers().get(header::ORIGIN).and_then(|v| v.to_str().ok());
+        if origin != Some(state.config.public_url.as_str()) {
+            return Err(ApiError::forbidden("Request origin doesn't match this site's address."));
+        }
+    }
+    Ok(next.run(req).await)
 }
 
 #[derive(Serialize)]
@@ -36,63 +97,10 @@ struct Health {
 }
 
 async fn health() -> Json<Health> {
-    Json(Health {
-        status: "ok",
-        version: mau_core::VERSION,
-    })
+    Json(Health { status: "ok", version: mau_core::VERSION })
 }
 
-async fn api_not_found() -> (axum::http::StatusCode, Json<serde_json::Value>) {
-    (
-        axum::http::StatusCode::NOT_FOUND,
-        Json(serde_json::json!({ "error": "not_found" })),
-    )
+async fn api_not_found() -> ApiError {
+    ApiError::not_found("No such API endpoint.")
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use axum::body::Body;
-    use axum::http::{Request, StatusCode};
-    use http_body_util::BodyExt;
-    use tower::ServiceExt;
-
-    async fn test_state() -> (AppState, tempfile::TempDir) {
-        let dir = tempfile::tempdir().unwrap();
-        let config = Config {
-            data_dir: dir.path().to_path_buf(),
-            ..Config::default()
-        };
-        let db = crate::db::open(&config.database_path()).await.unwrap();
-        (
-            AppState {
-                db,
-                config: Arc::new(config),
-            },
-            dir,
-        )
-    }
-
-    #[tokio::test]
-    async fn health_reports_ok() {
-        let (state, _dir) = test_state().await;
-        let res = router(state)
-            .oneshot(Request::get("/api/health").body(Body::empty()).unwrap())
-            .await
-            .unwrap();
-        assert_eq!(res.status(), StatusCode::OK);
-        let body = res.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(json["status"], "ok");
-    }
-
-    #[tokio::test]
-    async fn unknown_api_path_is_json_404() {
-        let (state, _dir) = test_state().await;
-        let res = router(state)
-            .oneshot(Request::get("/api/nope").body(Body::empty()).unwrap())
-            .await
-            .unwrap();
-        assert_eq!(res.status(), StatusCode::NOT_FOUND);
-    }
-}

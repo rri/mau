@@ -1,12 +1,19 @@
 //! The `mau` binary.
 
 mod app;
+#[cfg(test)]
+mod app_tests;
+mod audit;
+mod auth;
 mod config;
 mod db;
+mod error;
+mod library;
+mod settings;
+mod util;
 mod web;
 
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -56,10 +63,8 @@ async fn serve(config: config::Config) -> Result<()> {
         .with_context(|| format!("listening on {}", config.listen))?;
     tracing::info!(listen = %config.listen, public_url = %config.public_url, data_dir = %config.data_dir.display(), "mau {} started", mau_core::VERSION);
 
-    let state = app::AppState {
-        db: db.clone(),
-        config: Arc::new(config),
-    };
+    let state = app::AppState::new(db.clone(), config)?;
+    announce_setup_link(&state).await?;
     axum::serve(listener, app::router(state))
         .with_graceful_shutdown(shutdown_signal())
         .await?;
@@ -80,4 +85,20 @@ async fn shutdown_signal() {
     let term = std::future::pending::<()>();
     tokio::select! { _ = ctrl_c => {}, _ = term => {} }
     tracing::info!("shutting down");
+}
+
+/// Until an admin exists, prints a one-time link for creating the admin
+/// account. A new link is made on every start.
+async fn announce_setup_link(state: &app::AppState) -> Result<()> {
+    let has_admin: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE is_admin = 1)")
+        .fetch_one(&state.db)
+        .await?;
+    if !has_admin {
+        let token = util::random_token();
+        let link = format!("{}/setup/{}", state.config.public_url, token);
+        *state.setup_token.lock().unwrap() = Some(token);
+        tracing::warn!("no admin account yet. Open this link to create it: {link}");
+        eprintln!("\n  Create the admin account: {link}\n");
+    }
+    Ok(())
 }
