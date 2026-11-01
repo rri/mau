@@ -7,21 +7,49 @@ const T0 = h(1000, 'srv');
 
 function base() {
 	const d = emptyData();
-	d.works.set('w', { id: 'w', title: 'W', first_year: null, cover: null, private: false, suggested: false, people: [], editions: [] });
+	d.works.set('w', {
+		id: 'w',
+		title: 'W',
+		first_year: null,
+		cover: null,
+		private: false,
+		suggested: false,
+		people: [],
+		editions: []
+	});
 	return applyOps(d, [
-		{ id: 'c1', hlc: T0, op: { type: 'book.create', id: 'b', work_id: 'w', rank: 'V', added_at: 0 } },
-		{ id: 'c2', hlc: T0, op: { type: 'reading.create', id: 'r', book_id: 'b', started_on: '2026-11-01', total: 100 } }
+		{
+			id: 'c1',
+			hlc: T0,
+			op: { type: 'book.create', id: 'b', work_id: 'w', rank: 'V', added_at: 0 }
+		},
+		{
+			id: 'c2',
+			hlc: T0,
+			op: { type: 'reading.create', id: 'r', book_id: 'b', started_on: '2026-11-01', total: 100 }
+		}
 	]);
 }
 
 const tap = (id: string, hlc: string, baseClock: string, from: number, to: number): Op => ({
 	id,
 	hlc,
-	op: { type: 'progress', event_id: `e-${id}`, reading_id: 'r', base: baseClock, from, to, local_date: '2026-11-01' }
+	op: {
+		type: 'progress',
+		event_id: `e-${id}`,
+		reading_id: 'r',
+		base: baseClock,
+		from,
+		to,
+		local_date: '2026-11-01'
+	}
 });
 
 const live = (d: ReturnType<typeof base>) =>
-	[...d.events.values()].filter((e) => !e.deleted).map((e) => e.id).sort();
+	[...d.events.values()]
+		.filter((e) => !e.deleted)
+		.map((e) => e.id)
+		.sort();
 
 describe('applyOps', () => {
 	it('a newer offline chain replaces the other branch (same rule as the server)', () => {
@@ -47,7 +75,11 @@ describe('applyOps', () => {
 			{ id: 's1', hlc: h(3000, 'a'), op: { type: 'book.set', id: 'b', fields: { rating: 4 } } }
 		]);
 		d = applyOps(cloneData(d), [
-			{ id: 's2', hlc: h(2000, 'b'), op: { type: 'book.set', id: 'b', fields: { rating: 2, rank: 'k' } } }
+			{
+				id: 's2',
+				hlc: h(2000, 'b'),
+				op: { type: 'book.set', id: 'b', fields: { rating: 2, rank: 'k' } }
+			}
 		]);
 		expect(d.books.get('b')!.rating).toBe(4);
 		expect(d.books.get('b')!.rank).toBe('k');

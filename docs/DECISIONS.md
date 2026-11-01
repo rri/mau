@@ -147,3 +147,26 @@ Newest entries at the bottom of each section.
   toast brings them back.
 - **Status line:** the Reading header says "Offline · N unsynced" or
   "Syncing…" when relevant, and nothing otherwise.
+
+## Milestone 4: catalog and book detail
+
+- **Surname for the author sort:** the last word of the first author's name,
+  plus particles directly before it (le, de, van, von, der, du, da, di, …), so
+  "Ursula K. Le Guin" sorts under "Le Guin". "St." is a particle only when it
+  comes right before the last word ("Emily St. John Mandel" sorts as "Mandel").
+- **Catalog layout and sort** are remembered per device in localStorage
+  (`mau.catalog.layout`, `mau.catalog.sort`); filters reset on each visit.
+- **"‹ Catalog"** uses browser history when you came from the catalog, so its
+  scroll position and filters are kept; otherwise it's a plain link.
+- **Edit details** takes authors as one comma-separated field. Entering the
+  catalog's own value clears that override instead of storing a copy.
+  "Reset to catalog" clears title, authors, and cover overrides together.
+- **Uploading a cover needs a connection** (the image goes to the server);
+  title and author edits work offline.
+- **Notes autosave** 0.7 s after typing stops.
+- **Calendar shading** uses one teal ramp mixed from the accent color, so it
+  follows light and dark mode automatically.
+- **Daily summaries** merge consecutive forward moves on the same day into
+  one line; any backward move is its own "moved back" line.
+- **A re-read** starts with the previous reading's total; it can be changed
+  by tapping the page count.
