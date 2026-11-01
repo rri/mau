@@ -9,6 +9,7 @@ mod config;
 mod db;
 mod error;
 mod library;
+mod seed;
 mod settings;
 mod util;
 mod web;
@@ -38,6 +39,12 @@ struct Cli {
 enum Command {
     /// Run the server (the default).
     Serve,
+    /// Development only: add the sample books from the design mocks to an account.
+    Seed {
+        /// Username to add the books to.
+        #[arg(long)]
+        user: String,
+    },
 }
 
 #[tokio::main]
@@ -53,6 +60,10 @@ async fn main() -> Result<()> {
 
     match cli.command.unwrap_or(Command::Serve) {
         Command::Serve => serve(config).await,
+        Command::Seed { user } => {
+            let db = db::open(&config.database_path()).await?;
+            seed::run(&config, &db, &user).await
+        }
     }
 }
 
@@ -90,9 +101,10 @@ async fn shutdown_signal() {
 /// Until an admin exists, prints a one-time link for creating the admin
 /// account. A new link is made on every start.
 async fn announce_setup_link(state: &app::AppState) -> Result<()> {
-    let has_admin: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE is_admin = 1)")
-        .fetch_one(&state.db)
-        .await?;
+    let has_admin: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE is_admin = 1)")
+            .fetch_one(&state.db)
+            .await?;
     if !has_admin {
         let token = util::random_token();
         let link = format!("{}/setup/{}", state.config.public_url, token);

@@ -7,7 +7,9 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use webauthn_rs::prelude::{DiscoverableAuthentication, PasskeyAuthentication, PasskeyRegistration};
+use webauthn_rs::prelude::{
+    DiscoverableAuthentication, PasskeyAuthentication, PasskeyRegistration,
+};
 
 use crate::util::{MINUTE_MS, now_ms, random_token};
 
@@ -25,10 +27,21 @@ pub struct NewAccount {
 }
 
 pub enum Ceremony {
-    Register { account: NewAccount, state: PasskeyRegistration },
-    AddPasskey { user_id: String, state: PasskeyRegistration },
-    Login { state: DiscoverableAuthentication },
-    Reauth { user_id: String, state: PasskeyAuthentication },
+    Register {
+        account: NewAccount,
+        state: PasskeyRegistration,
+    },
+    AddPasskey {
+        user_id: String,
+        state: PasskeyRegistration,
+    },
+    Login {
+        state: DiscoverableAuthentication,
+    },
+    Reauth {
+        user_id: String,
+        state: PasskeyAuthentication,
+    },
 }
 
 #[derive(Default)]

@@ -7,7 +7,9 @@ use axum::response::{AppendHeaders, IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use super::handlers::{Me, Ok_, clean_display_name, clean_time_zone, is_secure, ok, username_taken};
+use super::handlers::{
+    Me, Ok_, clean_display_name, clean_time_zone, is_secure, ok, username_taken,
+};
 use super::recovery;
 use super::session::{self, Authed};
 use crate::app::AppState;
@@ -39,7 +41,10 @@ pub async fn update_account(
     if let Some(b) = &req.bio {
         let b = b.trim();
         if b.chars().count() > 280 {
-            return Err(ApiError::bad_request("bio", "Keep the bio to 280 characters."));
+            return Err(ApiError::bad_request(
+                "bio",
+                "Keep the bio to 280 characters.",
+            ));
         }
         user.bio = b.to_string();
     }
@@ -48,13 +53,20 @@ pub async fn update_account(
     }
     let mut tx = state.db.begin().await?;
     if let Some(u) = &req.username {
-        let name = mau_core::username::validate(u).map_err(|e| ApiError::bad_request("username", e.message()))?;
+        let name = mau_core::username::validate(u)
+            .map_err(|e| ApiError::bad_request("username", e.message()))?;
         if name != user.username {
             s.require_recent_passkey()?;
             if username_taken(&mut *tx, &name, Some(&user.id)).await? {
-                return Err(ApiError::conflict("username_taken", format!("@{name} is taken.")));
+                return Err(ApiError::conflict(
+                    "username_taken",
+                    format!("@{name} is taken."),
+                ));
             }
-            sqlx::query("DELETE FROM username_reservations WHERE username = ?").bind(&name).execute(&mut *tx).await?;
+            sqlx::query("DELETE FROM username_reservations WHERE username = ?")
+                .bind(&name)
+                .execute(&mut *tx)
+                .await?;
             sqlx::query(
                 "INSERT INTO username_reservations (username, user_id, until) VALUES (?, ?, ?)
                  ON CONFLICT(username) DO UPDATE SET user_id = excluded.user_id, until = excluded.until",
@@ -67,14 +79,16 @@ pub async fn update_account(
             user.username = name;
         }
     }
-    sqlx::query("UPDATE users SET display_name = ?, bio = ?, time_zone = ?, username = ? WHERE id = ?")
-        .bind(&user.display_name)
-        .bind(&user.bio)
-        .bind(&user.time_zone)
-        .bind(&user.username)
-        .bind(&user.id)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(
+        "UPDATE users SET display_name = ?, bio = ?, time_zone = ?, username = ? WHERE id = ?",
+    )
+    .bind(&user.display_name)
+    .bind(&user.bio)
+    .bind(&user.time_zone)
+    .bind(&user.username)
+    .bind(&user.id)
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await?;
     Ok(Json(Me::from(&user)))
 }
@@ -92,13 +106,17 @@ pub async fn delete_account(
 ) -> ApiResult<Response> {
     s.require_recent_passkey()?;
     if req.username.trim().to_ascii_lowercase() != s.user.username {
-        return Err(ApiError::bad_request("username", "The username didn't match. Nothing was deleted."));
+        return Err(ApiError::bad_request(
+            "username",
+            "The username didn't match. Nothing was deleted.",
+        ));
     }
     let mut tx = state.db.begin().await?;
     if s.user.is_admin {
-        let admins: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE is_admin = 1 AND suspended = 0")
-            .fetch_one(&mut *tx)
-            .await?;
+        let admins: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE is_admin = 1 AND suspended = 0")
+                .fetch_one(&mut *tx)
+                .await?;
         if admins <= 1 {
             return Err(ApiError::forbidden(
                 "You're the only admin. Make someone else an admin before deleting your account.",
@@ -106,11 +124,22 @@ pub async fn delete_account(
         }
     }
     crate::library::delete_user_data(&mut tx, &s.user.id).await?;
-    sqlx::query("DELETE FROM users WHERE id = ?").bind(&s.user.id).execute(&mut *tx).await?;
-    audit::record(&mut *tx, None, format!("{} deleted their account", s.user.username)).await?;
+    sqlx::query("DELETE FROM users WHERE id = ?")
+        .bind(&s.user.id)
+        .execute(&mut *tx)
+        .await?;
+    audit::record(
+        &mut *tx,
+        None,
+        format!("{} deleted their account", s.user.username),
+    )
+    .await?;
     tx.commit().await?;
     Ok((
-        AppendHeaders([(header::SET_COOKIE, session::clear_cookie_header(is_secure(&state)))]),
+        AppendHeaders([(
+            header::SET_COOKIE,
+            session::clear_cookie_header(is_secure(&state)),
+        )]),
         Json(Ok_ { ok: true }),
     )
         .into_response())
@@ -130,7 +159,10 @@ pub struct PasskeyInfo {
     pub last_used_at: Option<i64>,
 }
 
-pub async fn list_passkeys(State(state): State<AppState>, Authed(s): Authed) -> ApiResult<Json<Vec<PasskeyInfo>>> {
+pub async fn list_passkeys(
+    State(state): State<AppState>,
+    Authed(s): Authed,
+) -> ApiResult<Json<Vec<PasskeyInfo>>> {
     let rows = sqlx::query_as("SELECT id, name, created_at, last_used_at FROM passkeys WHERE user_id = ? ORDER BY created_at")
         .bind(&s.user.id)
         .fetch_all(&state.db)
@@ -179,7 +211,10 @@ pub async fn delete_passkey(
         .fetch_one(&mut *tx)
         .await?;
     if count <= 1 {
-        return Err(ApiError::bad_request("last_passkey", "You need at least one passkey. Add another first."));
+        return Err(ApiError::bad_request(
+            "last_passkey",
+            "You need at least one passkey. Add another first.",
+        ));
     }
     let n = sqlx::query("DELETE FROM passkeys WHERE id = ? AND user_id = ?")
         .bind(id)
@@ -207,7 +242,10 @@ pub struct SessionInfo {
     pub current: bool,
 }
 
-pub async fn list_sessions(State(state): State<AppState>, Authed(s): Authed) -> ApiResult<Json<Vec<SessionInfo>>> {
+pub async fn list_sessions(
+    State(state): State<AppState>,
+    Authed(s): Authed,
+) -> ApiResult<Json<Vec<SessionInfo>>> {
     let rows: Vec<(String, String, i64)> = sqlx::query_as(
         "SELECT id, device, last_seen_at FROM sessions WHERE user_id = ? AND expires_at > ? ORDER BY last_seen_at DESC",
     )
@@ -217,7 +255,12 @@ pub async fn list_sessions(State(state): State<AppState>, Authed(s): Authed) -> 
     .await?;
     Ok(Json(
         rows.into_iter()
-            .map(|(id, device, last_seen_at)| SessionInfo { current: id == s.id, id, device, last_seen_at })
+            .map(|(id, device, last_seen_at)| SessionInfo {
+                current: id == s.id,
+                id,
+                device,
+                last_seen_at,
+            })
             .collect(),
     ))
 }
@@ -236,7 +279,10 @@ pub async fn revoke_session(
     Ok(ok())
 }
 
-pub async fn revoke_other_sessions(State(state): State<AppState>, Authed(s): Authed) -> ApiResult<Json<Ok_>> {
+pub async fn revoke_other_sessions(
+    State(state): State<AppState>,
+    Authed(s): Authed,
+) -> ApiResult<Json<Ok_>> {
     sqlx::query("DELETE FROM sessions WHERE user_id = ? AND id != ?")
         .bind(&s.user.id)
         .bind(&s.id)
@@ -264,16 +310,23 @@ pub struct RecoveryStatus {
     pub events: Vec<RecoveryEvent>,
 }
 
-pub async fn recovery_status(State(state): State<AppState>, Authed(s): Authed) -> ApiResult<Json<RecoveryStatus>> {
+pub async fn recovery_status(
+    State(state): State<AppState>,
+    Authed(s): Authed,
+) -> ApiResult<Json<RecoveryStatus>> {
     let left = recovery::remaining(&state.db, &s.user.id).await?;
-    let events: Vec<(i64, String)> =
-        sqlx::query_as("SELECT at, message FROM recovery_events WHERE user_id = ? ORDER BY at DESC LIMIT 20")
-            .bind(&s.user.id)
-            .fetch_all(&state.db)
-            .await?;
+    let events: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT at, message FROM recovery_events WHERE user_id = ? ORDER BY at DESC LIMIT 20",
+    )
+    .bind(&s.user.id)
+    .fetch_all(&state.db)
+    .await?;
     Ok(Json(RecoveryStatus {
         left,
-        events: events.into_iter().map(|(at, message)| RecoveryEvent { at, message }).collect(),
+        events: events
+            .into_iter()
+            .map(|(at, message)| RecoveryEvent { at, message })
+            .collect(),
     }))
 }
 

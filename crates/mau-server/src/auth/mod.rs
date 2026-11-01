@@ -15,7 +15,10 @@ use crate::config::Config;
 /// its host name.
 pub fn build_webauthn(config: &Config) -> Result<Webauthn> {
     let origin = Url::parse(&config.public_url).context("public_url is not a valid URL")?;
-    let rp_id = origin.host_str().context("public_url has no host name")?.to_string();
+    let rp_id = origin
+        .host_str()
+        .context("public_url has no host name")?
+        .to_string();
     WebauthnBuilder::new(&rp_id, &origin)
         .context("invalid WebAuthn configuration")?
         .rp_name("mau")

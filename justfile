@@ -49,3 +49,7 @@ release: web-build
 e2e: web-build
     cargo build -p mau-server
     cd web && npx playwright test
+
+# Development: add the mock sample books to an account (e.g. `just seed rri`)
+seed user:
+    MAU_DATA_DIR=data cargo run -p mau-server -- seed --user {{user}}

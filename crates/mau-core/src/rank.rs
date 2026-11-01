@@ -10,7 +10,10 @@ const DIGITS: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrst
 const BASE: usize = 62;
 
 fn digit(c: u8) -> usize {
-    DIGITS.iter().position(|&d| d == c).expect("rank contains only base-62 digits")
+    DIGITS
+        .iter()
+        .position(|&d| d == c)
+        .expect("rank contains only base-62 digits")
 }
 
 /// A rank strictly between `a` and `b`. `None` means "no bound" on that side.
@@ -45,7 +48,11 @@ fn midpoint(a: &[u8], b: Option<&[u8]>) -> String {
     if let Some(b) = b.filter(|b| b.len() > 1) {
         return (b[0] as char).to_string();
     }
-    format!("{}{}", DIGITS[da] as char, midpoint(a.get(1..).unwrap_or(&[]), None))
+    format!(
+        "{}{}",
+        DIGITS[da] as char,
+        midpoint(a.get(1..).unwrap_or(&[]), None)
+    )
 }
 
 /// `n` evenly spread ranks in order, for initial or imported lists.

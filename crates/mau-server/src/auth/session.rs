@@ -72,8 +72,10 @@ pub fn cookie_header(token: &str, secure: bool) -> HeaderValue {
 
 pub fn clear_cookie_header(secure: bool) -> HeaderValue {
     let secure = if secure { "; Secure" } else { "" };
-    HeaderValue::from_str(&format!("{COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0{secure}"))
-        .expect("cookie is ASCII")
+    HeaderValue::from_str(&format!(
+        "{COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0{secure}"
+    ))
+    .expect("cookie is ASCII")
 }
 
 pub fn token_from_headers(headers: &HeaderMap) -> Option<String> {
@@ -98,7 +100,9 @@ pub async fn lookup(db: &SqlitePool, token: &str) -> sqlx::Result<Option<Session
     .bind(now)
     .fetch_optional(db)
     .await?;
-    let Some((id, restricted, reauth_at, last_seen)) = row else { return Ok(None) };
+    let Some((id, restricted, reauth_at, last_seen)) = row else {
+        return Ok(None);
+    };
     let user: Option<User> = sqlx::query_as(concat!(
         "SELECT ",
         crate::user_columns!(),
@@ -119,7 +123,12 @@ pub async fn lookup(db: &SqlitePool, token: &str) -> sqlx::Result<Option<Session
             .execute(db)
             .await?;
     }
-    Ok(Some(Session { id, user, restricted, reauth_at }))
+    Ok(Some(Session {
+        id,
+        user,
+        restricted,
+        reauth_at,
+    }))
 }
 
 /// Any signed-in session, including restricted ones.
@@ -139,7 +148,9 @@ impl FromRequestParts<AppState> for AnySession {
             return Ok(AnySession(s.clone()));
         }
         let token = token_from_headers(&parts.headers).ok_or_else(ApiError::unauthorized)?;
-        let session = lookup(&state.db, &token).await?.ok_or_else(ApiError::unauthorized)?;
+        let session = lookup(&state.db, &token)
+            .await?
+            .ok_or_else(ApiError::unauthorized)?;
         parts.extensions.insert(session.clone());
         Ok(AnySession(session))
     }
@@ -151,7 +162,8 @@ impl FromRequestParts<AppState> for Authed {
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, ApiError> {
         let AnySession(s) = AnySession::from_request_parts(parts, state).await?;
         if s.restricted {
-            return Err(ApiError::forbidden("Add a passkey before continuing.").with_code("enroll_required"));
+            return Err(ApiError::forbidden("Add a passkey before continuing.")
+                .with_code("enroll_required"));
         }
         Ok(Authed(s))
     }

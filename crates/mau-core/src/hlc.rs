@@ -74,7 +74,11 @@ pub struct Clock {
 
 impl Clock {
     pub fn new(node: impl Into<String>) -> Self {
-        Self { node: node.into(), last_ms: 0, counter: 0 }
+        Self {
+            node: node.into(),
+            last_ms: 0,
+            counter: 0,
+        }
     }
 
     /// A timestamp later than every one this clock has issued or observed.
@@ -85,7 +89,11 @@ impl Clock {
         } else {
             self.counter = self.counter.saturating_add(1);
         }
-        Hlc { ms: self.last_ms, counter: self.counter, node: self.node.clone() }
+        Hlc {
+            ms: self.last_ms,
+            counter: self.counter,
+            node: self.node.clone(),
+        }
     }
 
     /// Moves the clock past a timestamp received from another node, so the
@@ -106,22 +114,40 @@ mod tests {
 
     #[test]
     fn string_order_matches_timestamp_order() {
-        let a = Hlc { ms: 999, counter: 5, node: "b".into() };
-        let b = Hlc { ms: 1000, counter: 0, node: "a".into() };
+        let a = Hlc {
+            ms: 999,
+            counter: 5,
+            node: "b".into(),
+        };
+        let b = Hlc {
+            ms: 1000,
+            counter: 0,
+            node: "a".into(),
+        };
         assert!(a < b);
         assert!(a.to_string() < b.to_string());
     }
 
     #[test]
     fn round_trips_through_string() {
-        let h = Hlc { ms: 1_793_572_081_259, counter: 3, node: "dev1".into() };
+        let h = Hlc {
+            ms: 1_793_572_081_259,
+            counter: 3,
+            node: "dev1".into(),
+        };
         assert_eq!(h.to_string(), "1793572081259-0003-dev1");
         assert_eq!(h.to_string().parse::<Hlc>().unwrap(), h);
     }
 
     #[test]
     fn rejects_malformed() {
-        for s in ["", "123-0001-x", "1793572081259-1-x", "1793572081259-0001-", "1793572081259-0001-a-b"] {
+        for s in [
+            "",
+            "123-0001-x",
+            "1793572081259-1-x",
+            "1793572081259-0001-",
+            "1793572081259-0001-a-b",
+        ] {
             assert!(s.parse::<Hlc>().is_err(), "{s}");
         }
     }
@@ -139,7 +165,11 @@ mod tests {
     fn observing_a_later_remote_moves_the_clock_past_it() {
         let mut c = Clock::new("n");
         c.now(100);
-        let remote = Hlc { ms: 500, counter: 7, node: "r".into() };
+        let remote = Hlc {
+            ms: 500,
+            counter: 7,
+            node: "r".into(),
+        };
         c.observe(&remote);
         assert!(c.now(200) > remote);
     }

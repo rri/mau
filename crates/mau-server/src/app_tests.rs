@@ -21,19 +21,33 @@ pub const ORIGIN: &str = "http://localhost:8370";
 impl TestApp {
     pub async fn new() -> Self {
         let dir = tempfile::tempdir().unwrap();
-        let config = Config { data_dir: dir.path().to_path_buf(), ..Config::default() };
+        let config = Config {
+            data_dir: dir.path().to_path_buf(),
+            ..Config::default()
+        };
         let db = crate::db::open(&config.database_path()).await.unwrap();
         let state = AppState::new(db, config).unwrap();
         TestApp { state, _dir: dir }
     }
 
-    pub async fn request(&self, method: &str, path: &str, body: Option<Value>, cookie: Option<&str>) -> (StatusCode, Value, Option<String>) {
-        let mut req = Request::builder().method(method).uri(path).header(header::ORIGIN, ORIGIN);
+    pub async fn request(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<Value>,
+        cookie: Option<&str>,
+    ) -> (StatusCode, Value, Option<String>) {
+        let mut req = Request::builder()
+            .method(method)
+            .uri(path)
+            .header(header::ORIGIN, ORIGIN);
         if let Some(c) = cookie {
             req = req.header(header::COOKIE, format!("mau_session={c}"));
         }
         let req = match body {
-            Some(b) => req.header(header::CONTENT_TYPE, "application/json").body(Body::from(b.to_string())),
+            Some(b) => req
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(b.to_string())),
             None => req.body(Body::empty()),
         }
         .unwrap();
@@ -72,7 +86,9 @@ impl TestApp {
             .execute(&self.state.db)
             .await
             .unwrap();
-        let token = crate::auth::session::create(&self.state.db, &id, "Test", false, true).await.unwrap();
+        let token = crate::auth::session::create(&self.state.db, &id, "Test", false, true)
+            .await
+            .unwrap();
         (id, token)
     }
 }
@@ -103,7 +119,11 @@ async fn fresh_instance_requires_setup() {
 
     // Without the setup token nobody can register.
     let (status, _) = app
-        .post("/api/auth/register/start", json!({"username": "rri", "display_name": "R", "time_zone": "UTC"}), None)
+        .post(
+            "/api/auth/register/start",
+            json!({"username": "rri", "display_name": "R", "time_zone": "UTC"}),
+            None,
+        )
         .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 
@@ -117,30 +137,39 @@ async fn fresh_instance_requires_setup() {
         )
         .await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    assert_eq!(body["options"]["publicKey"]["authenticatorSelection"]["residentKey"], "required");
+    assert_eq!(
+        body["options"]["publicKey"]["authenticatorSelection"]["residentKey"],
+        "required"
+    );
 }
 
 #[tokio::test]
 async fn invite_only_signup_needs_a_live_invite() {
     let app = TestApp::new().await;
     app.user("admin1", true).await;
-    let start = |invite: Option<&str>| {
-        json!({"username": "juno", "display_name": "Juno", "time_zone": "UTC", "invite": invite})
-    };
-    let (status, _) = app.post("/api/auth/register/start", start(None), None).await;
+    let start = |invite: Option<&str>| json!({"username": "juno", "display_name": "Juno", "time_zone": "UTC", "invite": invite});
+    let (status, _) = app
+        .post("/api/auth/register/start", start(None), None)
+        .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
-    let (status, _) = app.post("/api/auth/register/start", start(Some("bogus")), None).await;
+    let (status, _) = app
+        .post("/api/auth/register/start", start(Some("bogus")), None)
+        .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 
-    sqlx::query("INSERT INTO invites (id, token_hash, created_at, expires_at) VALUES ('i1', ?, 0, ?)")
-        .bind(crate::util::sha256("good"))
-        .bind(crate::util::now_ms() + 1000 * 60)
-        .execute(&app.state.db)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO invites (id, token_hash, created_at, expires_at) VALUES ('i1', ?, 0, ?)",
+    )
+    .bind(crate::util::sha256("good"))
+    .bind(crate::util::now_ms() + 1000 * 60)
+    .execute(&app.state.db)
+    .await
+    .unwrap();
     let (_, info) = app.get("/api/auth/invite/good", None).await;
     assert_eq!(info["valid"], true);
-    let (status, _) = app.post("/api/auth/register/start", start(Some("good")), None).await;
+    let (status, _) = app
+        .post("/api/auth/register/start", start(Some("good")), None)
+        .await;
     assert_eq!(status, StatusCode::OK);
 }
 
@@ -149,11 +178,17 @@ async fn username_availability() {
     let app = TestApp::new().await;
     app.user("taken", false).await;
     let check = |u: &str| json!({ "username": u });
-    let (_, b) = app.post("/api/auth/username-available", check("Taken"), None).await;
+    let (_, b) = app
+        .post("/api/auth/username-available", check("Taken"), None)
+        .await;
     assert_eq!(b["available"], false);
-    let (_, b) = app.post("/api/auth/username-available", check("ok_name"), None).await;
+    let (_, b) = app
+        .post("/api/auth/username-available", check("ok_name"), None)
+        .await;
     assert_eq!(b["available"], true);
-    let (_, b) = app.post("/api/auth/username-available", check("settings"), None).await;
+    let (_, b) = app
+        .post("/api/auth/username-available", check("settings"), None)
+        .await;
     assert_eq!(b["available"], false);
 }
 
@@ -173,11 +208,15 @@ async fn recovery_code_gives_restricted_session_once() {
     let app = TestApp::new().await;
     let (id, _) = app.user("rri", true).await;
     let mut tx = app.state.db.begin().await.unwrap();
-    let codes = crate::auth::recovery::regenerate(&mut tx, &id).await.unwrap();
+    let codes = crate::auth::recovery::regenerate(&mut tx, &id)
+        .await
+        .unwrap();
     tx.commit().await.unwrap();
 
     let body = json!({"username": "RRI", "code": codes[0].to_uppercase()});
-    let (status, res, cookie) = app.request("POST", "/api/auth/recovery", Some(body.clone()), None).await;
+    let (status, res, cookie) = app
+        .request("POST", "/api/auth/recovery", Some(body.clone()), None)
+        .await;
     assert_eq!(status, StatusCode::OK, "{res}");
     assert_eq!(res["codes_left"], 9);
     let cookie = cookie.unwrap();
@@ -190,7 +229,9 @@ async fn recovery_code_gives_restricted_session_once() {
     assert_eq!(err["error"], "enroll_required");
 
     // The same code doesn't work twice.
-    let (status, _, _) = app.request("POST", "/api/auth/recovery", Some(body), None).await;
+    let (status, _, _) = app
+        .request("POST", "/api/auth/recovery", Some(body), None)
+        .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
@@ -198,12 +239,23 @@ async fn recovery_code_gives_restricted_session_once() {
 async fn sensitive_actions_need_a_recent_passkey() {
     let app = TestApp::new().await;
     let (_, cookie) = app.user("rri", false).await;
-    sqlx::query("UPDATE sessions SET reauth_at = 0").execute(&app.state.db).await.unwrap();
-    let (status, err) = app.post("/api/recovery-codes/regenerate", json!({}), Some(&cookie)).await;
+    sqlx::query("UPDATE sessions SET reauth_at = 0")
+        .execute(&app.state.db)
+        .await
+        .unwrap();
+    let (status, err) = app
+        .post("/api/recovery-codes/regenerate", json!({}), Some(&cookie))
+        .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
     assert_eq!(err["error"], "reauth_required");
-    sqlx::query("UPDATE sessions SET reauth_at = ?").bind(crate::util::now_ms()).execute(&app.state.db).await.unwrap();
-    let (status, codes) = app.post("/api/recovery-codes/regenerate", json!({}), Some(&cookie)).await;
+    sqlx::query("UPDATE sessions SET reauth_at = ?")
+        .bind(crate::util::now_ms())
+        .execute(&app.state.db)
+        .await
+        .unwrap();
+    let (status, codes) = app
+        .post("/api/recovery-codes/regenerate", json!({}), Some(&cookie))
+        .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(codes["codes"].as_array().unwrap().len(), 10);
 }
@@ -212,10 +264,23 @@ async fn sensitive_actions_need_a_recent_passkey() {
 async fn username_change_reserves_the_old_name() {
     let app = TestApp::new().await;
     let (_, cookie) = app.user("oldname", false).await;
-    let (status, me, _) = app.request("PATCH", "/api/account", Some(json!({"username": "newname", "bio": "Hi"})), Some(&cookie)).await;
+    let (status, me, _) = app
+        .request(
+            "PATCH",
+            "/api/account",
+            Some(json!({"username": "newname", "bio": "Hi"})),
+            Some(&cookie),
+        )
+        .await;
     assert_eq!(status, StatusCode::OK, "{me}");
     assert_eq!(me["username"], "newname");
-    let (_, b) = app.post("/api/auth/username-available", json!({"username": "oldname"}), None).await;
+    let (_, b) = app
+        .post(
+            "/api/auth/username-available",
+            json!({"username": "oldname"}),
+            None,
+        )
+        .await;
     assert_eq!(b["available"], false);
 }
 
@@ -228,7 +293,9 @@ async fn last_passkey_cannot_be_removed() {
         .execute(&app.state.db)
         .await
         .unwrap();
-    let (status, err, _) = app.request("DELETE", "/api/passkeys/p1", None, Some(&cookie)).await;
+    let (status, err, _) = app
+        .request("DELETE", "/api/passkeys/p1", None, Some(&cookie))
+        .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(err["error"], "last_passkey");
     let _ = Arc::clone(&app.state.config);

@@ -55,20 +55,34 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/login/finish", post(auth::login_finish))
         .route("/auth/logout", post(auth::logout))
         .route("/auth/recovery", post(auth::recovery_sign_in))
-        .route("/auth/enroll/{token}", get(auth::enroll_info).post(auth::enroll_use))
+        .route(
+            "/auth/enroll/{token}",
+            get(auth::enroll_info).post(auth::enroll_use),
+        )
         .route("/auth/reauth/start", post(auth::reauth_start))
         .route("/auth/reauth/finish", post(auth::reauth_finish))
         // Account settings
-        .route("/account", patch(manage::update_account).delete(manage::delete_account))
+        .route(
+            "/account",
+            patch(manage::update_account).delete(manage::delete_account),
+        )
         .route("/passkeys", get(manage::list_passkeys))
         .route("/passkeys/start", post(auth::passkey_add_start))
         .route("/passkeys/finish", post(auth::passkey_add_finish))
-        .route("/passkeys/{id}", patch(manage::rename_passkey).delete(manage::delete_passkey))
+        .route(
+            "/passkeys/{id}",
+            patch(manage::rename_passkey).delete(manage::delete_passkey),
+        )
         .route("/sessions", get(manage::list_sessions))
-        .route("/sessions/revoke-others", post(manage::revoke_other_sessions))
+        .route(
+            "/sessions/revoke-others",
+            post(manage::revoke_other_sessions),
+        )
         .route("/sessions/{id}", delete(manage::revoke_session))
         .route("/recovery-codes", get(manage::recovery_status))
         .route("/recovery-codes/regenerate", post(manage::regenerate_codes))
+        // Library sync
+        .route("/sync", post(crate::library::sync))
         .fallback(api_not_found)
         .layer(middleware::from_fn_with_state(state.clone(), check_origin));
     Router::new()
@@ -80,11 +94,20 @@ pub fn router(state: AppState) -> Router {
 
 /// Rejects state-changing API requests from other sites. SameSite cookies
 /// already block most of these; this also covers older browsers.
-async fn check_origin(State(state): State<AppState>, req: Request, next: Next) -> Result<Response, ApiError> {
+async fn check_origin(
+    State(state): State<AppState>,
+    req: Request,
+    next: Next,
+) -> Result<Response, ApiError> {
     if !matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS) {
-        let origin = req.headers().get(header::ORIGIN).and_then(|v| v.to_str().ok());
+        let origin = req
+            .headers()
+            .get(header::ORIGIN)
+            .and_then(|v| v.to_str().ok());
         if origin != Some(state.config.public_url.as_str()) {
-            return Err(ApiError::forbidden("Request origin doesn't match this site's address."));
+            return Err(ApiError::forbidden(
+                "Request origin doesn't match this site's address.",
+            ));
         }
     }
     Ok(next.run(req).await)
@@ -97,10 +120,12 @@ struct Health {
 }
 
 async fn health() -> Json<Health> {
-    Json(Health { status: "ok", version: mau_core::VERSION })
+    Json(Health {
+        status: "ok",
+        version: mau_core::VERSION,
+    })
 }
 
 async fn api_not_found() -> ApiError {
     ApiError::not_found("No such API endpoint.")
 }
-

@@ -3,7 +3,11 @@
 /// Strips spaces and hyphens, validates the check digit, and returns the
 /// ISBN-13. `None` if the input isn't a valid ISBN.
 pub fn normalize(input: &str) -> Option<String> {
-    let s: String = input.chars().filter(|c| !matches!(c, ' ' | '-')).collect::<String>().to_ascii_uppercase();
+    let s: String = input
+        .chars()
+        .filter(|c| !matches!(c, ' ' | '-'))
+        .collect::<String>()
+        .to_ascii_uppercase();
     match s.len() {
         13 if s.bytes().all(|b| b.is_ascii_digit()) && valid13(&s) => Some(s),
         10 if s[..9].bytes().all(|b| b.is_ascii_digit())
@@ -64,7 +68,10 @@ mod tests {
 
     #[test]
     fn isbn13() {
-        assert_eq!(normalize("978-0-306-40615-7").as_deref(), Some("9780306406157"));
+        assert_eq!(
+            normalize("978-0-306-40615-7").as_deref(),
+            Some("9780306406157")
+        );
         assert_eq!(normalize("9780306406158"), None);
     }
 

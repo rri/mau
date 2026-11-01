@@ -2,9 +2,35 @@
 
 /// Names that would collide with routes or look official.
 const RESERVED: &[&str] = &[
-    "admin", "administrator", "api", "app", "assets", "auth", "catalog", "covers", "enroll", "help",
-    "invite", "login", "logout", "mau", "me", "new", "reading", "root", "s", "settings", "setup",
-    "signin", "signup", "static", "support", "system", "u", "user", "users",
+    "admin",
+    "administrator",
+    "api",
+    "app",
+    "assets",
+    "auth",
+    "catalog",
+    "covers",
+    "enroll",
+    "help",
+    "invite",
+    "login",
+    "logout",
+    "mau",
+    "me",
+    "new",
+    "reading",
+    "root",
+    "s",
+    "settings",
+    "setup",
+    "signin",
+    "signup",
+    "static",
+    "support",
+    "system",
+    "u",
+    "user",
+    "users",
 ];
 
 #[derive(Debug, PartialEq, Eq)]
@@ -29,7 +55,10 @@ pub fn validate(input: &str) -> Result<String, Invalid> {
     if !(3..=30).contains(&name.len()) {
         return Err(Invalid::Length);
     }
-    if !name.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-') {
+    if !name
+        .bytes()
+        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-')
+    {
         return Err(Invalid::Characters);
     }
     if RESERVED.contains(&name.as_str()) {

@@ -23,7 +23,11 @@ pub type ApiResult<T> = Result<T, ApiError>;
 
 impl ApiError {
     pub fn new(status: StatusCode, code: &'static str, message: impl Into<String>) -> Self {
-        Self { status, code, message: message.into() }
+        Self {
+            status,
+            code,
+            message: message.into(),
+        }
     }
     pub fn bad_request(code: &'static str, message: impl Into<String>) -> Self {
         Self::new(StatusCode::BAD_REQUEST, code, message)
@@ -42,20 +46,39 @@ impl ApiError {
     }
     /// The action needs a passkey confirmation from the last few minutes.
     pub fn reauth_required() -> Self {
-        Self::new(StatusCode::FORBIDDEN, "reauth_required", "Confirm with a passkey to continue.")
+        Self::new(
+            StatusCode::FORBIDDEN,
+            "reauth_required",
+            "Confirm with a passkey to continue.",
+        )
     }
     pub fn too_many_requests() -> Self {
-        Self::new(StatusCode::TOO_MANY_REQUESTS, "rate_limited", "Too many attempts. Wait a minute and try again.")
+        Self::new(
+            StatusCode::TOO_MANY_REQUESTS,
+            "rate_limited",
+            "Too many attempts. Wait a minute and try again.",
+        )
     }
     pub fn internal(err: impl std::fmt::Display) -> Self {
         tracing::error!("internal error: {err}");
-        Self::new(StatusCode::INTERNAL_SERVER_ERROR, "internal", "Something went wrong on the server.")
+        Self::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal",
+            "Something went wrong on the server.",
+        )
     }
 }
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        (self.status, Json(Body { error: self.code, message: &self.message })).into_response()
+        (
+            self.status,
+            Json(Body {
+                error: self.code,
+                message: &self.message,
+            }),
+        )
+            .into_response()
     }
 }
 

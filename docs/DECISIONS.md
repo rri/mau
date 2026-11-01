@@ -100,3 +100,27 @@ Newest entries at the bottom of each section.
 - **Routes:** signed-out pages under `src/routes/(public)`, the app under
   `src/routes/(app)` with the tab bar (bottom on phones, left sidebar from
   900px wide).
+
+## Milestone 3: library, sync, Reading view
+
+- **Progress conflicts are judged per chain, not per tap.** A device's unsynced
+  progress changes form a chain (each one's `base` is the previous one's
+  clock). The server judges the whole chain by its newest change against the
+  current position: older chains are dropped whole; newer chains that branched
+  from an older position replace the other branch's events after that point.
+  Judging tap by tap would drop the early taps of a winning session.
+- **Undo is an operation** (`progress.undo`) that removes the event it undoes
+  and restores the position, so undone taps never count as reading.
+- **One change number per sync request.** All rows a request changes share
+  one `seq`, taken first so the transaction holds SQLite's write lock.
+- **Each operation runs in a savepoint;** an invalid operation is rolled back
+  and reported under `rejected`, and the device discards it. Operations about
+  deleted or unknown rows, or with stale clocks, are `dropped` silently.
+- **Removing a book** tombstones its readings, events, copies, and tags in
+  the same operation (the spec's "permanently deletes"), and blanks its notes
+  and rating. Tombstone rows stay so other devices learn about the removal.
+- **Seed data:** `mau seed --user NAME` (or `just seed NAME`) adds the mocks'
+  16 books with generated reading history. It refuses unless `public_url` is
+  `http://localhost…`.
+- **Dates for progress events** are computed by the device in the user's time
+  zone setting and stored as `YYYY-MM-DD`.

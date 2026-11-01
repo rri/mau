@@ -1,7 +1,7 @@
 //! Recovery codes: generation, hashing, and checking.
 
-use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use argon2::Argon2;
+use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use rand::{Rng, RngCore};
 use sqlx::{Sqlite, Transaction};
 
@@ -26,7 +26,10 @@ pub fn generate_code() -> String {
 
 /// Lowercase, without spaces or the hyphen, so typing variations still match.
 fn canonical(code: &str) -> String {
-    code.chars().filter(|c| c.is_ascii_alphanumeric()).map(|c| c.to_ascii_lowercase()).collect()
+    code.chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .map(|c| c.to_ascii_lowercase())
+        .collect()
 }
 
 fn hash(code: &str) -> String {
@@ -41,12 +44,19 @@ fn hash(code: &str) -> String {
 
 fn verify(code: &str, phc: &str) -> bool {
     PasswordHash::new(phc)
-        .map(|h| Argon2::default().verify_password(canonical(code).as_bytes(), &h).is_ok())
+        .map(|h| {
+            Argon2::default()
+                .verify_password(canonical(code).as_bytes(), &h)
+                .is_ok()
+        })
         .unwrap_or(false)
 }
 
 /// Replaces the user's codes with a fresh set and returns them in plain text.
-pub async fn regenerate(tx: &mut Transaction<'_, Sqlite>, user_id: &str) -> sqlx::Result<Vec<String>> {
+pub async fn regenerate(
+    tx: &mut Transaction<'_, Sqlite>,
+    user_id: &str,
+) -> sqlx::Result<Vec<String>> {
     let codes: Vec<String> = (0..CODE_COUNT).map(|_| generate_code()).collect();
     let hashes: Vec<String> = {
         let codes = codes.clone();
@@ -54,7 +64,10 @@ pub async fn regenerate(tx: &mut Transaction<'_, Sqlite>, user_id: &str) -> sqlx
             .await
             .expect("hashing task")
     };
-    sqlx::query("DELETE FROM recovery_codes WHERE user_id = ?").bind(user_id).execute(&mut **tx).await?;
+    sqlx::query("DELETE FROM recovery_codes WHERE user_id = ?")
+        .bind(user_id)
+        .execute(&mut **tx)
+        .await?;
     for h in hashes {
         sqlx::query("INSERT INTO recovery_codes (user_id, hash) VALUES (?, ?)")
             .bind(user_id)
@@ -66,7 +79,11 @@ pub async fn regenerate(tx: &mut Transaction<'_, Sqlite>, user_id: &str) -> sqlx
 }
 
 /// Marks a matching unused code as used. Returns whether one matched.
-pub async fn consume(tx: &mut Transaction<'_, Sqlite>, user_id: &str, code: &str) -> sqlx::Result<bool> {
+pub async fn consume(
+    tx: &mut Transaction<'_, Sqlite>,
+    user_id: &str,
+    code: &str,
+) -> sqlx::Result<bool> {
     let rows: Vec<(i64, String)> =
         sqlx::query_as("SELECT id, hash FROM recovery_codes WHERE user_id = ? AND used_at IS NULL")
             .bind(user_id)
@@ -74,7 +91,9 @@ pub async fn consume(tx: &mut Transaction<'_, Sqlite>, user_id: &str, code: &str
             .await?;
     let code = code.to_string();
     let matched = tokio::task::spawn_blocking(move || {
-        rows.into_iter().find(|(_, h)| verify(&code, h)).map(|(id, _)| id)
+        rows.into_iter()
+            .find(|(_, h)| verify(&code, h))
+            .map(|(id, _)| id)
     })
     .await
     .expect("verify task");
@@ -103,7 +122,11 @@ mod tests {
         let c = generate_code();
         assert_eq!(c.len(), 11);
         assert_eq!(&c[5..6], "-");
-        assert!(c.bytes().filter(|&b| b != b'-').all(|b| ALPHABET.contains(&b)));
+        assert!(
+            c.bytes()
+                .filter(|&b| b != b'-')
+                .all(|b| ALPHABET.contains(&b))
+        );
     }
 
     #[test]

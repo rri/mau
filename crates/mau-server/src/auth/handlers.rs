@@ -13,10 +13,10 @@ use super::ceremony::{Ceremony, NewAccount};
 use super::session::{self, AnySession, Authed};
 use super::{User, recovery};
 use crate::app::AppState;
+use crate::audit;
 use crate::error::{ApiError, ApiResult};
 use crate::settings::{self, SignupMode};
 use crate::util::{DAY_MS, b64url, device_label, new_id, now_ms, sha256};
-use crate::audit;
 
 #[derive(Serialize, TS)]
 #[ts(export)]
@@ -67,22 +67,35 @@ pub fn is_secure(state: &AppState) -> bool {
 }
 
 fn user_agent(headers: &HeaderMap) -> String {
-    device_label(headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok()).unwrap_or(""))
+    device_label(
+        headers
+            .get(header::USER_AGENT)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or(""),
+    )
 }
 
 fn with_cookie<T: Serialize>(state: &AppState, token: &str, body: T) -> Response {
     (
-        AppendHeaders([(header::SET_COOKIE, session::cookie_header(token, is_secure(state)))]),
+        AppendHeaders([(
+            header::SET_COOKIE,
+            session::cookie_header(token, is_secure(state)),
+        )]),
         Json(body),
     )
         .into_response()
 }
 
 async fn admin_exists(db: &sqlx::SqlitePool) -> sqlx::Result<bool> {
-    sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE is_admin = 1)").fetch_one(db).await
+    sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE is_admin = 1)")
+        .fetch_one(db)
+        .await
 }
 
-pub async fn status(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<Json<AuthStatus>> {
+pub async fn status(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> ApiResult<Json<AuthStatus>> {
     let session = match session::token_from_headers(&headers) {
         Some(t) => session::lookup(&state.db, &t).await?,
         None => None,
@@ -134,11 +147,18 @@ pub async fn username_available(
     Json(req): Json<UsernameCheck>,
 ) -> ApiResult<Json<UsernameAvailability>> {
     let res = match mau_core::username::validate(&req.username) {
-        Err(e) => UsernameAvailability { available: false, message: e.message().into() },
-        Ok(name) if username_taken(&state.db, &name, None).await? => {
-            UsernameAvailability { available: false, message: format!("@{name} is taken.") }
-        }
-        Ok(name) => UsernameAvailability { available: true, message: format!("@{name} is available.") },
+        Err(e) => UsernameAvailability {
+            available: false,
+            message: e.message().into(),
+        },
+        Ok(name) if username_taken(&state.db, &name, None).await? => UsernameAvailability {
+            available: false,
+            message: format!("@{name} is taken."),
+        },
+        Ok(name) => UsernameAvailability {
+            available: true,
+            message: format!("@{name} is available."),
+        },
     };
     Ok(Json(res))
 }
@@ -154,7 +174,10 @@ pub struct InviteInfo {
 }
 
 /// The invite's ID if the token is usable now.
-async fn live_invite(db: impl sqlx::SqliteExecutor<'_>, token: &str) -> sqlx::Result<Option<(String, Option<String>)>> {
+async fn live_invite(
+    db: impl sqlx::SqliteExecutor<'_>,
+    token: &str,
+) -> sqlx::Result<Option<(String, Option<String>)>> {
     sqlx::query_as(
         "SELECT i.id, u.display_name FROM invites i LEFT JOIN users u ON u.id = i.created_by
          WHERE i.token_hash = ? AND i.used_at IS NULL AND i.revoked = 0 AND i.expires_at > ?",
@@ -165,12 +188,21 @@ async fn live_invite(db: impl sqlx::SqliteExecutor<'_>, token: &str) -> sqlx::Re
     .await
 }
 
-pub async fn invite_info(State(state): State<AppState>, Path(token): Path<String>) -> ApiResult<Json<InviteInfo>> {
+pub async fn invite_info(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+) -> ApiResult<Json<InviteInfo>> {
     let invite = live_invite(&state.db, &token).await?;
     let closed = settings::signup_mode(&state.db).await? == SignupMode::Closed;
     Ok(Json(match invite {
-        Some((_, inviter)) if !closed => InviteInfo { valid: true, inviter },
-        _ => InviteInfo { valid: false, inviter: None },
+        Some((_, inviter)) if !closed => InviteInfo {
+            valid: true,
+            inviter,
+        },
+        _ => InviteInfo {
+            valid: false,
+            inviter: None,
+        },
     }))
 }
 
@@ -190,7 +222,10 @@ fn setup_token_matches(state: &AppState, token: &str) -> bool {
     state.setup_token.lock().unwrap().as_deref() == Some(token)
 }
 
-pub async fn setup_check(State(state): State<AppState>, Json(req): Json<SetupCheck>) -> ApiResult<Json<Valid>> {
+pub async fn setup_check(
+    State(state): State<AppState>,
+    Json(req): Json<SetupCheck>,
+) -> ApiResult<Json<Valid>> {
     let valid = setup_token_matches(&state, &req.token) && !admin_exists(&state.db).await?;
     Ok(Json(Valid { valid }))
 }
@@ -211,14 +246,22 @@ pub struct RegisterStart {
 pub fn clean_display_name(s: &str) -> ApiResult<String> {
     let s = s.trim();
     if s.is_empty() || s.chars().count() > 80 {
-        return Err(ApiError::bad_request("display_name", "Enter a display name of up to 80 characters."));
+        return Err(ApiError::bad_request(
+            "display_name",
+            "Enter a display name of up to 80 characters.",
+        ));
     }
     Ok(s.to_string())
 }
 
 pub fn clean_time_zone(s: &str) -> ApiResult<String> {
     let s = s.trim();
-    if s.is_empty() || s.len() > 64 || !s.bytes().all(|b| b.is_ascii_alphanumeric() || b"/_+-".contains(&b)) {
+    if s.is_empty()
+        || s.len() > 64
+        || !s
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"/_+-".contains(&b))
+    {
         return Err(ApiError::bad_request("time_zone", "Unknown time zone."));
     }
     Ok(s.to_string())
@@ -247,7 +290,9 @@ pub async fn register_start(
     let mut invite_id = None;
     if let Some(token) = &req.setup {
         if !setup_token_matches(&state, token) || admin_exists(&state.db).await? {
-            return Err(ApiError::forbidden("This setup link has already been used."));
+            return Err(ApiError::forbidden(
+                "This setup link has already been used.",
+            ));
         }
         first_admin = true;
     } else if !admin_exists(&state.db).await? {
@@ -258,16 +303,21 @@ pub async fn register_start(
         if mode == SignupMode::Closed {
             return Err(ApiError::forbidden("Signup is closed on this instance."));
         }
-        let (id, _) = live_invite(&state.db, token)
-            .await?
-            .ok_or_else(|| ApiError::forbidden("This invite link has expired or has already been used."))?;
+        let (id, _) = live_invite(&state.db, token).await?.ok_or_else(|| {
+            ApiError::forbidden("This invite link has expired or has already been used.")
+        })?;
         invite_id = Some(id);
     } else if mode != SignupMode::Open {
-        return Err(ApiError::forbidden("You need an invite link to create an account."));
+        return Err(ApiError::forbidden(
+            "You need an invite link to create an account.",
+        ));
     }
 
     if username_taken(&state.db, &username, None).await? {
-        return Err(ApiError::conflict("username_taken", format!("@{username} is taken.")));
+        return Err(ApiError::conflict(
+            "username_taken",
+            format!("@{username} is taken."),
+        ));
     }
 
     let webauthn_id = Uuid::new_v4();
@@ -284,8 +334,14 @@ pub async fn register_start(
         invite_id,
         first_admin,
     };
-    let challenge = state.ceremonies.insert(Ceremony::Register { account, state: reg });
-    Ok(Json(CeremonyStart { challenge, options: serde_json::to_value(&ccr)? }))
+    let challenge = state.ceremonies.insert(Ceremony::Register {
+        account,
+        state: reg,
+    });
+    Ok(Json(CeremonyStart {
+        challenge,
+        options: serde_json::to_value(&ccr)?,
+    }))
 }
 
 #[derive(Deserialize, TS)]
@@ -305,7 +361,11 @@ pub struct RecoveryCodes {
 
 pub fn clean_passkey_name(name: &str, fallback: &str) -> String {
     let n: String = name.trim().chars().take(60).collect();
-    if n.is_empty() { fallback.to_string() } else { n }
+    if n.is_empty() {
+        fallback.to_string()
+    } else {
+        n
+    }
 }
 
 fn expired() -> ApiError {
@@ -317,26 +377,41 @@ pub async fn register_finish(
     headers: HeaderMap,
     Json(req): Json<RegisterFinish>,
 ) -> ApiResult<Response> {
-    let Some(Ceremony::Register { account, state: reg }) = state.ceremonies.take(&req.challenge) else {
+    let Some(Ceremony::Register {
+        account,
+        state: reg,
+    }) = state.ceremonies.take(&req.challenge)
+    else {
         return Err(expired());
     };
     let passkey = state
         .webauthn
         .finish_passkey_registration(&req.credential, &reg)
-        .map_err(|e| ApiError::bad_request("passkey", format!("The passkey couldn't be registered ({e}).")))?;
+        .map_err(|e| {
+            ApiError::bad_request(
+                "passkey",
+                format!("The passkey couldn't be registered ({e})."),
+            )
+        })?;
     let device = user_agent(&headers);
     let now = now_ms();
 
     let mut tx = state.db.begin().await?;
     if username_taken(&mut *tx, &account.username, None).await? {
-        return Err(ApiError::conflict("username_taken", format!("@{} was just taken.", account.username)));
+        return Err(ApiError::conflict(
+            "username_taken",
+            format!("@{} was just taken.", account.username),
+        ));
     }
     if account.first_admin {
-        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE is_admin = 1)")
-            .fetch_one(&mut *tx)
-            .await?;
+        let exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE is_admin = 1)")
+                .fetch_one(&mut *tx)
+                .await?;
         if exists {
-            return Err(ApiError::forbidden("This setup link has already been used."));
+            return Err(ApiError::forbidden(
+                "This setup link has already been used.",
+            ));
         }
     }
     if let Some(invite_id) = &account.invite_id {
@@ -350,7 +425,9 @@ pub async fn register_finish(
         .await?
         .rows_affected();
         if claimed == 0 {
-            return Err(ApiError::forbidden("This invite link has expired or has already been used."));
+            return Err(ApiError::forbidden(
+                "This invite link has expired or has already been used.",
+            ));
         }
     }
 
@@ -375,10 +452,19 @@ pub async fn register_finish(
             .execute(&mut *tx)
             .await?;
     }
-    insert_passkey(&mut tx, &user_id, &clean_passkey_name(&req.passkey_name, &device), &passkey).await?;
+    insert_passkey(
+        &mut tx,
+        &user_id,
+        &clean_passkey_name(&req.passkey_name, &device),
+        &passkey,
+    )
+    .await?;
     let codes = recovery::regenerate(&mut tx, &user_id).await?;
     let action = if account.first_admin {
-        format!("{} created the instance's first (admin) account", account.username)
+        format!(
+            "{} created the instance's first (admin) account",
+            account.username
+        )
     } else {
         format!("{} signed up", account.username)
     };
@@ -422,11 +508,17 @@ pub async fn insert_passkey(
 // Sign-in
 
 pub async fn login_start(State(state): State<AppState>) -> ApiResult<Json<CeremonyStart>> {
-    let (mut rcr, auth) = state.webauthn.start_discoverable_authentication().map_err(ApiError::internal)?;
+    let (mut rcr, auth) = state
+        .webauthn
+        .start_discoverable_authentication()
+        .map_err(ApiError::internal)?;
     // A button press opens the normal prompt, not the autofill UI.
     rcr.mediation = None;
     let challenge = state.ceremonies.insert(Ceremony::Login { state: auth });
-    Ok(Json(CeremonyStart { challenge, options: serde_json::to_value(&rcr)? }))
+    Ok(Json(CeremonyStart {
+        challenge,
+        options: serde_json::to_value(&rcr)?,
+    }))
 }
 
 #[derive(Deserialize, TS)]
@@ -457,11 +549,17 @@ async fn passkey_by_cred(
             .bind(b64url(cred_id))
             .fetch_optional(db)
             .await?;
-    let Some((id, data, user_id)) = row else { return Ok(None) };
-    let user: User = sqlx::query_as(concat!("SELECT ", crate::user_columns!(), " FROM users WHERE id = ?"))
-        .bind(user_id)
-        .fetch_one(db)
-        .await?;
+    let Some((id, data, user_id)) = row else {
+        return Ok(None);
+    };
+    let user: User = sqlx::query_as(concat!(
+        "SELECT ",
+        crate::user_columns!(),
+        " FROM users WHERE id = ?"
+    ))
+    .bind(user_id)
+    .fetch_one(db)
+    .await?;
     let passkey = serde_json::from_str(&data).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
     Ok(Some((id, passkey, user)))
 }
@@ -499,10 +597,13 @@ pub async fn login_finish(
     let Some(Ceremony::Login { state: auth }) = state.ceremonies.take(&req.challenge) else {
         return Err(expired());
     };
-    let (user_handle, cred_id) =
-        state.webauthn.identify_discoverable_authentication(&req.credential).map_err(|_| unknown_passkey())?;
-    let (pk_id, mut passkey, user) =
-        passkey_by_cred(&state.db, cred_id).await?.ok_or_else(unknown_passkey)?;
+    let (user_handle, cred_id) = state
+        .webauthn
+        .identify_discoverable_authentication(&req.credential)
+        .map_err(|_| unknown_passkey())?;
+    let (pk_id, mut passkey, user) = passkey_by_cred(&state.db, cred_id)
+        .await?
+        .ok_or_else(unknown_passkey)?;
     if user.webauthn_id != user_handle.to_string() {
         return Err(unknown_passkey());
     }
@@ -511,7 +612,9 @@ pub async fn login_finish(
         .finish_discoverable_authentication_v2(&req.credential, auth, &passkey)
         .map_err(|_| unknown_passkey())?;
     if user.suspended {
-        return Err(ApiError::forbidden("This account is suspended. Contact an admin."));
+        return Err(ApiError::forbidden(
+            "This account is suspended. Contact an admin.",
+        ));
     }
     touch_passkey(&state.db, &pk_id, &mut passkey, &result).await?;
     let token = session::create(&state.db, &user.id, &user_agent(&headers), false, true).await?;
@@ -520,10 +623,16 @@ pub async fn login_finish(
 
 pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
     if let Some(token) = session::token_from_headers(&headers) {
-        sqlx::query("DELETE FROM sessions WHERE token_hash = ?").bind(sha256(&token)).execute(&state.db).await?;
+        sqlx::query("DELETE FROM sessions WHERE token_hash = ?")
+            .bind(sha256(&token))
+            .execute(&state.db)
+            .await?;
     }
     Ok((
-        AppendHeaders([(header::SET_COOKIE, session::clear_cookie_header(is_secure(&state)))]),
+        AppendHeaders([(
+            header::SET_COOKIE,
+            session::clear_cookie_header(is_secure(&state)),
+        )]),
         Json(Ok_ { ok: true }),
     )
         .into_response())
@@ -558,28 +667,41 @@ pub async fn recovery_sign_in(
         )
     };
     let name = req.username.trim().to_ascii_lowercase();
-    let user: Option<User> = sqlx::query_as(concat!("SELECT ", crate::user_columns!(), " FROM users WHERE username = ?"))
-        .bind(&name)
-        .fetch_optional(&state.db)
-        .await?;
+    let user: Option<User> = sqlx::query_as(concat!(
+        "SELECT ",
+        crate::user_columns!(),
+        " FROM users WHERE username = ?"
+    ))
+    .bind(&name)
+    .fetch_optional(&state.db)
+    .await?;
     let user = user.ok_or_else(wrong)?;
     let mut tx = state.db.begin().await?;
     if !recovery::consume(&mut tx, &user.id, &req.code).await? {
         return Err(wrong());
     }
     if user.suspended {
-        return Err(ApiError::forbidden("This account is suspended. Contact an admin."));
+        return Err(ApiError::forbidden(
+            "This account is suspended. Contact an admin.",
+        ));
     }
     sqlx::query("INSERT INTO recovery_events (user_id, at, message) VALUES (?, ?, ?)")
         .bind(&user.id)
         .bind(now_ms())
-        .bind(format!("Signed in with a recovery code on {}.", user_agent(&headers)))
+        .bind(format!(
+            "Signed in with a recovery code on {}.",
+            user_agent(&headers)
+        ))
         .execute(&mut *tx)
         .await?;
     let left = recovery::remaining(&mut *tx, &user.id).await?;
     tx.commit().await?;
     let token = session::create(&state.db, &user.id, &user_agent(&headers), true, false).await?;
-    Ok(with_cookie(&state, &token, RecoverySignedIn { codes_left: left }))
+    Ok(with_cookie(
+        &state,
+        &token,
+        RecoverySignedIn { codes_left: left },
+    ))
 }
 
 #[derive(Serialize, TS)]
@@ -589,7 +711,10 @@ pub struct EnrollInfo {
     pub username: Option<String>,
 }
 
-async fn live_enroll_link(db: impl sqlx::SqliteExecutor<'_>, token: &str) -> sqlx::Result<Option<(String, String)>> {
+async fn live_enroll_link(
+    db: impl sqlx::SqliteExecutor<'_>,
+    token: &str,
+) -> sqlx::Result<Option<(String, String)>> {
     sqlx::query_as(
         "SELECT e.user_id, u.username FROM enroll_links e JOIN users u ON u.id = e.user_id
          WHERE e.token_hash = ? AND e.used_at IS NULL AND e.expires_at > ?",
@@ -600,9 +725,15 @@ async fn live_enroll_link(db: impl sqlx::SqliteExecutor<'_>, token: &str) -> sql
     .await
 }
 
-pub async fn enroll_info(State(state): State<AppState>, Path(token): Path<String>) -> ApiResult<Json<EnrollInfo>> {
+pub async fn enroll_info(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+) -> ApiResult<Json<EnrollInfo>> {
     let link = live_enroll_link(&state.db, &token).await?;
-    Ok(Json(EnrollInfo { valid: link.is_some(), username: link.map(|(_, u)| u) }))
+    Ok(Json(EnrollInfo {
+        valid: link.is_some(),
+        username: link.map(|(_, u)| u),
+    }))
 }
 
 /// Uses an admin-issued enrollment link: signs in with a restricted session
@@ -624,7 +755,10 @@ pub async fn enroll_use(
     sqlx::query("INSERT INTO recovery_events (user_id, at, message) VALUES (?, ?, ?)")
         .bind(&user_id)
         .bind(now_ms())
-        .bind(format!("An admin's one-time enrollment link was used on {}.", user_agent(&headers)))
+        .bind(format!(
+            "An admin's one-time enrollment link was used on {}.",
+            user_agent(&headers)
+        ))
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
@@ -638,23 +772,41 @@ pub const ENROLL_LINK_TTL_MS: i64 = DAY_MS;
 // ---------------------------------------------------------------------------
 // Passkey confirmation for sensitive actions
 
-async fn user_passkeys(db: &sqlx::SqlitePool, user_id: &str) -> ApiResult<Vec<(String, webauthn_rs::prelude::Passkey)>> {
-    let rows: Vec<(String, String)> = sqlx::query_as("SELECT id, data FROM passkeys WHERE user_id = ?")
-        .bind(user_id)
-        .fetch_all(db)
-        .await?;
-    rows.into_iter().map(|(id, d)| Ok((id, serde_json::from_str(&d)?))).collect()
+async fn user_passkeys(
+    db: &sqlx::SqlitePool,
+    user_id: &str,
+) -> ApiResult<Vec<(String, webauthn_rs::prelude::Passkey)>> {
+    let rows: Vec<(String, String)> =
+        sqlx::query_as("SELECT id, data FROM passkeys WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_all(db)
+            .await?;
+    rows.into_iter()
+        .map(|(id, d)| Ok((id, serde_json::from_str(&d)?)))
+        .collect()
 }
 
-pub async fn reauth_start(State(state): State<AppState>, AnySession(s): AnySession) -> ApiResult<Json<CeremonyStart>> {
+pub async fn reauth_start(
+    State(state): State<AppState>,
+    AnySession(s): AnySession,
+) -> ApiResult<Json<CeremonyStart>> {
     let keys = user_passkeys(&state.db, &s.user.id).await?;
     if keys.is_empty() {
         return Err(ApiError::bad_request("no_passkeys", "Add a passkey first."));
     }
     let creds: Vec<_> = keys.into_iter().map(|(_, k)| k).collect();
-    let (rcr, auth) = state.webauthn.start_passkey_authentication(&creds).map_err(ApiError::internal)?;
-    let challenge = state.ceremonies.insert(Ceremony::Reauth { user_id: s.user.id, state: auth });
-    Ok(Json(CeremonyStart { challenge, options: serde_json::to_value(&rcr)? }))
+    let (rcr, auth) = state
+        .webauthn
+        .start_passkey_authentication(&creds)
+        .map_err(ApiError::internal)?;
+    let challenge = state.ceremonies.insert(Ceremony::Reauth {
+        user_id: s.user.id,
+        state: auth,
+    });
+    Ok(Json(CeremonyStart {
+        challenge,
+        options: serde_json::to_value(&rcr)?,
+    }))
 }
 
 pub async fn reauth_finish(
@@ -662,7 +814,11 @@ pub async fn reauth_finish(
     Authed(s): Authed,
     Json(req): Json<AssertionFinish>,
 ) -> ApiResult<Json<Ok_>> {
-    let Some(Ceremony::Reauth { user_id, state: auth }) = state.ceremonies.take(&req.challenge) else {
+    let Some(Ceremony::Reauth {
+        user_id,
+        state: auth,
+    }) = state.ceremonies.take(&req.challenge)
+    else {
         return Err(expired());
     };
     if user_id != s.user.id {
@@ -705,8 +861,14 @@ pub async fn passkey_add_start(
         .start_passkey_registration(uuid, &s.user.username, &s.user.display_name, Some(existing))
         .map_err(ApiError::internal)?;
     require_resident_key(&mut ccr);
-    let challenge = state.ceremonies.insert(Ceremony::AddPasskey { user_id: s.user.id, state: reg });
-    Ok(Json(CeremonyStart { challenge, options: serde_json::to_value(&ccr)? }))
+    let challenge = state.ceremonies.insert(Ceremony::AddPasskey {
+        user_id: s.user.id,
+        state: reg,
+    });
+    Ok(Json(CeremonyStart {
+        challenge,
+        options: serde_json::to_value(&ccr)?,
+    }))
 }
 
 #[derive(Deserialize, TS)]
@@ -724,7 +886,11 @@ pub async fn passkey_add_finish(
     AnySession(s): AnySession,
     Json(req): Json<PasskeyAddFinish>,
 ) -> ApiResult<Json<Ok_>> {
-    let Some(Ceremony::AddPasskey { user_id, state: reg }) = state.ceremonies.take(&req.challenge) else {
+    let Some(Ceremony::AddPasskey {
+        user_id,
+        state: reg,
+    }) = state.ceremonies.take(&req.challenge)
+    else {
         return Err(expired());
     };
     if user_id != s.user.id {
@@ -733,9 +899,20 @@ pub async fn passkey_add_finish(
     let passkey = state
         .webauthn
         .finish_passkey_registration(&req.credential, &reg)
-        .map_err(|e| ApiError::bad_request("passkey", format!("The passkey couldn't be registered ({e}).")))?;
+        .map_err(|e| {
+            ApiError::bad_request(
+                "passkey",
+                format!("The passkey couldn't be registered ({e})."),
+            )
+        })?;
     let mut tx = state.db.begin().await?;
-    insert_passkey(&mut tx, &s.user.id, &clean_passkey_name(&req.name, &user_agent(&headers)), &passkey).await?;
+    insert_passkey(
+        &mut tx,
+        &s.user.id,
+        &clean_passkey_name(&req.name, &user_agent(&headers)),
+        &passkey,
+    )
+    .await?;
     if s.restricted {
         // Recovery is complete: this session becomes a normal one.
         sqlx::query("UPDATE sessions SET restricted = 0, reauth_at = ? WHERE id = ?")

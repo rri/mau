@@ -2,6 +2,7 @@
 
 pub mod hlc;
 pub mod isbn;
+pub mod progress;
 pub mod rank;
 
 /// The mau version, shared by the server and the API.

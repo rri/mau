@@ -22,15 +22,23 @@ pub enum InviteWho {
     All,
 }
 
-pub async fn get<T: DeserializeOwned>(db: impl SqliteExecutor<'_>, key: &str) -> sqlx::Result<Option<T>> {
-    let raw: Option<String> = sqlx::query_scalar("SELECT value FROM instance_settings WHERE key = ?")
-        .bind(key)
-        .fetch_optional(db)
-        .await?;
+pub async fn get<T: DeserializeOwned>(
+    db: impl SqliteExecutor<'_>,
+    key: &str,
+) -> sqlx::Result<Option<T>> {
+    let raw: Option<String> =
+        sqlx::query_scalar("SELECT value FROM instance_settings WHERE key = ?")
+            .bind(key)
+            .fetch_optional(db)
+            .await?;
     Ok(raw.and_then(|v| serde_json::from_str(&v).ok()))
 }
 
-pub async fn set<T: Serialize>(db: impl SqliteExecutor<'_>, key: &str, value: &T) -> sqlx::Result<()> {
+pub async fn set<T: Serialize>(
+    db: impl SqliteExecutor<'_>,
+    key: &str,
+    value: &T,
+) -> sqlx::Result<()> {
     sqlx::query(
         "INSERT INTO instance_settings (key, value) VALUES (?, ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
