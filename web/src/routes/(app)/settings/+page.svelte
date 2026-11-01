@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { get } from '#lib/api/client.ts';
 	import type { RecoveryStatus } from '#lib/api/generated/RecoveryStatus.ts';
+	import type { Invites } from '#lib/api/generated/Invites.ts';
 	import type { Share } from '#lib/api/generated/Share.ts';
 	import { auth } from '#lib/auth.svelte.ts';
 	import { library } from '#lib/library.svelte.ts';
@@ -9,6 +10,7 @@
 
 	let codesLeft = $state<number | null>(null);
 	let shares = $state<number | null>(null);
+	let canInvite = $state(false);
 	let confirmSignOut = $state(false);
 
 	onMount(() => {
@@ -18,6 +20,10 @@
 		get<Share[]>('/shares')
 			.then((s) => (shares = s.length))
 			.catch(() => {});
+		if (!auth.me?.is_admin)
+			get<Invites>('/invites')
+				.then((i) => (canInvite = i.can_create || i.pending.length > 0))
+				.catch(() => {});
 	});
 
 	function startSignOut() {
@@ -44,7 +50,8 @@
 			label: 'Sharing',
 			value: shares === null ? '' : shares ? `${shares} shared` : 'Nothing shared'
 		},
-		{ href: '/settings/import', label: 'Import & export' }
+		{ href: '/settings/import', label: 'Import & export' },
+		...(canInvite ? [{ href: '/settings/invites', label: 'Invites' }] : [])
 	]);
 	const adminItems: Item[] = [
 		{ href: '/settings/admin/users', label: 'Users' },
