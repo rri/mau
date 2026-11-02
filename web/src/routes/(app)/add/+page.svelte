@@ -36,6 +36,17 @@
 	let scanning = $state(false);
 	let mode = $state<'search' | 'manual'>('search');
 
+	function statusLine(r: SearchResponse): string {
+		const parts = [
+			r.isbn ? `ISBN ${r.isbn}` : '',
+			`${r.results.length} ${r.results.length === 1 ? 'result' : 'results'}`
+		];
+		let line = parts.filter(Boolean).join(' · ');
+		if (r.sources.length) line += ` from ${r.sources.join(', then ')}`;
+		if (r.errors.length) line += ` · ${r.errors[0]}`;
+		return line;
+	}
+
 	const thumb = (url: string | null) =>
 		url ? `/api/catalog/thumb?u=${encodeURIComponent(url)}` : null;
 
@@ -86,7 +97,10 @@
 	let sheetError = $state('');
 	const allTags = $derived([...new Set(liveBooks(library.view).flatMap((b) => b.tags))]);
 
-	const editionKey = (e: CandidateEdition, i: number) => e.isbn13 ?? e.source_id ?? `i${i}`;
+	// Editions are chosen by their position in the list: providers sometimes
+	// list the same ISBN twice, so ISBNs can't be keys.
+	const pickByIsbn = (list: CandidateEdition[], isbn: string | null) =>
+		isbn ? String(list.findIndex((e) => e.isbn13 === isbn)).replace('-1', '') : '';
 	function editionLabel(e: {
 		publisher?: string | null;
 		binding?: string | null;
@@ -108,7 +122,7 @@
 			editions: candidate.editions,
 			loadingEditions: true
 		};
-		chosen = isbn ?? '';
+		chosen = pickByIsbn(candidate.editions, isbn);
 		owned = false;
 		tags = [];
 		location = '';
@@ -118,7 +132,11 @@
 			const list = await get<CandidateEdition[]>(
 				`/catalog/editions?provider=${encodeURIComponent(candidate.provider)}&source_id=${encodeURIComponent(candidate.source_id)}`
 			);
-			if (sheet?.candidate?.source_id === candidate.source_id) sheet.editions = list;
+			if (sheet?.candidate?.source_id === candidate.source_id) {
+				const wanted = chosen ? (sheet.editions[Number(chosen)]?.isbn13 ?? null) : null;
+				sheet.editions = list;
+				chosen = pickByIsbn(list, wanted);
+			}
 		} catch {
 			// Keep the editions the search returned.
 		} finally {
@@ -152,7 +170,7 @@
 		adding = true;
 		sheetError = '';
 		try {
-			const pick = sheet.editions.find((e, i) => editionKey(e, i) === chosen);
+			const pick = chosen === '' ? undefined : sheet.editions[Number(chosen)];
 			let work = sheet.work;
 			if (!work && sheet.candidate) {
 				work = await post<WorkRow>('/catalog/ensure', {
@@ -357,13 +375,7 @@
 	{:else if error}
 		<p class="note error">{error}</p>
 	{:else if res}
-		<p class="note">
-			{#if res.isbn}ISBN {res.isbn} ·
-			{/if}{res.results.length}
-			{res.results.length === 1 ? 'result' : 'results'}{#if res.sources.length}
-				from {res.sources.join(', then ')}{/if}{#if res.errors.length}
-				· <span class="error">{res.errors[0]}</span>{/if}
-		</p>
+		<p class="note">{statusLine(res)}</p>
 		<ul class="results">
 			{#each res.results as r (r.provider + r.source_id)}
 				<li>
@@ -375,8 +387,14 @@
 							<span class="title">{r.title}</span>
 							<span class="author">{r.authors.join(', ')}</span>
 							<span class="sub"
-								>{r.first_year ?? 'Year unknown'}{#if r.edition_count}
-									· {r.edition_count} {r.edition_count === 1 ? 'edition' : 'editions'}{/if}</span
+								>{[
+									r.first_year ?? 'Year unknown',
+									r.edition_count
+										? `${r.edition_count} ${r.edition_count === 1 ? 'edition' : 'editions'}`
+										: ''
+								]
+									.filter(Boolean)
+									.join(' · ')}</span
 							>
 						</span>
 						{#if r.book_id}<span class="on-list">On your list</span>{:else}<span class="chev"
@@ -535,8 +553,7 @@
 					<option value=""
 						>{sheet.loadingEditions ? 'Loading editions…' : 'Not sure / choose later'}</option
 					>
-					{#each sheet.editions as e, i (editionKey(e, i))}<option value={editionKey(e, i)}
-							>{editionLabel(e)}</option
+					{#each sheet.editions as e, i (i)}<option value={String(i)}>{editionLabel(e)}</option
 						>{/each}
 				</select></label
 			>
@@ -762,6 +779,7 @@
 		justify-content: center;
 	}
 	.sheet {
+		grid-template-columns: minmax(0, 1fr);
 		width: 100%;
 		max-width: 560px;
 		max-height: 92%;

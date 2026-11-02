@@ -344,3 +344,8 @@ Newest entries at the bottom of each section.
   (120 px) and medium (300 px) covers of every book on the list are fetched
   into the service worker's cover cache, three at a time. Large (600 px)
   covers aren't kept offline (spec assumption 1: thumbnails, not full size).
+- **Runtime check in Firefox:** the system Firefox (153 ESR) was driven
+  headless through Puppeteer and WebDriver BiDi, with a session cookie
+  instead of a passkey. That run found and fixed three bugs: duplicate ISBNs
+  crashing the add sheet (editions are now keyed by position), the sheet
+  overflowing on phones, and search-result covers never loading.

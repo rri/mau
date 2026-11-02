@@ -42,10 +42,10 @@
 	const titleY = $derived(style === 3 ? 238 : style === 2 ? 50 : 232);
 </script>
 
-{#if cover && !failed}
+{#if (src || cover) && !failed}
 	<img
 		class="cover"
-		src="/covers/{cover}-{size}.jpg"
+		src={src ?? `/covers/${cover}-${size}.jpg`}
 		alt=""
 		loading="lazy"
 		onerror={() => (failed = true)}
