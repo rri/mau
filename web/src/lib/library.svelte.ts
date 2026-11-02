@@ -163,6 +163,40 @@ class Library {
 		this.since = c.seq;
 		this.store?.saveChanges(c);
 		this.rebuild();
+		if (c.books.length || c.works.length) this.prefetchCovers();
+	}
+
+	private prefetchTimer: ReturnType<typeof setTimeout> | undefined;
+
+	/** Keeps small and medium cover images in the offline cache (the service
+	 *  worker's `mau-covers`), so covers show offline too. Full-size ones aren't kept. */
+	private prefetchCovers() {
+		clearTimeout(this.prefetchTimer);
+		this.prefetchTimer = setTimeout(async () => {
+			if (typeof caches === 'undefined') return;
+			const hashes = new Set<string>();
+			for (const b of this.view.books.values()) {
+				if (b.deleted) continue;
+				const w = this.view.works.get(b.work_id);
+				const h = b.cover_override ?? w?.cover ?? w?.editions.find((e) => e.cover)?.cover;
+				if (h) hashes.add(h);
+			}
+			const cache = await caches.open('mau-covers');
+			const urls = [...hashes].flatMap((h) => [`/covers/${h}-s.jpg`, `/covers/${h}-m.jpg`]);
+			const queue: string[] = [];
+			for (const url of urls) if (!(await cache.match(url))) queue.push(url);
+			const worker = async () => {
+				for (let url = queue.shift(); url; url = queue.shift()) {
+					try {
+						const res = await fetch(url);
+						if (res.ok) await cache.put(url, res);
+					} catch {
+						return; // Offline again; try after the next sync.
+					}
+				}
+			};
+			await Promise.all([worker(), worker(), worker()]);
+		}, 2000);
 	}
 }
 

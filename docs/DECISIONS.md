@@ -337,3 +337,10 @@ Newest entries at the bottom of each section.
   undo, offline taps syncing later, pausing, and the catalog and detail page.
   They share one server and run in file order; the signup test saves its
   session for the others.
+- **Installable app:** a web app manifest with a teal open-book icon (SVG,
+  192 and 512 px PNGs, a maskable version, and an Apple touch icon), theme
+  color deep teal, standalone display.
+- **Offline covers:** after each sync that changes books or works, the small
+  (120 px) and medium (300 px) covers of every book on the list are fetched
+  into the service worker's cover cache, three at a time. Large (600 px)
+  covers aren't kept offline (spec assumption 1: thumbnails, not full size).
