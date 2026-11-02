@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { addAuthenticator, setupToken } from './helpers.ts';
+import { AUTH_FILE, addAuthenticator, setupToken } from './helpers.ts';
 
 test('first admin signs up with the setup link, then signs in with the passkey', async ({
 	page
@@ -32,4 +32,7 @@ test('first admin signs up with the setup link, then signs in with the passkey',
 	await expect(page).toHaveURL(/\/signin$/);
 	await page.getByRole('button', { name: 'Sign in with a passkey' }).click();
 	await expect(page.getByText('Welcome, R. Reader.')).toBeVisible();
+
+	// Later test files reuse this session.
+	await page.context().storageState({ path: AUTH_FILE });
 });

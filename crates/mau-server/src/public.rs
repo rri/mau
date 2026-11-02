@@ -121,7 +121,7 @@ async fn items(state: &AppState, owner: &str, s: &ShareRow) -> sqlx::Result<Vec<
     match s.kind.as_str() {
         "finished" => list.sort_by(|a, b| b.0.finished_on.cmp(&a.0.finished_on)),
         "active" => {}
-        _ => list.sort_by(|a, b| b.2.cmp(&a.2)),
+        _ => list.sort_by_key(|x| std::cmp::Reverse(x.2)),
     }
     Ok(list.into_iter().map(|(i, _, _)| i).collect())
 }

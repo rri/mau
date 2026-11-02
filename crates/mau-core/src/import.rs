@@ -125,8 +125,10 @@ fn joined_notes(parts: &[&str]) -> String {
         .join("\n\n")
 }
 
+type Record = HashMap<String, String>;
+
 /// Reads a CSV/TSV into header → value maps.
-fn records(text: &str, delimiter: u8) -> Result<(Vec<String>, Vec<HashMap<String, String>>)> {
+fn records(text: &str, delimiter: u8) -> Result<(Vec<String>, Vec<Record>)> {
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(delimiter)
         .flexible(true)

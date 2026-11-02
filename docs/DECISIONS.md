@@ -324,3 +324,16 @@ Newest entries at the bottom of each section.
   `backup_keep` (default 7; `0` turns them off) are kept. `mau backup PATH`
   makes a one-off copy. Cover images aren't copied; back up `<data_dir>/covers`
   with your own tools.
+- **Clippy's "complex type" lint is allowed in `mau-server`:** many queries read
+  rows into tuples directly; naming each tuple type would add indirection
+  without clarity.
+- **The release binary links the system C library dynamically** (glibc), and
+  is built for the machine it's built on. Fully static (musl) and arm64 builds
+  aren't set up yet; they'd need the musl and aarch64 Rust targets plus a cross
+  C toolchain for the TLS library.
+- **Generated API types are excluded from prettier**, so `cargo test` and
+  `npm run format` don't fight over their formatting.
+- **End-to-end tests** cover the first-admin signup and passkey sign-in, +1 and
+  undo, offline taps syncing later, pausing, and the catalog and detail page.
+  They share one server and run in file order; the signup test saves its
+  session for the others.

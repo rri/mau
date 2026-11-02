@@ -1,5 +1,9 @@
 //! The `mau` binary.
 
+// Many queries read rows as tuples straight from sqlx; naming each tuple type
+// would add indirection without making them clearer.
+#![allow(clippy::type_complexity)]
+
 mod admin;
 mod app;
 #[cfg(test)]

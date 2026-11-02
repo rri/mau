@@ -49,7 +49,7 @@ fn valid10(s: &str) -> bool {
             v * (10 - i as u32)
         })
         .sum();
-    sum % 11 == 0
+    sum.is_multiple_of(11)
 }
 
 fn to13(isbn10: &str) -> String {

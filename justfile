@@ -24,10 +24,10 @@ dev:
     (cd web && npm run dev) &
     wait
 
-# Run all tests
+# Run all tests (except end-to-end; see `just e2e`)
 test:
     cargo test --workspace
-    cd web && npm run check
+    cd web && npm run check && npx vitest --run
 
 # Check formatting and lints
 lint:
