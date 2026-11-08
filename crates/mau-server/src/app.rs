@@ -86,6 +86,12 @@ pub fn router(state: AppState) -> Router {
             patch(manage::update_account).delete(manage::delete_account),
         )
         .route("/account/password", put(manage::change_password))
+        .route(
+            "/account/google-books",
+            get(manage::google_books_key)
+                .put(manage::set_google_books_key)
+                .delete(manage::remove_google_books_key),
+        )
         .route("/two-factor", delete(manage::totp_disable))
         .route("/two-factor/setup", post(manage::totp_setup))
         .route("/two-factor/enable", post(manage::totp_enable))
@@ -127,7 +133,15 @@ pub fn router(state: AppState) -> Router {
             "/import",
             post(crate::importer::start).layer(axum::extract::DefaultBodyLimit::max(IMPORT_LIMIT)),
         )
-        .route("/import/{job}", get(crate::importer::status))
+        .route("/import/current", get(crate::importer::current))
+        .route(
+            "/import/{job}",
+            get(crate::importer::status).delete(crate::importer::dismiss),
+        )
+        .route(
+            "/import/{job}/rows/{index}",
+            post(crate::importer::research),
+        )
         .route("/import/{job}/commit", post(crate::importer::commit))
         // Invites (admins, or everyone when allowed)
         .route(

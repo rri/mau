@@ -13,7 +13,17 @@ async fn volumes(http: &reqwest::Client, key: &str, q: &str) -> ProviderResult<V
         .await
         .map_err(|e| format!("Google Books: {e}"))?;
     if !res.status().is_success() {
-        return Err(format!("Google Books answered {}", res.status()));
+        let status = res.status();
+        // Google explains itself, e.g. "API key not valid" or a used-up quota.
+        let why = res
+            .json::<Value>()
+            .await
+            .ok()
+            .and_then(|v| v["error"]["message"].as_str().map(str::to_string));
+        return Err(match why {
+            Some(m) => format!("Google Books refused: {m}"),
+            None => format!("Google Books answered {status}"),
+        });
     }
     let v: Value = res.json().await.map_err(|e| format!("Google Books: {e}"))?;
     Ok(v["items"]

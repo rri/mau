@@ -4,4 +4,8 @@ export type Me = { id: string, username: string, display_name: string, bio: stri
 /**
  * Authenticator-app codes are on.
  */
-two_factor: boolean, };
+two_factor: boolean, 
+/**
+ * They've added their own Google Books key.
+ */
+google_books: boolean, };

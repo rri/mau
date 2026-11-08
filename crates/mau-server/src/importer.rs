@@ -5,7 +5,14 @@
 //! 2. `GET /api/import/{job}` reports progress, then each row's match:
 //!    matched, uncertain (choose a candidate), unmatched (add as a manual
 //!    entry or skip), or already on the list (skipped).
-//! 3. `POST /api/import/{job}/commit` creates the books.
+//!    `POST /api/import/{job}/rows/{index}` searches again with a corrected
+//!    title and authors.
+//! 3. `POST /api/import/{job}/commit` starts creating the books in the
+//!    background; `GET /api/import/{job}` reports progress, then the result.
+//!
+//! Searches go to Google Books when the user has their own key, otherwise to
+//! Open Library: title + first author, then, without a clear match, the
+//! short title with punctuation removed + the author's surname.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -23,13 +30,15 @@ use crate::catalog;
 use crate::error::{ApiError, ApiResult};
 use crate::export;
 use crate::library::{self, Person};
-use crate::providers::Candidate;
+use crate::providers::{self, Candidate, ProviderConfig, ProviderName};
 use crate::util::{HOUR_MS, new_id, now_ms};
 
 /// Stands for "finished, date unknown" (spec: undated reads are finished).
 pub const UNKNOWN_DATE: &str = "0000-01-01";
 const MAX_ROWS: usize = 5000;
 const CONCURRENCY: usize = 3;
+/// Choices offered for a book without a clear match.
+const MAX_CANDIDATES: usize = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "lowercase")]
@@ -47,6 +56,26 @@ struct Matched {
     candidates: Vec<Candidate>,
     /// An existing shared work (mau exports matched by ISBN).
     local_work: Option<String>,
+    /// Why Google Books refused, when Open Library was asked instead.
+    refused: Option<String>,
+}
+
+impl Matched {
+    fn of(kind: MatchKind) -> Self {
+        Matched {
+            kind,
+            candidates: vec![],
+            local_work: None,
+            refused: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum Saving {
+    Running { done: usize, total: usize },
+    Done(CommitResult),
+    Failed(String),
 }
 
 struct Job {
@@ -54,10 +83,23 @@ struct Job {
     rows: Vec<Row>,
     /// Full history for mau's own exports.
     mau: Option<Vec<export::Book>>,
-    /// Match on titles without trailing (…) notes (dinky.dev).
+    /// Search titles without trailing (…) notes from the start (dinky.dev).
     strip_notes: bool,
+    /// The user's own Google Books key when the import started.
+    google_key: Option<String>,
     results: Vec<Option<Matched>>,
+    saving: Option<Saving>,
     created_at: i64,
+}
+
+impl Job {
+    fn matched(&self) -> bool {
+        self.results.iter().all(Option::is_some)
+    }
+
+    fn saving_now(&self) -> bool {
+        matches!(self.saving, Some(Saving::Running { .. }))
+    }
 }
 
 #[derive(Default)]
@@ -70,7 +112,10 @@ impl Jobs {
         let id = new_id();
         let mut map = self.inner.lock().unwrap();
         let cutoff = now_ms() - 6 * HOUR_MS;
-        map.retain(|_, j| j.lock().unwrap().created_at > cutoff);
+        map.retain(|_, j| {
+            let j = j.lock().unwrap();
+            j.created_at > cutoff || j.saving_now()
+        });
         map.insert(id.clone(), Arc::new(Mutex::new(job)));
         id
     }
@@ -84,6 +129,18 @@ impl Jobs {
 
     fn remove(&self, id: &str) {
         self.inner.lock().unwrap().remove(id);
+    }
+
+    /// The user's newest import, to pick up where they left off.
+    fn latest(&self, user_id: &str) -> Option<String> {
+        let map = self.inner.lock().unwrap();
+        map.iter()
+            .filter_map(|(id, j)| {
+                let j = j.lock().unwrap();
+                (j.user_id == user_id).then(|| (j.created_at, id.clone()))
+            })
+            .max()
+            .map(|(_, id)| id)
     }
 }
 
@@ -207,6 +264,8 @@ pub async fn start(
         rows,
         mau,
         strip_notes: req.source == "dinky",
+        google_key: s.user.google_books_key.clone(),
+        saving: None,
         created_at: now_ms(),
     });
     let handle = state.imports.get(&job, &s.user.id).expect("just inserted");
@@ -217,7 +276,10 @@ pub async fn start(
 // ---------------------------------------------------------------------------
 // Matching
 
+/// A title for comparing: no trailing (…) notes, no subtitle, no leading
+/// article, only letters and digits, lowercase.
 fn norm_title(t: &str) -> String {
+    let t = import::without_notes(t);
     let t = t.split(':').next().unwrap_or(t).to_lowercase();
     let t = ["the ", "a ", "an "]
         .iter()
@@ -227,14 +289,118 @@ fn norm_title(t: &str) -> String {
     t.chars().filter(|c| c.is_alphanumeric()).collect()
 }
 
+/// The surname as written: the last word before any comma, so "Mike Piper,
+/// CPA" and "Bird, Richard" give Piper and Bird.
+fn surname(a: &str) -> &str {
+    let before = a.split(',').next().unwrap_or(a);
+    before.split_whitespace().last().unwrap_or("")
+}
+
 fn norm_author(a: &str) -> String {
-    a.split_whitespace()
-        .last()
-        .unwrap_or("")
+    surname(a)
         .to_lowercase()
         .chars()
         .filter(|c| c.is_alphanumeric())
         .collect()
+}
+
+/// Words only: apostrophes dropped ("Don't" → "Dont"), other punctuation
+/// becomes a space. Open Library finds nothing for some hyphenated or
+/// apostrophized titles when an author is in the query.
+fn plain(s: &str) -> String {
+    s.chars()
+        .filter(|c| !matches!(c, '\'' | '’' | '‘' | '`'))
+        .map(|c| if c.is_alphanumeric() { c } else { ' ' })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// The second search: the short title (no subtitle or trailing notes) and the
+/// author's surname, punctuation removed. Open Library needs every word of a
+/// query to be in a record, so middle initials, "CPA", or a different
+/// subtitle make the first search come back empty.
+fn fallback_query(title: &str, author: Option<&str>) -> String {
+    let t = import::without_notes(title);
+    let short = t.split(':').next().unwrap_or(t);
+    format!("{} {}", plain(short), plain(author.map_or("", surname)))
+        .trim()
+        .to_string()
+}
+
+/// A clear match: the same title and one of the authors has the surname.
+fn is_match(c: &Candidate, row: &Row) -> bool {
+    norm_title(&c.title) == norm_title(&row.title)
+        && row
+            .authors
+            .first()
+            .is_none_or(|a| c.authors.iter().any(|x| norm_author(x) == norm_author(a)))
+}
+
+/// Where an import's searches go.
+#[derive(Clone)]
+struct Searcher {
+    google: Option<ProviderConfig>,
+    /// Unless an admin has turned it off.
+    openlibrary: Option<ProviderConfig>,
+}
+
+impl Searcher {
+    async fn new(state: &AppState, google_key: Option<&str>) -> Searcher {
+        let openlibrary = providers::enabled(&state.db)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .find(|p| p.name == ProviderName::Openlibrary);
+        Searcher {
+            google: google_key.map(providers::own_google),
+            openlibrary,
+        }
+    }
+
+    async fn openlibrary_search(&self, state: &AppState, q: &str) -> Vec<Candidate> {
+        let Some(p) = &self.openlibrary else {
+            return vec![];
+        };
+        catalog::provider_search(state, p, q)
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!("import search failed: {e}");
+                vec![]
+            })
+    }
+
+    /// Results, and why Google refused if Open Library answered instead.
+    async fn search(&self, state: &AppState, q: &str) -> (Vec<Candidate>, Option<String>) {
+        if let Some(g) = &self.google {
+            match catalog::provider_search(state, g, q).await {
+                Ok(found) => return (found, None),
+                Err(e) => return (self.openlibrary_search(state, q).await, Some(e)),
+            }
+        }
+        (self.openlibrary_search(state, q).await, None)
+    }
+
+    async fn isbn(&self, state: &AppState, isbn: &str) -> (Option<Candidate>, Option<String>) {
+        let mut refused = None;
+        if let Some(g) = &self.google {
+            match catalog::provider_isbn(state, g, isbn).await {
+                Ok(found) => return (found, None),
+                Err(e) => refused = Some(e),
+            }
+        }
+        let found = match &self.openlibrary {
+            Some(p) => catalog::provider_isbn(state, p, isbn)
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::warn!("import ISBN lookup failed: {e}");
+                    None
+                }),
+            None => None,
+        };
+        (found, refused)
+    }
 }
 
 /// What the user already has, for spotting duplicates.
@@ -267,20 +433,23 @@ async fn existing(state: &AppState, user_id: &str) -> sqlx::Result<Existing> {
     })
 }
 
-/// `title` is what to search for and compare: the row's title, or the row's
-/// title without trailing notes.
-async fn match_row(state: &AppState, ex: &Existing, row: &Row, title: &str, mau: bool) -> Matched {
-    let author = norm_author(row.authors.first().map_or("", |s| s));
+/// `first_title` is what the first search uses: the row's title, or for
+/// dinky.dev the title without trailing notes.
+async fn match_row(
+    state: &AppState,
+    ex: &Existing,
+    searcher: &Searcher,
+    row: &Row,
+    first_title: &str,
+    mau: bool,
+) -> Matched {
     let dupe = row.isbn13.as_ref().is_some_and(|i| ex.isbns.contains(i))
-        || [title, &row.title]
-            .iter()
-            .any(|t| ex.titles.contains(&(norm_title(t), author.clone())));
+        || ex.titles.contains(&(
+            norm_title(&row.title),
+            norm_author(row.authors.first().map_or("", |s| s)),
+        ));
     if dupe {
-        return Matched {
-            kind: MatchKind::Dupe,
-            candidates: vec![],
-            local_work: None,
-        };
+        return Matched::of(MatchKind::Dupe);
     }
     // Something already in the shared catalog with this ISBN.
     if let Some(isbn) = &row.isbn13 {
@@ -294,71 +463,95 @@ async fn match_row(state: &AppState, ex: &Existing, row: &Row, title: &str, mau:
         .flatten();
         if local.is_some() {
             return Matched {
-                kind: MatchKind::Matched,
-                candidates: vec![],
                 local_work: local,
+                ..Matched::of(MatchKind::Matched)
             };
         }
     }
     if mau {
         // A mau export carries everything needed; don't ask providers.
+        return Matched::of(MatchKind::Unmatched);
+    }
+    find(state, searcher, row, first_title, true).await
+}
+
+/// Asks the catalog: by ISBN (if `by_isbn`), then title + first author, then
+/// the fallback search. Without a clear match, offers what both searches
+/// found.
+async fn find(
+    state: &AppState,
+    searcher: &Searcher,
+    row: &Row,
+    first_title: &str,
+    by_isbn: bool,
+) -> Matched {
+    let mut refused = None;
+    if by_isbn && let Some(isbn) = &row.isbn13 {
+        let (found, r) = searcher.isbn(state, isbn).await;
+        refused = refused.or(r);
+        if let Some(c) = found {
+            return Matched {
+                candidates: vec![c],
+                refused,
+                ..Matched::of(MatchKind::Matched)
+            };
+        }
+    }
+    let author = row.authors.first().map(String::as_str);
+    let first = format!("{} {}", first_title, author.unwrap_or(""))
+        .trim()
+        .to_string();
+    let (mut found, r) = searcher.search(state, &first).await;
+    refused = refused.or(r);
+    if let Some(c) = found.iter().find(|c| is_match(c, row)) {
         return Matched {
-            kind: MatchKind::Unmatched,
-            candidates: vec![],
-            local_work: None,
+            candidates: vec![c.clone()],
+            refused,
+            ..Matched::of(MatchKind::Matched)
         };
     }
-    if let Some(isbn) = &row.isbn13
-        && let Ok((found, _, _)) = catalog::find_candidates(state, isbn, Some(isbn)).await
-        && !found.is_empty()
-    {
-        return Matched {
-            kind: MatchKind::Matched,
-            candidates: found.into_iter().take(1).collect(),
-            local_work: None,
-        };
+    let second = fallback_query(&row.title, author);
+    if !second.is_empty() && !second.eq_ignore_ascii_case(&first) {
+        let (more, r) = searcher.search(state, &second).await;
+        refused = refused.or(r);
+        if let Some(c) = more.iter().find(|c| is_match(c, row)) {
+            return Matched {
+                candidates: vec![c.clone()],
+                refused,
+                ..Matched::of(MatchKind::Matched)
+            };
+        }
+        for c in more {
+            if !found
+                .iter()
+                .any(|f| f.provider == c.provider && f.source_id == c.source_id)
+            {
+                found.push(c);
+            }
+        }
     }
-    let query = format!("{} {}", title, row.authors.first().map_or("", |s| s));
-    let found = catalog::find_candidates(state, query.trim(), None)
-        .await
-        .map(|(f, _, _)| f)
-        .unwrap_or_default();
-    if found.is_empty() {
-        return Matched {
-            kind: MatchKind::Unmatched,
-            candidates: vec![],
-            local_work: None,
-        };
-    }
-    let want = (
-        norm_title(title),
-        row.authors.first().map(|a| norm_author(a)),
-    );
-    let exact = found.iter().position(|c| {
-        norm_title(&c.title) == want.0
-            && want
-                .1
-                .as_ref()
-                .is_none_or(|a| c.authors.iter().any(|x| &norm_author(x) == a))
-    });
-    match exact {
-        Some(i) => Matched {
-            kind: MatchKind::Matched,
-            candidates: vec![found[i].clone()],
-            local_work: None,
-        },
-        None => Matched {
-            kind: MatchKind::Uncertain,
-            candidates: found.into_iter().take(3).collect(),
-            local_work: None,
-        },
+    found.truncate(MAX_CANDIDATES);
+    let kind = if found.is_empty() {
+        MatchKind::Unmatched
+    } else {
+        MatchKind::Uncertain
+    };
+    Matched {
+        candidates: found,
+        refused,
+        ..Matched::of(kind)
     }
 }
 
 async fn match_all(state: AppState, user_id: String, job: Arc<Mutex<Job>>) {
-    let (rows, mau, strip) = {
+    let (rows, mau, strip, google_key) = {
         let j = job.lock().unwrap();
-        (j.rows.clone(), j.mau.is_some(), j.strip_notes)
+        (
+            j.rows.clone(),
+            j.mau.is_some(),
+            j.strip_notes,
+            j.google_key.clone(),
+        )
     };
     let ex = match existing(&state, &user_id).await {
         Ok(e) => e,
@@ -371,16 +564,17 @@ async fn match_all(state: AppState, user_id: String, job: Arc<Mutex<Job>>) {
         }
     };
     let ex = Arc::new(ex);
+    let searcher = Searcher::new(&state, google_key.as_deref()).await;
     futures::stream::iter(rows.into_iter().enumerate())
         .map(|(i, row)| {
-            let (state, ex) = (state.clone(), ex.clone());
+            let (state, ex, searcher) = (state.clone(), ex.clone(), searcher.clone());
             async move {
                 let title = if strip {
                     import::without_notes(&row.title)
                 } else {
                     &row.title
                 };
-                (i, match_row(&state, &ex, &row, title, mau).await)
+                (i, match_row(&state, &ex, &searcher, &row, title, mau).await)
             }
         })
         .buffer_unordered(CONCURRENCY)
@@ -418,11 +612,28 @@ pub struct RowStatus {
 
 #[derive(Serialize, TS)]
 #[ts(export)]
+pub struct SaveProgress {
+    pub done: usize,
+    pub total: usize,
+}
+
+#[derive(Serialize, TS)]
+#[ts(export)]
 pub struct JobStatus {
     pub total: usize,
     pub done: usize,
-    /// Present once every row is matched.
+    /// Present once every row is matched, until saving starts.
     pub rows: Option<Vec<RowStatus>>,
+    /// Books searched on Open Library because Google Books refused.
+    pub refused: usize,
+    /// Google's reason, from the latest refusal.
+    pub refused_reason: Option<String>,
+    /// While saving.
+    pub saving: Option<SaveProgress>,
+    /// Once saved.
+    pub result: Option<CommitResult>,
+    /// If saving failed.
+    pub error: Option<String>,
 }
 
 fn summary(row: &Row) -> String {
@@ -435,49 +646,163 @@ fn summary(row: &Row) -> String {
     }
 }
 
+fn row_status(index: usize, row: &Row, m: &Matched) -> RowStatus {
+    RowStatus {
+        index,
+        title: row.title.clone(),
+        authors: row.authors.clone(),
+        summary: summary(row),
+        tags: row.tags.clone(),
+        kind: m.kind,
+        candidates: m
+            .candidates
+            .iter()
+            .map(|c| CandidateBrief {
+                title: c.title.clone(),
+                authors: c.authors.clone(),
+                first_year: c.first_year,
+            })
+            .collect(),
+    }
+}
+
+fn job_of(state: &AppState, id: &str, user_id: &str) -> ApiResult<Arc<Mutex<Job>>> {
+    state
+        .imports
+        .get(id, user_id)
+        .ok_or_else(|| ApiError::not_found("That import has expired. Start again."))
+}
+
 pub async fn status(
     State(state): State<AppState>,
     Authed(s): Authed,
     Path(id): Path<String>,
 ) -> ApiResult<Json<JobStatus>> {
-    let job = state
-        .imports
-        .get(&id, &s.user.id)
-        .ok_or_else(|| ApiError::not_found("That import has expired. Start again."))?;
+    let job = job_of(&state, &id, &s.user.id)?;
     let j = job.lock().unwrap();
     let done = j.results.iter().filter(|r| r.is_some()).count();
-    let rows = (done == j.rows.len()).then(|| {
+    let rows = (j.matched() && j.saving.is_none()).then(|| {
         j.rows
             .iter()
             .zip(&j.results)
             .enumerate()
-            .map(|(index, (row, m))| {
-                let m = m.as_ref().expect("all matched");
-                RowStatus {
-                    index,
-                    title: row.title.clone(),
-                    authors: row.authors.clone(),
-                    summary: summary(row),
-                    tags: row.tags.clone(),
-                    kind: m.kind,
-                    candidates: m
-                        .candidates
-                        .iter()
-                        .map(|c| CandidateBrief {
-                            title: c.title.clone(),
-                            authors: c.authors.clone(),
-                            first_year: c.first_year,
-                        })
-                        .collect(),
-                }
-            })
+            .map(|(index, (row, m))| row_status(index, row, m.as_ref().expect("all matched")))
             .collect()
     });
+    let refusals: Vec<&String> = j
+        .results
+        .iter()
+        .flatten()
+        .filter_map(|m| m.refused.as_ref())
+        .collect();
+    let (saving, result, error) = match &j.saving {
+        None => (None, None, None),
+        Some(Saving::Running { done, total }) => (
+            Some(SaveProgress {
+                done: *done,
+                total: *total,
+            }),
+            None,
+            None,
+        ),
+        Some(Saving::Done(r)) => (None, Some(r.clone()), None),
+        Some(Saving::Failed(e)) => (None, None, Some(e.clone())),
+    };
     Ok(Json(JobStatus {
         total: j.rows.len(),
         done,
         rows,
+        refused: refusals.len(),
+        refused_reason: refusals.last().map(|r| r.to_string()),
+        saving,
+        result,
+        error,
     }))
+}
+
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct CurrentImport {
+    pub job: Option<String>,
+}
+
+/// `GET /api/import/current`: the user's newest import, if one is still
+/// kept, so the page can pick up where it was.
+pub async fn current(State(state): State<AppState>, Authed(s): Authed) -> Json<CurrentImport> {
+    Json(CurrentImport {
+        job: state.imports.latest(&s.user.id),
+    })
+}
+
+/// `DELETE /api/import/{job}`: drops an import that isn't being saved.
+pub async fn dismiss(
+    State(state): State<AppState>,
+    Authed(s): Authed,
+    Path(id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let job = job_of(&state, &id, &s.user.id)?;
+    if job.lock().unwrap().saving_now() {
+        return Err(ApiError::conflict(
+            "saving",
+            "This import is being saved. Wait for it to finish.",
+        ));
+    }
+    state.imports.remove(&id);
+    Ok(Json(serde_json::json!({})))
+}
+
+#[derive(Deserialize, TS)]
+#[ts(export)]
+pub struct RowEdit {
+    pub title: String,
+    pub authors: Vec<String>,
+}
+
+/// `POST /api/import/{job}/rows/{index}`: searches again with a corrected
+/// title and authors, which a manual entry then uses too.
+pub async fn research(
+    State(state): State<AppState>,
+    Authed(s): Authed,
+    Path((id, index)): Path<(String, usize)>,
+    Json(req): Json<RowEdit>,
+) -> ApiResult<Json<RowStatus>> {
+    let title = req.title.trim().to_string();
+    if title.is_empty() {
+        return Err(ApiError::bad_request("title", "Enter a title."));
+    }
+    let authors: Vec<String> = req
+        .authors
+        .iter()
+        .map(|a| a.trim().to_string())
+        .filter(|a| !a.is_empty())
+        .take(20)
+        .collect();
+    let job = job_of(&state, &id, &s.user.id)?;
+    let (mut row, google_key) = {
+        let j = job.lock().unwrap();
+        if !j.matched() || j.saving.is_some() {
+            return Err(ApiError::conflict(
+                "not_ready",
+                "This import can't be changed now.",
+            ));
+        }
+        let row = j
+            .rows
+            .get(index)
+            .cloned()
+            .ok_or_else(|| ApiError::not_found("No such row."))?;
+        (row, j.google_key.clone())
+    };
+    state.limits.check("import-search", &s.user.id, 30)?;
+    row.title = title.chars().take(300).collect();
+    row.authors = authors;
+    let searcher = Searcher::new(&state, google_key.as_deref()).await;
+    let m = find(&state, &searcher, &row, &row.title, false).await;
+    let out = row_status(index, &row, &m);
+    let mut j = job.lock().unwrap();
+    j.rows[index] = row;
+    j.results[index] = Some(m);
+    Ok(Json(out))
 }
 
 // ---------------------------------------------------------------------------
@@ -499,7 +824,7 @@ pub struct CommitRequest {
     pub choices: Vec<Choice>,
 }
 
-#[derive(Serialize, TS)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct CommitResult {
     pub imported: usize,
@@ -540,31 +865,74 @@ const BOOK_FIELDS: [&str; 7] = [
     "cover_override",
 ];
 
+/// Rows the commit will create.
+fn to_create(results: &[Matched], choices: &HashMap<usize, &Choice>) -> usize {
+    results
+        .iter()
+        .enumerate()
+        .filter(|(i, m)| {
+            m.kind != MatchKind::Dupe && choices.get(i).is_none_or(|c| c.action != "skip")
+        })
+        .count()
+}
+
+/// Starts saving in the background; `GET /api/import/{job}` reports
+/// progress and the result. Saving many books takes minutes (each matched
+/// book's editions and cover are fetched), longer than a proxy waits for one
+/// request.
 pub async fn commit(
     State(state): State<AppState>,
     Authed(s): Authed,
     Path(id): Path<String>,
     Json(req): Json<CommitRequest>,
-) -> ApiResult<Json<CommitResult>> {
-    let job = state
-        .imports
-        .get(&id, &s.user.id)
-        .ok_or_else(|| ApiError::not_found("That import has expired. Start again."))?;
-    let (rows, mau, results) = {
-        let j = job.lock().unwrap();
-        if j.results.iter().any(Option::is_none) {
+) -> ApiResult<Json<SaveProgress>> {
+    let job = job_of(&state, &id, &s.user.id)?;
+    let total = {
+        let mut j = job.lock().unwrap();
+        if !j.matched() {
             return Err(ApiError::conflict(
                 "not_ready",
                 "Still matching books. Try again in a moment.",
             ));
         }
+        if j.saving.is_some() {
+            return Err(ApiError::conflict(
+                "saving",
+                "This import has already been saved.",
+            ));
+        }
+        let results: Vec<Matched> = j.results.iter().flatten().cloned().collect();
+        let choices: HashMap<usize, &Choice> = req.choices.iter().map(|c| (c.index, c)).collect();
+        let total = to_create(&results, &choices);
+        j.saving = Some(Saving::Running { done: 0, total });
+        total
+    };
+    let user_id = s.user.id.clone();
+    tokio::spawn(async move {
+        let outcome = match save(&state, &user_id, &job, req).await {
+            Ok(r) => Saving::Done(r),
+            Err(e) => {
+                tracing::error!("import: saving failed: {}", e.message);
+                Saving::Failed(e.message)
+            }
+        };
+        job.lock().unwrap().saving = Some(outcome);
+    });
+    Ok(Json(SaveProgress { done: 0, total }))
+}
+
+async fn save(
+    state: &AppState,
+    user_id: &str,
+    job: &Arc<Mutex<Job>>,
+    req: CommitRequest,
+) -> ApiResult<CommitResult> {
+    let (rows, mau, results) = {
+        let j = job.lock().unwrap();
         (
             j.rows.clone(),
             j.mau.clone(),
-            j.results
-                .iter()
-                .map(|r| r.clone().unwrap())
-                .collect::<Vec<_>>(),
+            j.results.iter().flatten().cloned().collect::<Vec<_>>(),
         )
     };
     let choices: HashMap<usize, &Choice> = req.choices.iter().map(|c| (c.index, c)).collect();
@@ -576,6 +944,7 @@ pub async fn commit(
     }
     let mut plans: Vec<(usize, Plan)> = Vec::new();
     let mut skipped = 0;
+    let mut done = 0;
     for (i, m) in results.iter().enumerate() {
         let default = match m.kind {
             MatchKind::Matched | MatchKind::Uncertain => "match",
@@ -587,6 +956,10 @@ pub async fn commit(
             skipped += 1;
             continue;
         }
+        if let Some(Saving::Running { done: d, .. }) = &mut job.lock().unwrap().saving {
+            *d = done;
+        }
+        done += 1;
         if action == "manual" {
             plans.push((i, Plan::Manual));
             continue;
@@ -597,19 +970,17 @@ pub async fn commit(
         }
         let k = choices.get(&i).and_then(|c| c.candidate).unwrap_or(0);
         match m.candidates.get(k) {
-            Some(c) => {
-                match catalog::ensure_candidate(&state, c, rows[i].isbn13.as_deref()).await {
-                    Ok(w) => plans.push((i, Plan::Work(w.id))),
-                    Err(e) => {
-                        tracing::warn!(
-                            "import: couldn't add {:?} to the catalog: {}",
-                            rows[i].title,
-                            e.message
-                        );
-                        plans.push((i, Plan::Manual));
-                    }
+            Some(c) => match catalog::ensure_candidate(state, c, rows[i].isbn13.as_deref()).await {
+                Ok(w) => plans.push((i, Plan::Work(w.id))),
+                Err(e) => {
+                    tracing::warn!(
+                        "import: couldn't add {:?} to the catalog: {}",
+                        rows[i].title,
+                        e.message
+                    );
+                    plans.push((i, Plan::Manual));
                 }
-            }
+            },
             None => plans.push((i, Plan::Manual)),
         }
     }
@@ -617,7 +988,7 @@ pub async fn commit(
     // Phase 2: the library rows, in one transaction.
     let mut tx = state.db.begin().await?;
     let seq = library::next_seq(&mut tx).await?;
-    let ranks = ranks_for(&mut tx, &s.user.id, plans.len()).await?;
+    let ranks = ranks_for(&mut tx, user_id, plans.len()).await?;
     let mut clock = state.clock.lock().unwrap().now(now_ms() as u64);
     let mut next_hlc = || {
         let h = clock.to_string();
@@ -647,7 +1018,7 @@ pub async fn commit(
                     .bind(&id)
                     .bind(row.title.chars().take(300).collect::<String>())
                     .bind(row.year)
-                    .bind(&s.user.id)
+                    .bind(user_id)
                     .bind(now_ms())
                     .bind(seq)
                     .execute(&mut *tx)
@@ -679,7 +1050,7 @@ pub async fn commit(
                     None => vec![],
                 };
                 for e in &editions {
-                    library::insert_edition(&mut tx, &id, Some(&s.user.id), e, seq).await?;
+                    library::insert_edition(&mut tx, &id, Some(user_id), e, seq).await?;
                 }
                 id
             }
@@ -702,7 +1073,7 @@ pub async fn commit(
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&book_id)
-        .bind(&s.user.id)
+        .bind(user_id)
         .bind(&work_id)
         .bind(&rank)
         .bind(active)
@@ -727,7 +1098,7 @@ pub async fn commit(
         for t in tags {
             sqlx::query("INSERT INTO book_tags (book_id, user_id, tag, present, clock, seq) VALUES (?, ?, ?, 1, ?, ?)")
                 .bind(&book_id)
-                .bind(&s.user.id)
+                .bind(user_id)
                 .bind(t)
                 .bind(&h)
                 .bind(seq)
@@ -776,7 +1147,7 @@ pub async fn commit(
             sqlx::query("INSERT INTO copies (id, book_id, user_id, format, location, edition_id, clock, seq) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
                 .bind(new_id())
                 .bind(&book_id)
-                .bind(&s.user.id)
+                .bind(user_id)
                 .bind(format)
                 .bind(location)
                 .bind(edition)
@@ -820,7 +1191,7 @@ pub async fn commit(
             )
             .bind(&reading_id)
             .bind(&book_id)
-            .bind(&s.user.id)
+            .bind(user_id)
             .bind(&r.started_on)
             .bind(&r.finished_on)
             .bind(r.total.clamp(1, 100_000))
@@ -838,7 +1209,7 @@ pub async fn commit(
                 )
                 .bind(new_id())
                 .bind(&reading_id)
-                .bind(&s.user.id)
+                .bind(user_id)
                 .bind(&last)
                 .bind(&e.date)
                 .bind(e.from)
@@ -860,8 +1231,7 @@ pub async fn commit(
         let mut c = state.clock.lock().unwrap();
         c.observe(&clock);
     }
-    state.imports.remove(&id);
-    Ok(Json(CommitResult { imported, skipped }))
+    Ok(CommitResult { imported, skipped })
 }
 
 #[cfg(test)]
@@ -870,7 +1240,13 @@ mod tests {
     use crate::app_tests::TestApp;
     use serde_json::{Value, json};
 
-    async fn run_import(app: &TestApp, cookie: &str, source: &str, text: &str) -> Value {
+    /// Starts an import and waits for matching; returns the job and its rows.
+    async fn start_import(
+        app: &TestApp,
+        cookie: &str,
+        source: &str,
+        text: &str,
+    ) -> (String, Value) {
         let (status, started) = app
             .post(
                 "/api/import",
@@ -890,15 +1266,197 @@ mod tests {
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }
         assert!(rows.is_array(), "matching never finished");
-        let (status, done) = app
+        (job, rows)
+    }
+
+    /// Saves an import and waits for the result.
+    async fn save_import(app: &TestApp, cookie: &str, job: &str, choices: Value) -> Value {
+        let (status, started) = app
             .post(
                 &format!("/api/import/{job}/commit"),
-                json!({ "choices": [] }),
+                json!({ "choices": choices }),
                 Some(cookie),
             )
             .await;
-        assert_eq!(status, 200, "{done}");
+        assert_eq!(status, 200, "{started}");
+        for _ in 0..200 {
+            let (_, st) = app.get(&format!("/api/import/{job}"), Some(cookie)).await;
+            assert!(st["error"].is_null(), "{st}");
+            if !st["result"].is_null() {
+                return st["result"].clone();
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        panic!("saving never finished");
+    }
+
+    async fn run_import(app: &TestApp, cookie: &str, source: &str, text: &str) -> Value {
+        let (job, rows) = start_import(app, cookie, source, text).await;
+        let done = save_import(app, cookie, &job, json!([])).await;
         json!({ "rows": rows, "done": done })
+    }
+
+    async fn offline(app: &TestApp) {
+        let none: Vec<crate::providers::ProviderConfig> = vec![];
+        crate::settings::set(&app.state.db, "providers", &none)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn correcting_a_row_then_saving_in_the_background() {
+        let app = TestApp::new().await;
+        offline(&app).await;
+        let (_, cookie) = app.user("rri", false).await;
+        let json = r#"{"contents": {"works": {
+            "a": {"data": "Dun Mesiah | Frank Herbret", "created": "2022-06-05T03:24:57.708Z", "updated": "2022-06-05T03:24:57.708Z"},
+            "b": {"data": "Cosmos | Carl Sagan", "created": "2022-06-05T02:54:14.625Z", "updated": "2022-06-05T03:19:27.548Z"}
+        }}}"#;
+        let (job, rows) = start_import(&app, &cookie, "dinky", json).await;
+        assert_eq!(rows[0]["kind"], "unmatched");
+        let (_, cur) = app.get("/api/import/current", Some(&cookie)).await;
+        assert_eq!(cur["job"], job.as_str());
+
+        // Correct the first row; with no providers it's still not found, but
+        // the manual entry uses the correction.
+        let (status, row) = app
+            .post(
+                &format!("/api/import/{job}/rows/0"),
+                json!({ "title": " Dune Messiah ", "authors": ["Frank Herbert", " "] }),
+                Some(&cookie),
+            )
+            .await;
+        assert_eq!(status, 200, "{row}");
+        assert_eq!(row["title"], "Dune Messiah");
+        assert_eq!(row["authors"], json!(["Frank Herbert"]));
+        let (status, _) = app
+            .post(
+                &format!("/api/import/{job}/rows/0"),
+                json!({ "title": "", "authors": [] }),
+                Some(&cookie),
+            )
+            .await;
+        assert_eq!(status, 400);
+
+        let done = save_import(
+            &app,
+            &cookie,
+            &job,
+            json!([{ "index": 1, "action": "skip" }]),
+        )
+        .await;
+        assert_eq!(done, json!({ "imported": 1, "skipped": 1 }));
+        // Saved once only.
+        let (status, _) = app
+            .post(
+                &format!("/api/import/{job}/commit"),
+                json!({ "choices": [] }),
+                Some(&cookie),
+            )
+            .await;
+        assert_eq!(status, 409);
+        let (_, sync) = app
+            .post("/api/sync", json!({ "since": 0, "ops": [] }), Some(&cookie))
+            .await;
+        assert_eq!(sync["changes"]["works"][0]["title"], "Dune Messiah");
+        let people = &sync["changes"]["works"][0]["people"];
+        assert_eq!(people[0]["name"], "Frank Herbert", "{people}");
+
+        // Dismissed, it's gone.
+        let (status, _, _) = app
+            .request("DELETE", &format!("/api/import/{job}"), None, Some(&cookie))
+            .await;
+        assert_eq!(status, 200);
+        let (_, cur) = app.get("/api/import/current", Some(&cookie)).await;
+        assert!(cur["job"].is_null());
+    }
+
+    #[tokio::test]
+    async fn own_google_books_key() {
+        let app = TestApp::new().await;
+        let (_, cookie) = app.user("rri", false).await;
+        let (_, k) = app.get("/api/account/google-books", Some(&cookie)).await;
+        assert!(k["ends_with"].is_null());
+        let (status, _, _) = app
+            .request(
+                "PUT",
+                "/api/account/google-books",
+                Some(json!({ "key": "not a key" })),
+                Some(&cookie),
+            )
+            .await;
+        assert_eq!(status, 400);
+        let (status, k, _) = app
+            .request(
+                "PUT",
+                "/api/account/google-books",
+                Some(json!({ "key": " AIzaSyExample1a2b " })),
+                Some(&cookie),
+            )
+            .await;
+        assert_eq!(status, 200, "{k}");
+        assert_eq!(k["ends_with"], "1a2b");
+        let (_, st) = app.get("/api/auth/status", Some(&cookie)).await;
+        assert_eq!(st["me"]["google_books"], true, "{st}");
+        let stored: Option<String> =
+            sqlx::query_scalar("SELECT google_books_key FROM users WHERE username = 'rri'")
+                .fetch_one(&app.state.db)
+                .await
+                .unwrap();
+        assert_eq!(stored.as_deref(), Some("AIzaSyExample1a2b"));
+        let (status, k, _) = app
+            .request("DELETE", "/api/account/google-books", None, Some(&cookie))
+            .await;
+        assert_eq!(status, 200);
+        assert!(k["ends_with"].is_null());
+    }
+
+    #[test]
+    fn fallback_searches() {
+        assert_eq!(
+            fallback_query(
+                "Designing Data-Intensive Applications: The Big Ideas",
+                Some("Martin Kleppmann")
+            ),
+            "Designing Data Intensive Applications Kleppmann"
+        );
+        assert_eq!(
+            fallback_query("Don't Make Me Think (Revised)", Some("Steve Krug")),
+            "Dont Make Me Think Krug"
+        );
+        assert_eq!(
+            fallback_query("Taxes Made Simple", Some("Mike Piper, CPA")),
+            "Taxes Made Simple Piper"
+        );
+        assert_eq!(fallback_query("Cosmos", None), "Cosmos");
+        assert_eq!(norm_author("Bird, Richard"), "bird");
+        assert_eq!(norm_author("Ernst W Mayr"), "mayr");
+    }
+
+    #[test]
+    fn clear_matches() {
+        let c = |title: &str, authors: &[&str]| Candidate {
+            provider: "openlibrary".into(),
+            source_id: "x".into(),
+            title: title.into(),
+            authors: authors.iter().map(|a| a.to_string()).collect(),
+            first_year: None,
+            cover_url: None,
+            edition_count: None,
+            editions: vec![],
+        };
+        let row = Row {
+            title: "Dune Messiah (Dune Series, #2)".into(),
+            authors: vec!["Frank Herbert".into()],
+            ..Default::default()
+        };
+        assert!(is_match(&c("Dune Messiah", &["Frank Herbert"]), &row));
+        assert!(is_match(
+            &c("Dune messiah: a novel", &["Herbert, Frank"]),
+            &row
+        ));
+        assert!(!is_match(&c("Dune Messiah", &["Brian Herbert Jr"]), &row));
+        assert!(!is_match(&c("Dune", &["Frank Herbert"]), &row));
     }
 
     #[tokio::test]

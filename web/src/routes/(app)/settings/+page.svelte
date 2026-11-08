@@ -55,6 +55,11 @@
 			label: 'Sharing',
 			value: shares === null ? '' : shares ? `${shares} shared` : 'Nothing shared'
 		},
+		{
+			href: '/settings/google-books',
+			label: 'Google Books',
+			value: auth.me?.google_books ? 'Own key' : 'Off'
+		},
 		{ href: '/settings/import', label: 'Import & export' },
 		...(canInvite ? [{ href: '/settings/invites', label: 'Invites' }] : [])
 	]);

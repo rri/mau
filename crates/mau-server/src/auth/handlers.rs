@@ -27,6 +27,8 @@ pub struct Me {
     pub is_admin: bool,
     /// Authenticator-app codes are on.
     pub two_factor: bool,
+    /// They've added their own Google Books key.
+    pub google_books: bool,
 }
 
 impl From<&User> for Me {
@@ -39,6 +41,7 @@ impl From<&User> for Me {
             time_zone: u.time_zone.clone(),
             is_admin: u.is_admin,
             two_factor: u.two_factor(),
+            google_books: u.google_books_key.is_some(),
         }
     }
 }

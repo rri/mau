@@ -191,6 +191,11 @@ recovery codes, and deleting the account: the password, plus an authenticator
 - Metadata providers are configured by an admin: Open Library built in;
   Google Books, Hardcover, and ISBNdb with the admin's own keys. They're tried
   in the admin's order, moving to the next only when results are missing or thin.
+- A user with their own Google Books key (Settings → Google Books) searches
+  only Google Books, by title or ISBN.
+- Covers come with the chosen result. For a Google Books result, Open
+  Library's large cover for one of its ISBNs is tried first, since Google's
+  are about 128 px wide.
 
 ## 8. Settings
 
@@ -203,6 +208,9 @@ A list of sections, each its own page, then **Sign out**.
 - **Password**, **Two-factor**, **Sessions** (device and browser, last active; no IP or
   location; sign out one or all others), **Recovery codes** (count, meter,
   regenerate, recovery activity).
+- **Google Books:** the user's own API key. Saving runs one test search and
+  refuses a key Google rejects; afterward only "Key ending in …1a2b" shows,
+  with Replace and Remove. Never sent back to the browser; not in exports.
 - **Sharing:** finished books, currently active, a tag, or the whole catalog.
   Each is Private (default) or Public. Ratings optional per item; notes never.
   "Make a new link" breaks the old one. Sharing with specific people is postponed.
@@ -213,11 +221,26 @@ A list of sections, each its own page, then **Sign out**.
   merged). Unfinished books come in inactive; read books without a date are
   finished with an unknown date; shelves become tags verbatim. Export: full
   JSON (re-importable) or simple CSV.
+- **Import matching:** searches Google Books with the user's own key,
+  otherwise Open Library (never the server's Google key). By ISBN when the
+  file has one; then title + first author; without a clear match (same title
+  ignoring subtitle, notes, a leading article, case and punctuation, and the
+  first author's surname among the result's authors), the short title with
+  punctuation removed + the surname. If Google refuses a search (quota, bad
+  key), Open Library answers for that book and review says how many and why.
+  Check-match rows offer what both searches found.
+- **Review corrections:** Edit on any row not already on the list: title and
+  authors, then Search runs the same search again (not by ISBN). The corrected
+  title and authors are used for a manual entry. A corrected row stays in view
+  until the tab changes.
+- **Saving runs in the background** with "Importing… n of m". Leaving the page
+  doesn't stop it; the page picks up the user's latest import (matching,
+  review, saving, or the result) when opened again. Done drops it.
 - **dinky.dev:** library items ("Title | Author; Author") that aren't deleted.
   Archived items (dinky's done list) are finished with an unknown date, the
   rest inactive in dinky's order (newest first). dinky's created time becomes
-  the added date. Matching ignores trailing (…) notes such as "(Dune Series,
-  #2)"; manual entries keep the title as written. No tags.
+  the added date. The first search leaves out trailing (…) notes such as
+  "(Dune Series, #2)"; manual entries keep the title as written. No tags.
 - **Admin** (admins only): users (make or remove admin, suspend, recovery link,
   delete; the last admin is protected), signup and invites, catalog providers
   (order, keys, on/off), review queue (edit, merge into existing, add to shared

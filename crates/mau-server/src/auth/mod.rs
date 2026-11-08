@@ -22,6 +22,7 @@ pub struct User {
     pub password_hash: Option<String>,
     pub totp_secret: Option<String>,
     pub totp_last_step: Option<i64>,
+    pub google_books_key: Option<String>,
 }
 
 impl User {
@@ -34,6 +35,6 @@ impl User {
 #[macro_export]
 macro_rules! user_columns {
     () => {
-        "id, username, display_name, bio, time_zone, is_admin, suspended, password_hash, totp_secret, totp_last_step"
+        "id, username, display_name, bio, time_zone, is_admin, suspended, password_hash, totp_secret, totp_last_step, google_books_key"
     };
 }

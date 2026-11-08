@@ -97,6 +97,15 @@ pub fn default_providers() -> Vec<ProviderConfig> {
         .collect()
 }
 
+/// Google Books with a user's own key.
+pub fn own_google(key: &str) -> ProviderConfig {
+    ProviderConfig {
+        name: ProviderName::Google,
+        enabled: true,
+        key: Some(key.to_string()),
+    }
+}
+
 pub async fn configured(db: &SqlitePool) -> sqlx::Result<Vec<ProviderConfig>> {
     Ok(crate::settings::get(db, "providers")
         .await?

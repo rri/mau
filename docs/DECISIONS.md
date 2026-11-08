@@ -426,3 +426,55 @@ Newest entries at the bottom of each section.
   import of the same file skips everything.
 - **Other importers still use the import time as the added date**, though
   Goodreads and StoryGraph files have a Date Added column.
+
+### Import search, own Google Books key, background saving (2026-11-08)
+
+- **Test run first:** the user's 1,020 dinky books against Open Library
+  matched 781, left 101 to check and 138 not found. Open Library needs every
+  query word in a record: middle initials ("Ernst W Mayr"), "CPA", subtitles,
+  and hyphens or apostrophes next to an author ("Data-Intensive …
+  Kleppmann", "Don't … Steve Krug") return nothing. Short title + surname with
+  punctuation removed found 80 of the 138 exactly and 22 loosely; 36 aren't
+  in Open Library at all. Keyless Google Books couldn't be tried (the shared
+  quota was used up).
+- **User choices:** each user adds their own Google Books key (Settings →
+  Google Books); it's used for imports and for the Add page search, which
+  then asks Google only. Without one, imports use Open Library, even if the
+  admin set a server Google key. The fallback search runs whenever the first
+  has no clear match, for every import source. Review rows can be edited and
+  searched again. If Google refuses, Open Library answers for that book.
+  Google results take Open Library's large cover by ISBN first. Saving runs
+  in the background.
+- **A clear match** is the same normalized title (no trailing notes, no
+  subtitle after ":", no leading The/A/An, letters and digits only) and the
+  first author's surname among the result's authors. The surname is the last
+  word before any comma, so "Bird, Richard" and "Mike Piper, CPA" both work.
+  This normalization now also applies to duplicate checks for every source.
+- **Imports use Open Library only if the admin hasn't turned it off.** With it
+  off and no own key, nothing is searched and rows come in as not found.
+- **Up to three requests per book** (ISBN, first search, fallback); the
+  fallback is skipped when it would be the same query. Check-match rows offer
+  up to 10 results from both searches.
+- **Refusals** are counted per book; review shows the count and Google's
+  latest message. Google's error text is now passed through ("Google Books
+  refused: API key not valid…") instead of only the HTTP status.
+- **The key** is stored in plain text in `users.google_books_key` (like the
+  admin's provider keys), checked with one search for "dune" before saving,
+  shown back only as its last 4 characters, and limited to 10 saves a minute.
+  Changing it doesn't need a password confirmation. `Me.google_books` drives
+  the Settings row ("Own key" / "Off").
+- **Re-search** (`POST /api/import/{job}/rows/{index}`) skips the ISBN step
+  and the duplicate check, allows 30 a minute, and replaces the row's title
+  and authors. It isn't allowed once saving has started.
+- **Background saving:** `commit` returns at once; the status reports
+  "n of m" (books processed in the catalog phase, which is the slow part:
+  12¾ minutes for the test file, almost all fetching editions and covers),
+  then the result or the error. A job being saved is never pruned or
+  dismissed. `GET /api/import/current` gives the user's newest job so the page
+  resumes; Done or Cancel drops it (`DELETE /api/import/{job}`). Catalog
+  works are still added one at a time, to avoid two rows racing to add the
+  same work.
+- **Covers by ISBN** try at most two of the result's ISBNs at
+  `covers.openlibrary.org/b/isbn/{isbn}-L.jpg?default=false`, then Google's
+  thumbnail. This applies wherever a Google result is added (import or Add).
+

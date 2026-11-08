@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
-	import { get, post } from '#lib/api/client.ts';
+	import { onDestroy, onMount } from 'svelte';
+	import { del, get, post } from '#lib/api/client.ts';
 	import type { CommitResult } from '#lib/api/generated/CommitResult.ts';
 	import type { CsvPreview } from '#lib/api/generated/CsvPreview.ts';
+	import type { CurrentImport } from '#lib/api/generated/CurrentImport.ts';
 	import type { ImportStarted } from '#lib/api/generated/ImportStarted.ts';
 	import type { JobStatus } from '#lib/api/generated/JobStatus.ts';
 	import type { RowStatus } from '#lib/api/generated/RowStatus.ts';
 	import { library } from '#lib/library.svelte.ts';
-	import { toasts } from '#lib/toast.svelte.ts';
 	import PageHead from '#lib/components/PageHead.svelte';
 
 	const SOURCES = [
@@ -39,7 +39,7 @@
 	let source = $state('goodreads');
 	let files = $state<FileList | null>(null);
 	let text = '';
-	let step = $state<'choose' | 'map' | 'matching' | 'review'>('choose');
+	let step = $state<'choose' | 'map' | 'matching' | 'review' | 'saving' | 'done'>('choose');
 	let preview = $state<CsvPreview | null>(null);
 	let mapping = $state<Record<string, string>>({});
 	let job = $state<string | null>(null);
@@ -47,10 +47,37 @@
 	let rows = $state<RowStatus[]>([]);
 	let tab = $state<(typeof KINDS)[number]['k']>('matched');
 	let choices = $state<Record<number, string>>({});
+	let refused = $state({ count: 0, reason: '' });
+	let result = $state<CommitResult | null>(null);
+	// Rows corrected on this tab stay in view until the tab changes, even if
+	// they're now matched.
+	let pinned = $state<number[]>([]);
+	let editing = $state<number | null>(null);
+	let editTitle = $state('');
+	let editAuthors = $state('');
+	let editError = $state('');
 	let error = $state('');
 	let busy = $state(false);
 	let poll: ReturnType<typeof setTimeout> | undefined;
-	onDestroy(() => clearTimeout(poll));
+	let gone = false;
+	onDestroy(() => {
+		gone = true;
+		clearTimeout(poll);
+	});
+
+	// Pick up an import that's still matching, waiting for review, or saving.
+	onMount(async () => {
+		try {
+			const cur = await get<CurrentImport>('/import/current');
+			if (cur.job && step === 'choose') {
+				job = cur.job;
+				step = 'matching';
+				check();
+			}
+		} catch {
+			// Offline: the page says so.
+		}
+	});
 
 	function guess(header: string): string {
 		const h = header.toLowerCase();
@@ -116,22 +143,75 @@
 	}
 
 	async function check() {
-		if (!job) return;
+		if (!job || gone) return;
 		try {
 			const st = await get<JobStatus>(`/import/${job}`);
-			progress = { done: st.done, total: st.total };
-			if (st.rows) {
+			refused = { count: st.refused, reason: st.refused_reason ?? '' };
+			if (st.error) {
+				error = `Saving stopped: ${st.error}`;
+				step = 'done';
+				return;
+			}
+			if (st.result) {
+				result = st.result;
+				step = 'done';
+				await library.sync();
+				return;
+			}
+			if (st.saving) {
+				progress = { done: st.saving.done, total: st.saving.total };
+				step = 'saving';
+			} else if (st.rows) {
+				progress = { done: st.done, total: st.total };
 				rows = st.rows;
 				const first = KINDS.find((k) => st.rows!.some((r) => r.kind === k.k));
 				tab = first?.k ?? 'matched';
 				step = 'review';
 				return;
+			} else {
+				progress = { done: st.done, total: st.total };
+				step = 'matching';
 			}
 		} catch (e) {
 			error = (e as Error).message;
 			return;
 		}
 		poll = setTimeout(check, 800);
+	}
+
+	function showTab(k: (typeof KINDS)[number]['k']) {
+		tab = k;
+		pinned = [];
+		editing = null;
+	}
+
+	function edit(r: RowStatus) {
+		editing = r.index;
+		editTitle = r.title;
+		editAuthors = r.authors.join('; ');
+		editError = '';
+	}
+
+	async function searchAgain(e: SubmitEvent) {
+		e.preventDefault();
+		if (editing === null || !job) return;
+		const index = editing;
+		busy = true;
+		editError = '';
+		try {
+			const r = await post<RowStatus>(`/import/${job}/rows/${index}`, {
+				title: editTitle,
+				authors: editAuthors.split(';')
+			});
+			rows = rows.map((x) => (x.index === index ? r : x));
+			delete choices[index];
+			if (!pinned.includes(index)) pinned = [...pinned, index];
+			editing = null;
+		} catch (err) {
+			editError = (err as Error).message;
+		} finally {
+			busy = false;
+		}
 	}
 
 	const count = (k: string) => rows.filter((r) => r.kind === k).length;
@@ -149,12 +229,12 @@
 				if (v === 'skip' || v === 'manual') return { index, action: v, candidate: null };
 				return { index, action: 'match', candidate: Number(v) };
 			});
-			const r = await post<CommitResult>(`/import/${job}/commit`, { choices: list });
-			await library.sync();
-			toasts.show(
-				`Imported ${r.imported} ${r.imported === 1 ? 'book' : 'books'}. Unfinished ones are at the top of your inactive books.`
-			);
-			reset();
+			const p = await post<{ done: number; total: number }>(`/import/${job}/commit`, {
+				choices: list
+			});
+			progress = p;
+			step = 'saving';
+			poll = setTimeout(check, 800);
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
@@ -162,11 +242,19 @@
 		}
 	}
 
+	/** Drops the import on the server too (not while it's saving). */
 	function reset() {
+		if (job && step !== 'saving') del(`/import/${job}`).catch(() => {});
+		clearTimeout(poll);
 		step = 'choose';
 		job = null;
 		rows = [];
 		choices = {};
+		pinned = [];
+		editing = null;
+		result = null;
+		refused = { count: 0, reason: '' };
+		error = '';
 		preview = null;
 		files = null;
 	}
@@ -218,22 +306,36 @@
 			<span style="width:{progress.total ? (100 * progress.done) / progress.total : 0}%"></span>
 		</div>
 	{:else if step === 'review'}
-		<p class="help">{rows.length} books in the file. Review, then import.</p>
+		<p class="help">
+			{rows.length} books in the file. Review, then import. Use Edit to fix a title or author and search
+			again.
+		</p>
+		{#if refused.count}
+			<p class="notice">
+				Google Books refused {refused.count}
+				{refused.count === 1 ? 'search' : 'searches'}, so {refused.count === 1
+					? 'that book was'
+					: 'those books were'} looked up on Open Library instead. {refused.reason}
+			</p>
+		{/if}
 		<div class="tabs">
 			{#each KINDS as k (k.k)}
-				<button class="chip" type="button" aria-pressed={tab === k.k} onclick={() => (tab = k.k)}
+				<button class="chip" type="button" aria-pressed={tab === k.k} onclick={() => showTab(k.k)}
 					>{k.l} {count(k.k)}</button
 				>
 			{/each}
 		</div>
 		<ul class="rows">
-			{#each rows.filter((r) => r.kind === tab) as r (r.index)}
+			{#each rows.filter((r) => r.kind === tab || pinned.includes(r.index)) as r (r.index)}
 				<li>
 					<div>
 						{r.title}
 						<div class="sub">
 							{r.authors.join(', ')} · {r.summary}{r.tags.length ? ` · #${r.tags.join(' #')}` : ''}
 						</div>
+						{#if r.kind !== 'dupe' && editing !== r.index}
+							<button class="link" type="button" onclick={() => edit(r)}>Edit</button>
+						{/if}
 					</div>
 					{#if r.kind === 'uncertain'}
 						<select bind:value={choices[r.index]} aria-label="Choose a match">
@@ -262,6 +364,21 @@
 							/> Import</label
 						>
 					{/if}
+					{#if editing === r.index}
+						<form class="edit" onsubmit={searchAgain}>
+							<label class="field" for="ed-title"
+								>Title<input id="ed-title" bind:value={editTitle} required /></label
+							>
+							<label class="field" for="ed-authors"
+								>Authors, separated by ;<input id="ed-authors" bind:value={editAuthors} /></label
+							>
+							{#if editError}<p class="error" role="alert">{editError}</p>{/if}
+							<div class="row-end">
+								<button class="btn" type="button" onclick={() => (editing = null)}>Cancel</button>
+								<button class="btn primary" type="submit" disabled={busy}>Search</button>
+							</div>
+						</form>
+					{/if}
 				</li>
 			{/each}
 		</ul>
@@ -270,6 +387,27 @@
 			<button class="btn primary" type="button" onclick={commit} disabled={busy || toImport === 0}
 				>Import {toImport} {toImport === 1 ? 'book' : 'books'}</button
 			>
+		</div>
+	{:else if step === 'saving'}
+		<p>Importing… {progress.done} of {progress.total}</p>
+		<div class="meter">
+			<span style="width:{progress.total ? (100 * progress.done) / progress.total : 0}%"></span>
+		</div>
+		<p class="help">
+			Covers and editions are fetched for each matched book, which takes a while for a big file. You
+			can leave this page; the import carries on.
+		</p>
+	{:else if step === 'done'}
+		{#if result}
+			<p>
+				Imported {result.imported}
+				{result.imported === 1 ? 'book' : 'books'}{result.skipped
+					? `, skipped ${result.skipped}`
+					: ''}. Unfinished ones are at the top of your inactive books.
+			</p>
+		{/if}
+		<div class="row-end">
+			<button class="btn primary" type="button" onclick={reset}>Done</button>
 		</div>
 	{/if}
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -363,5 +501,19 @@
 	.sub {
 		font-size: 13px;
 		color: var(--muted);
+	}
+	.link {
+		background: none;
+		border: 0;
+		padding: 0;
+		color: var(--accent);
+		font-size: 13px;
+		cursor: pointer;
+	}
+	.edit {
+		grid-column: 1 / -1;
+		display: grid;
+		gap: 10px;
+		padding: 6px 0 4px;
 	}
 </style>

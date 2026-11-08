@@ -175,6 +175,73 @@ pub async fn change_password(
 }
 
 // ---------------------------------------------------------------------------
+// Google Books key (the user's own, for their searches and imports)
+
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct GoogleBooksKey {
+    /// The last 4 characters of the saved key, or null if there's none.
+    pub ends_with: Option<String>,
+}
+
+fn key_hint(key: Option<&str>) -> GoogleBooksKey {
+    GoogleBooksKey {
+        ends_with: key.map(|k| {
+            let n = k.chars().count();
+            k.chars().skip(n.saturating_sub(4)).collect()
+        }),
+    }
+}
+
+pub async fn google_books_key(Authed(s): Authed) -> Json<GoogleBooksKey> {
+    Json(key_hint(s.user.google_books_key.as_deref()))
+}
+
+#[derive(Deserialize, TS)]
+#[ts(export)]
+pub struct GoogleBooksKeySet {
+    pub key: String,
+}
+
+/// Saves the key after one test search, so a mistyped key is refused here
+/// rather than at the next search.
+pub async fn set_google_books_key(
+    State(state): State<AppState>,
+    Authed(s): Authed,
+    Json(req): Json<GoogleBooksKeySet>,
+) -> ApiResult<Json<GoogleBooksKey>> {
+    let key = req.key.trim();
+    if key.is_empty() || key.len() > 200 || !key.bytes().all(|b| b.is_ascii_graphic()) {
+        return Err(ApiError::bad_request(
+            "key",
+            "That doesn't look like an API key. Paste it from the Google Cloud console.",
+        ));
+    }
+    state.limits.check("google-key", &s.user.id, 10)?;
+    #[cfg(not(test))]
+    crate::providers::google::search(&state.http, key, "dune")
+        .await
+        .map_err(|e| ApiError::bad_request("key", format!("The key didn't work. {e}")))?;
+    sqlx::query("UPDATE users SET google_books_key = ? WHERE id = ?")
+        .bind(key)
+        .bind(&s.user.id)
+        .execute(&state.db)
+        .await?;
+    Ok(Json(key_hint(Some(key))))
+}
+
+pub async fn remove_google_books_key(
+    State(state): State<AppState>,
+    Authed(s): Authed,
+) -> ApiResult<Json<GoogleBooksKey>> {
+    sqlx::query("UPDATE users SET google_books_key = NULL WHERE id = ?")
+        .bind(&s.user.id)
+        .execute(&state.db)
+        .await?;
+    Ok(Json(key_hint(None)))
+}
+
+// ---------------------------------------------------------------------------
 // Two-factor (authenticator app)
 
 #[derive(Serialize, TS)]

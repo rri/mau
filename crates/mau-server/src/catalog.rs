@@ -66,7 +66,7 @@ fn dedupe_key(c: &Candidate) -> String {
     format!("{t}|{a}")
 }
 
-async fn cache_candidate(state: &AppState, c: &Candidate) {
+pub(crate) async fn cache_candidate(state: &AppState, c: &Candidate) {
     providers::cache_put(
         &state.db,
         &format!("cand:{}:{}", c.provider, c.source_id),
@@ -75,7 +75,7 @@ async fn cache_candidate(state: &AppState, c: &Candidate) {
     .await;
 }
 
-async fn provider_search(
+pub(crate) async fn provider_search(
     state: &AppState,
     p: &ProviderConfig,
     q: &str,
@@ -89,7 +89,7 @@ async fn provider_search(
     Ok(res)
 }
 
-async fn provider_isbn(
+pub(crate) async fn provider_isbn(
     state: &AppState,
     p: &ProviderConfig,
     isbn: &str,
@@ -185,7 +185,39 @@ pub async fn find_candidates(
     Ok((results, sources, errors))
 }
 
-/// `GET /api/catalog/search?q=…`: asks enabled providers in order, moving on
+/// Searches only Google Books with a user's own key.
+async fn own_google(
+    state: &AppState,
+    key: &str,
+    query: &str,
+    isbn: Option<&str>,
+) -> (Vec<Candidate>, Vec<String>, Vec<String>) {
+    let p = providers::own_google(key);
+    let found = match isbn {
+        Some(i) => provider_isbn(state, &p, i)
+            .await
+            .map(|c| c.into_iter().collect::<Vec<_>>()),
+        None => provider_search(state, &p, query).await,
+    };
+    match found {
+        Ok(mut list) => {
+            list.truncate(MAX_RESULTS);
+            for c in &list {
+                cache_candidate(state, c).await;
+            }
+            let sources = if list.is_empty() {
+                vec![]
+            } else {
+                vec![p.name.label().to_string()]
+            };
+            (list, sources, vec![])
+        }
+        Err(e) => (vec![], vec![], vec![e]),
+    }
+}
+
+/// `GET /api/catalog/search?q=…`: with the user's own Google Books key, asks
+/// only Google Books. Otherwise asks enabled providers in order, moving on
 /// only when results are missing or thin.
 pub async fn search(
     State(state): State<AppState>,
@@ -210,7 +242,10 @@ pub async fn search(
         None
     };
     state.limits.check("search", &s.user.id, 30)?;
-    let (results, sources, errors) = find_candidates(&state, query, isbn.as_deref()).await?;
+    let (results, sources, errors) = match s.user.google_books_key.as_deref() {
+        Some(key) => own_google(&state, key, query, isbn.as_deref()).await,
+        None => find_candidates(&state, query, isbn.as_deref()).await?,
+    };
 
     let mut out = Vec::with_capacity(results.len());
     for c in results {
@@ -357,10 +392,7 @@ pub async fn ensure_candidate(
     });
     editions.truncate(MAX_EDITIONS);
 
-    let cover = match &c.cover_url {
-        Some(url) => crate::covers::fetch_and_store(state, url).await,
-        None => None,
-    };
+    let cover = cover_for(state, c, &editions).await;
 
     let mut tx = state.db.begin().await?;
     let seq = library::next_seq(&mut tx).await?;
@@ -453,6 +485,27 @@ pub async fn ensure_candidate(
         .ok_or_else(|| ApiError::internal("work vanished"))?;
     tx.commit().await?;
     Ok(work)
+}
+
+/// Google Books covers are small (about 128 px wide), so for its results
+/// Open Library's large cover for one of the ISBNs comes first.
+async fn cover_for(
+    state: &AppState,
+    c: &Candidate,
+    editions: &[CandidateEdition],
+) -> Option<String> {
+    if c.provider == "google" {
+        for isbn in editions.iter().filter_map(|e| e.isbn13.as_deref()).take(2) {
+            let url = format!("https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg?default=false");
+            if let Some(hash) = crate::covers::fetch_and_store(state, &url).await {
+                return Some(hash);
+            }
+        }
+    }
+    match &c.cover_url {
+        Some(url) => crate::covers::fetch_and_store(state, url).await,
+        None => None,
+    }
 }
 
 /// `GET /api/catalog/works/{id}`: a shared work, or the user's own private one.
