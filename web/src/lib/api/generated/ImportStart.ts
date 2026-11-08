@@ -2,7 +2,7 @@
 
 export type ImportStart = { 
 /**
- * goodreads, storygraph, librarything, csv, or mau
+ * goodreads, storygraph, librarything, dinky, csv, or mau
  */
 source: string, text: string, 
 /**

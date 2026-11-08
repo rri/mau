@@ -14,6 +14,7 @@
 		{ v: 'goodreads', l: 'Goodreads (CSV)' },
 		{ v: 'storygraph', l: 'StoryGraph (CSV)' },
 		{ v: 'librarything', l: 'LibraryThing (TSV or JSON)' },
+		{ v: 'dinky', l: 'dinky.dev (JSON)' },
 		{ v: 'mau', l: 'mau (full JSON export)' },
 		{ v: 'csv', l: 'Other CSV (map columns)' }
 	];

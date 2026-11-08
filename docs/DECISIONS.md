@@ -404,3 +404,25 @@ Newest entries at the bottom of each section.
   same flows were run in Firefox: sign-up, sign-in, turning on two-factor, a
   code at sign-in, a recovery code at sign-in and in confirmation, changing the
   password, recovery, and a reset link from the command line.
+
+### dinky.dev import (2026-11-08)
+
+- **User choices:** archived items are finished with an unknown date, active
+  ones inactive; trailing (…) notes are ignored when matching only; dinky's
+  `created` becomes the added date; no source tag. Deleted items are left out
+  (the request).
+- **It's a regular import source** ("dinky.dev (JSON)" in Settings → Import),
+  with the usual review, rather than a one-off command.
+- **Order:** unfinished books newest-created first and finished ones
+  newest-updated first, as dinky's library lists them; the Reading view keeps
+  that order.
+- **Parsing:** the line splits at the first `|`; authors split on `;`; a
+  Markdown link `[text](url)` keeps its text; whitespace (including
+  non-breaking spaces) is trimmed. A line without `|` is a title with no
+  authors. dinky's `today` reminders are ignored.
+- **Notes stripping is for dinky only.** Goodreads titles carry the same
+  "(Series, #2)" notes and would match better too, but that wasn't asked for.
+  Duplicate checks compare both the full and the stripped title, so a second
+  import of the same file skips everything.
+- **Other importers still use the import time as the added date**, though
+  Goodreads and StoryGraph files have a Date Added column.

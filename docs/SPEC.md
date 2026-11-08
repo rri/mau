@@ -207,12 +207,17 @@ A list of sections, each its own page, then **Sign out**.
   Each is Private (default) or Public. Ratings optional per item; notes never.
   "Make a new link" breaks the old one. Sharing with specific people is postponed.
 - **Import & export:** import from Goodreads (CSV), StoryGraph (CSV),
-  LibraryThing (TSV/JSON), or any CSV with column mapping (needs Title +
-  Authors, or ISBN). Review before commit: matched / check match / not found
-  (add as manual entry or skip) / already on list (skipped, nothing merged).
-  Unfinished books come in inactive; read books without a date are finished
-  with an unknown date; shelves become tags verbatim. Export: full JSON
-  (re-importable) or simple CSV.
+  LibraryThing (TSV/JSON), dinky.dev (JSON), or any CSV with column mapping
+  (needs Title + Authors, or ISBN). Review before commit: matched / check match
+  / not found (add as manual entry or skip) / already on list (skipped, nothing
+  merged). Unfinished books come in inactive; read books without a date are
+  finished with an unknown date; shelves become tags verbatim. Export: full
+  JSON (re-importable) or simple CSV.
+- **dinky.dev:** library items ("Title | Author; Author") that aren't deleted.
+  Archived items (dinky's done list) are finished with an unknown date, the
+  rest inactive in dinky's order (newest first). dinky's created time becomes
+  the added date. Matching ignores trailing (…) notes such as "(Dune Series,
+  #2)"; manual entries keep the title as written. No tags.
 - **Admin** (admins only): users (make or remove admin, suspend, recovery link,
   delete; the last admin is protected), signup and invites, catalog providers
   (order, keys, on/off), review queue (edit, merge into existing, add to shared

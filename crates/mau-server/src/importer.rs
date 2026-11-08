@@ -54,6 +54,8 @@ struct Job {
     rows: Vec<Row>,
     /// Full history for mau's own exports.
     mau: Option<Vec<export::Book>>,
+    /// Match on titles without trailing (…) notes (dinky.dev).
+    strip_notes: bool,
     results: Vec<Option<Matched>>,
     created_at: i64,
 }
@@ -120,7 +122,7 @@ pub async fn preview(
 #[derive(Deserialize, TS)]
 #[ts(export)]
 pub struct ImportStart {
-    /// goodreads, storygraph, librarything, csv, or mau
+    /// goodreads, storygraph, librarything, dinky, csv, or mau
     pub source: String,
     pub text: String,
     /// For `csv`: mau field → column name.
@@ -175,6 +177,7 @@ pub async fn start(
         "goodreads" => (import::goodreads(&req.text).map_err(bad)?, None),
         "storygraph" => (import::storygraph(&req.text).map_err(bad)?, None),
         "librarything" => (import::librarything(&req.text).map_err(bad)?, None),
+        "dinky" => (import::dinky(&req.text).map_err(bad)?, None),
         "csv" => (
             import::generic(&req.text, &req.mapping.unwrap_or_default()).map_err(bad)?,
             None,
@@ -203,6 +206,7 @@ pub async fn start(
         results: vec![None; total],
         rows,
         mau,
+        strip_notes: req.source == "dinky",
         created_at: now_ms(),
     });
     let handle = state.imports.get(&job, &s.user.id).expect("just inserted");
@@ -263,12 +267,14 @@ async fn existing(state: &AppState, user_id: &str) -> sqlx::Result<Existing> {
     })
 }
 
-async fn match_row(state: &AppState, ex: &Existing, row: &Row, mau: bool) -> Matched {
+/// `title` is what to search for and compare: the row's title, or the row's
+/// title without trailing notes.
+async fn match_row(state: &AppState, ex: &Existing, row: &Row, title: &str, mau: bool) -> Matched {
+    let author = norm_author(row.authors.first().map_or("", |s| s));
     let dupe = row.isbn13.as_ref().is_some_and(|i| ex.isbns.contains(i))
-        || ex.titles.contains(&(
-            norm_title(&row.title),
-            norm_author(row.authors.first().map_or("", |s| s)),
-        ));
+        || [title, &row.title]
+            .iter()
+            .any(|t| ex.titles.contains(&(norm_title(t), author.clone())));
     if dupe {
         return Matched {
             kind: MatchKind::Dupe,
@@ -312,7 +318,7 @@ async fn match_row(state: &AppState, ex: &Existing, row: &Row, mau: bool) -> Mat
             local_work: None,
         };
     }
-    let query = format!("{} {}", row.title, row.authors.first().map_or("", |s| s));
+    let query = format!("{} {}", title, row.authors.first().map_or("", |s| s));
     let found = catalog::find_candidates(state, query.trim(), None)
         .await
         .map(|(f, _, _)| f)
@@ -325,7 +331,7 @@ async fn match_row(state: &AppState, ex: &Existing, row: &Row, mau: bool) -> Mat
         };
     }
     let want = (
-        norm_title(&row.title),
+        norm_title(title),
         row.authors.first().map(|a| norm_author(a)),
     );
     let exact = found.iter().position(|c| {
@@ -350,9 +356,9 @@ async fn match_row(state: &AppState, ex: &Existing, row: &Row, mau: bool) -> Mat
 }
 
 async fn match_all(state: AppState, user_id: String, job: Arc<Mutex<Job>>) {
-    let (rows, mau) = {
+    let (rows, mau, strip) = {
         let j = job.lock().unwrap();
-        (j.rows.clone(), j.mau.is_some())
+        (j.rows.clone(), j.mau.is_some(), j.strip_notes)
     };
     let ex = match existing(&state, &user_id).await {
         Ok(e) => e,
@@ -368,7 +374,14 @@ async fn match_all(state: AppState, user_id: String, job: Arc<Mutex<Job>>) {
     futures::stream::iter(rows.into_iter().enumerate())
         .map(|(i, row)| {
             let (state, ex) = (state.clone(), ex.clone());
-            async move { (i, match_row(&state, &ex, &row, mau).await) }
+            async move {
+                let title = if strip {
+                    import::without_notes(&row.title)
+                } else {
+                    &row.title
+                };
+                (i, match_row(&state, &ex, &row, title, mau).await)
+            }
         })
         .buffer_unordered(CONCURRENCY)
         .for_each(|(i, m)| {
@@ -697,7 +710,7 @@ pub async fn commit(
         .bind(row.notes.chars().take(20_000).collect::<String>())
         .bind(full.and_then(|b| b.title_override.clone()))
         .bind(full.and_then(|b| b.authors_override.as_ref()).map(|a| serde_json::to_string(a).unwrap()))
-        .bind(full.map_or_else(now_ms, |b| b.added_at))
+        .bind(full.map(|b| b.added_at).or(row.added_at).unwrap_or_else(now_ms))
         .bind(&clock_json)
         .bind(seq)
         .execute(&mut *tx)
@@ -952,6 +965,52 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn dinky_import() {
+        let app = TestApp::new().await;
+        let none: Vec<crate::providers::ProviderConfig> = vec![];
+        crate::settings::set(&app.state.db, "providers", &none)
+            .await
+            .unwrap();
+        let (_, cookie) = app.user("rri", false).await;
+        let json = r#"{"contents": {"works": {
+            "a": {"data": "Dune Messiah (Dune Series, #2) | Frank Herbert", "created": "2022-06-05T03:24:57.708Z", "updated": "2022-06-05T03:24:57.708Z"},
+            "b": {"data": "Cosmos | Carl Sagan", "created": "2022-06-05T02:54:14.625Z", "updated": "2022-06-05T03:19:27.548Z", "archive": true},
+            "c": {"data": "Gone | Nobody", "created": "2022-06-05T02:54:14.625Z", "updated": "2026-11-01T13:20:08.034Z", "deleted": "2026-11-01T13:20:08.034Z"}
+        }}}"#;
+        let res = run_import(&app, &cookie, "dinky", json).await;
+        assert_eq!(res["done"]["imported"], 2);
+        let (_, sync) = app
+            .post("/api/sync", json!({ "since": 0, "ops": [] }), Some(&cookie))
+            .await;
+        let ch = &sync["changes"];
+        let works = ch["works"].as_array().unwrap();
+        // Manual entries keep the title as written.
+        assert!(
+            works
+                .iter()
+                .any(|w| w["title"] == "Dune Messiah (Dune Series, #2)")
+        );
+        let readings = ch["readings"].as_array().unwrap();
+        assert_eq!(readings.len(), 1);
+        assert_eq!(readings[0]["finished_on"], UNKNOWN_DATE);
+        let books = ch["books"].as_array().unwrap();
+        assert!(books.iter().all(|b| b["active"] == false));
+        assert!(books.iter().any(|b| b["added_at"] == 1_654_399_497_708i64));
+
+        // Again: both already on the list, with or without the note.
+        let again = run_import(&app, &cookie, "dinky", json).await;
+        assert_eq!(again["done"]["skipped"], 2);
+        let (_, other) = app.user("juno", false).await;
+        let csv = "Book Id,Title,Author,Additional Authors,ISBN,ISBN13,My Rating,Publisher,Binding,Number of Pages,Year Published,Original Publication Year,Date Read,Date Added,Bookshelves,Exclusive Shelf,My Review,Private Notes,Read Count,Owned Copies
+1,Dune Messiah,Frank Herbert,,,,0,,,,,,,,to-read,to-read,,,0,0
+";
+        run_import(&app, &other, "goodreads", csv).await;
+        let res = run_import(&app, &other, "dinky", json).await;
+        assert_eq!(res["rows"][0]["kind"], "dupe");
+        assert_eq!(res["done"]["imported"], 1);
     }
 
     async fn router_get_text(app: &TestApp, path: &str, cookie: &str) -> String {

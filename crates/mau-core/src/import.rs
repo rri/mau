@@ -1,8 +1,8 @@
 //! Parsing other services' exports into a common row format.
 //!
 //! Supported: Goodreads CSV, StoryGraph CSV, LibraryThing (TSV or JSON),
-//! any CSV with a column mapping, and mau's own JSON export (parsed by the
-//! server, since it carries full history).
+//! dinky.dev JSON, any CSV with a column mapping, and mau's own JSON export
+//! (parsed by the server, since it carries full history).
 
 use std::collections::HashMap;
 
@@ -28,6 +28,8 @@ pub struct Row {
     /// Hardcover, Paperback, Ebook, or Audiobook, when the file says.
     pub binding: Option<String>,
     pub notes: String,
+    /// When the book was added there (Unix ms), if the file says.
+    pub added_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -212,6 +214,7 @@ pub fn goodreads(text: &str) -> Result<Vec<Row>> {
                 owned: int_of(get(r, "Owned Copies")).unwrap_or(0) > 0,
                 binding: binding_of(get(r, "Binding")),
                 notes: joined_notes(&[get(r, "My Review"), get(r, "Private Notes")]),
+                added_at: None,
             }
         })
         .filter(|r| !r.title.is_empty())
@@ -276,6 +279,7 @@ pub fn storygraph(text: &str) -> Result<Vec<Row>> {
                 owned: owned.eq_ignore_ascii_case("yes") || owned.eq_ignore_ascii_case("true"),
                 binding: binding_of(get(r, "Format")),
                 notes: clean(get(r, "Review")),
+                added_at: None,
             }
         })
         .filter(|r| !r.title.is_empty())
@@ -338,6 +342,7 @@ pub fn librarything(text: &str) -> Result<Vec<Row>> {
                     get(r, "Comment"),
                     get(r, "Private Comment"),
                 ]),
+                added_at: None,
             }
         })
         .filter(|r| !r.title.is_empty())
@@ -416,10 +421,128 @@ fn librarything_json(text: &str) -> Result<Vec<Row>> {
                 owned: lt_owned(&collections),
                 binding: None,
                 notes: joined_notes(&[&s(b, "review"), &s(b, "comment"), &s(b, "privatecomment")]),
+                added_at: None,
             }
         })
         .filter(|r| !r.title.is_empty())
         .collect())
+}
+
+// ---------------------------------------------------------------------------
+// dinky.dev
+
+/// Unix ms for an ISO 8601 UTC timestamp such as `2022-06-05T03:24:57.708Z`.
+fn timestamp_ms(s: &str) -> Option<i64> {
+    let (date, time) = s.trim().strip_suffix('Z')?.split_once('T')?;
+    let mut d = date.split('-').map(|p| p.parse::<i64>().ok());
+    let (y, m, day) = (d.next()??, d.next()??, d.next()??);
+    let mut t = time.split(':');
+    let (h, min) = (
+        t.next()?.parse::<i64>().ok()?,
+        t.next()?.parse::<i64>().ok()?,
+    );
+    let secs: f64 = t.next()?.parse().ok()?;
+    if !(1..=12).contains(&m) || !(1..=31).contains(&day) || h > 23 || min > 59 || secs >= 61.0 {
+        return None;
+    }
+    // Days since 1970-01-01 (Howard Hinnant's days_from_civil).
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    Some(((days * 24 + h) * 60 + min) * 60_000 + (secs * 1000.0).round() as i64)
+}
+
+/// `[text](url)` becomes `text`.
+fn strip_links(s: &str) -> String {
+    let mut out = String::new();
+    let mut rest = s;
+    while let Some(open) = rest.find('[') {
+        let after = &rest[open + 1..];
+        let Some(close) = after.find("](") else { break };
+        let Some(end) = after[close + 2..].find(')') else {
+            break;
+        };
+        out.push_str(&rest[..open]);
+        out.push_str(&after[..close]);
+        rest = &after[close + 2 + end + 1..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// A title without trailing parenthesized notes, for matching:
+/// "Dune Messiah (Dune Series, #2)" → "Dune Messiah".
+pub fn without_notes(title: &str) -> &str {
+    let mut t = title.trim_end();
+    while t.ends_with(')') {
+        let mut depth = 0;
+        let open = t.char_indices().rev().find_map(|(i, c)| {
+            match c {
+                ')' => depth += 1,
+                '(' => depth -= 1,
+                _ => {}
+            }
+            (depth == 0).then_some(i)
+        });
+        match open {
+            Some(i) if !t[..i].trim().is_empty() => t = t[..i].trim_end(),
+            _ => break,
+        }
+    }
+    t
+}
+
+/// dinky.dev's JSON export. Library items ("works") are lines of the form
+/// `Title | Author; Author`. Deleted items are left out; archived ones (its
+/// "done" list) are finished with an unknown date. Unfinished books come
+/// first, newest first as dinky lists them, then finished ones.
+pub fn dinky(text: &str) -> Result<Vec<Row>> {
+    let v: serde_json::Value =
+        serde_json::from_str(text).map_err(|e| Error::Format("dinky.dev", e.to_string()))?;
+    let works = v["contents"]["works"]
+        .as_object()
+        .ok_or_else(|| Error::Format("dinky.dev", "it has no library items".into()))?;
+    let mut items: Vec<(bool, &str, Row)> = works
+        .values()
+        .filter(|w| w["deleted"].is_null())
+        .filter_map(|w| {
+            let line = strip_links(w["data"].as_str()?);
+            let (title, authors) = line.split_once('|').unwrap_or((&line, ""));
+            let archived = w["archive"].as_bool().unwrap_or(false);
+            let row = Row {
+                title: clean(title),
+                authors: authors
+                    .split(';')
+                    .map(clean)
+                    .filter(|a| !a.is_empty())
+                    .collect(),
+                reads: if archived {
+                    vec![Read::default()]
+                } else {
+                    vec![]
+                },
+                added_at: w["created"].as_str().and_then(timestamp_ms),
+                ..Default::default()
+            };
+            // dinky sorts unfinished items by created, done items by updated.
+            let key = if archived {
+                &w["updated"]
+            } else {
+                &w["created"]
+            };
+            Some((archived, key.as_str().unwrap_or(""), row))
+        })
+        .filter(|(_, _, r)| !r.title.is_empty())
+        .collect();
+    items.sort_by(|a, b| {
+        a.0.cmp(&b.0)
+            .then(b.1.cmp(a.1))
+            .then_with(|| a.2.title.cmp(&b.2.title))
+    });
+    Ok(items.into_iter().map(|(_, _, r)| r).collect())
 }
 
 // ---------------------------------------------------------------------------
@@ -592,6 +715,52 @@ Solaris,Stanisław Lem,,,digital,currently-reading,2026/02/01,,,0,,,,No
         let rows = librarything(json).unwrap();
         assert_eq!(rows[0].authors, vec!["Stanisław Lem"]);
         assert_eq!(rows[0].reads.len(), 1);
+    }
+
+    #[test]
+    fn dinky_rows() {
+        let json = r#"{"settings": {}, "contents": {"tasks": {}, "works": {
+            "a": {"data": "Old | Someone", "created": "2022-06-05T03:24:57.708Z", "updated": "2022-06-05T03:24:57.708Z"},
+            "b": {"data": "Calculus | Ron Larson; Bruce H Edwards\u00a0", "created": "2023-05-07T20:59:01.352Z", "updated": "2023-05-07T20:59:01.352Z", "archive": false},
+            "c": {"data": "Dune (Dune Series, #1) | Frank Herbert", "created": "2022-06-05T02:54:14.625Z", "updated": "2022-06-05T03:19:27.548Z", "archive": true, "today": "2023-01-01T00:00:00.000Z"},
+            "d": {"data": "Gone | Nobody", "created": "2022-06-05T02:54:14.625Z", "updated": "2026-11-01T13:20:08.034Z", "deleted": "2026-11-01T13:20:08.034Z"},
+            "e": {"data": " [The Implementation Of Functional Programming Languages](https://example.com/a.pdf) | Simon L Peyton Jones", "created": "2021-01-01T00:00:00.000Z", "updated": "2021-01-01T00:00:00.000Z"},
+            "f": {"data": "Just a title", "created": "2020-01-01T00:00:00Z", "updated": "2020-01-01T00:00:00Z"}
+        }}}"#;
+        let rows = dinky(json).unwrap();
+        let titles: Vec<&str> = rows.iter().map(|r| r.title.as_str()).collect();
+        assert_eq!(
+            titles,
+            [
+                "Calculus",
+                "Old",
+                "The Implementation Of Functional Programming Languages",
+                "Just a title",
+                "Dune (Dune Series, #1)"
+            ]
+        );
+        assert_eq!(rows[0].authors, ["Ron Larson", "Bruce H Edwards"]);
+        assert!(rows[0].reads.is_empty());
+        assert_eq!(rows[1].added_at, Some(1_654_399_497_708));
+        assert!(rows[3].authors.is_empty());
+        assert_eq!(rows[3].added_at, Some(1_577_836_800_000));
+        assert_eq!(rows[4].reads, vec![Read::default()]);
+        assert!(dinky("{}").is_err());
+    }
+
+    #[test]
+    fn notes_come_off_titles() {
+        assert_eq!(
+            without_notes("Dune Messiah (Dune Series, #2)"),
+            "Dune Messiah"
+        );
+        assert_eq!(
+            without_notes("Facts And Mysteries (Revised Edition) (Particle Physics)"),
+            "Facts And Mysteries"
+        );
+        assert_eq!(without_notes("(Untitled)"), "(Untitled)");
+        assert_eq!(without_notes("Cosmos"), "Cosmos");
+        assert_eq!(without_notes("A (b (c)) d"), "A (b (c)) d");
     }
 
     #[test]
