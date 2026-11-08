@@ -6,7 +6,7 @@ use axum::http::{HeaderMap, header};
 use axum::response::{AppendHeaders, IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
-use webauthn_rs::prelude::{PublicKeyCredential, RegisterPublicKeyCredential, Uuid};
+use webauthn_rs::prelude::{PublicKeyCredential, RegisterPublicKeyCredential, Uuid, WebauthnError};
 use webauthn_rs_proto::ResidentKeyRequirement;
 
 use super::ceremony::{Ceremony, NewAccount};
@@ -368,6 +368,21 @@ pub fn clean_passkey_name(name: &str, fallback: &str) -> String {
     }
 }
 
+fn registration_failed(e: WebauthnError) -> ApiError {
+    match e {
+        // Security keys without a PIN can't verify the user, and some
+        // browsers don't offer to set one.
+        WebauthnError::UserNotVerified => ApiError::bad_request(
+            "passkey_no_pin",
+            "This security key didn't ask for a PIN, and mau requires one. Set a PIN on the key, then try again.",
+        ),
+        e => ApiError::bad_request(
+            "passkey",
+            format!("The passkey couldn't be registered ({e})."),
+        ),
+    }
+}
+
 fn expired() -> ApiError {
     ApiError::bad_request("challenge_expired", "That took too long. Please try again.")
 }
@@ -387,12 +402,7 @@ pub async fn register_finish(
     let passkey = state
         .webauthn
         .finish_passkey_registration(&req.credential, &reg)
-        .map_err(|e| {
-            ApiError::bad_request(
-                "passkey",
-                format!("The passkey couldn't be registered ({e})."),
-            )
-        })?;
+        .map_err(registration_failed)?;
     let device = user_agent(&headers);
     let now = now_ms();
 
@@ -901,12 +911,7 @@ pub async fn passkey_add_finish(
     let passkey = state
         .webauthn
         .finish_passkey_registration(&req.credential, &reg)
-        .map_err(|e| {
-            ApiError::bad_request(
-                "passkey",
-                format!("The passkey couldn't be registered ({e})."),
-            )
-        })?;
+        .map_err(registration_failed)?;
     let mut tx = state.db.begin().await?;
     insert_passkey(
         &mut tx,

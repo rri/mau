@@ -41,6 +41,11 @@ it; passkeys only work over HTTPS.
    Open it to create the admin account. Until an admin exists, a new link is
    printed on every start.
 
+   mau requires passkeys to check a PIN or fingerprint. A new security key
+   (such as a YubiKey) has no PIN, and not every browser offers to set one,
+   so set it first: `ykman fido access change-pin`, Yubico Authenticator, or
+   Chrome's Settings → Privacy and security → Security → Manage security keys.
+
 3. In **Settings → Admin → Signup & invites**, choose who can sign up
    (invite-only by default) and create invite links.
 

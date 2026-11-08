@@ -349,3 +349,12 @@ Newest entries at the bottom of each section.
   instead of a passkey. That run found and fixed three bugs: duplicate ISBNs
   crashing the add sheet (editions are now keyed by position), the sheet
   overflowing on phones, and search-result covers never loading.
+
+## After launch
+
+- **Security keys without a PIN are refused** (user choice, 2026-11-08). A new
+  YubiKey made a passkey without user verification and webauthn-rs rejected
+  it. mau keeps requiring user verification, since a passkey is the only way
+  to sign in. Registration now answers with a clear message ("Set a PIN on the
+  key, then try again", code `passkey_no_pin`), and the README explains how to
+  set a PIN.
