@@ -358,3 +358,49 @@ Newest entries at the bottom of each section.
   to sign in. Registration now answers with a clear message ("Set a PIN on the
   key, then try again", code `passkey_no_pin`), and the README explains how to
   set a PIN.
+- **Passwords replace passkeys** (user choice, 2026-11-08). The security key
+  on hand couldn't be given a PIN, and the user chose username and password
+  with optional authenticator-app two-factor instead. webauthn-rs and the
+  passkey screens are gone. The answers they gave:
+  - Forgotten password: a recovery code (from signup) sets a new one, or an
+    admin's one-time reset link, or `mau reset-password <username>` on the
+    server.
+  - Password rules: 10–256 characters, not a common password, not the
+    username. Argon2id.
+  - Lost authenticator: a recovery code works in place of a code; reset links
+    also turn two-factor off.
+  - Confirming sensitive actions: password, plus a code when two-factor is on.
+- **The common-password list is the UK NCSC's top 100,000**, not the 10,000
+  list proposed. Only entries of 10+ characters matter (shorter ones are
+  refused anyway), and the 10,000 list has just 51 of them. The NCSC list has
+  9,126, which is about 106 KB in the binary.
+- **Confirmation lasts 10 minutes**, up from the 5 used for passkeys. The
+  question put to the user wrongly said 10 was the existing value; 10 is what
+  they approved, so it's 10.
+- **Two-factor codes:** TOTP, SHA-1, 6 digits, 30 seconds, one step of drift
+  either way. The last accepted step is stored per user, so a code can't be
+  used twice (including the one that turned two-factor on). Setup must be
+  confirmed with a code within 5 minutes. The app label is "mau (host)".
+- **Sign-in with two-factor is two requests.** A right password returns a
+  ticket (kept in server memory for 5 minutes, at most 5 wrong codes); the
+  code goes with the ticket. A restart means signing in again.
+- **Wrong usernames and wrong passwords get the same answer**, and an unknown
+  account still costs one Argon2 check, so answers don't reveal which
+  usernames exist. The username check on signup still does, as before.
+- **Rate limits:** sign-in 20 per minute per address and 10 per account;
+  password confirmation 10 per address and 5 per account; recovery 5 per
+  address and per account; reset links 10 per address.
+- **Setting a password through recovery signs out every device**, then signs
+  in the one in use. Changing it in Settings signs out nothing; Sessions can.
+- **A recovery code leaves two-factor on; a reset link turns it off.** With a
+  code the person still has their recovery material; a reset link is for
+  people who have lost everything.
+- **Only the newest reset link works.** Issuing one voids earlier unused ones.
+- **Migration 0006 rebuilds `users`** (to drop the unique `webauthn_id`
+  column) and drops `passkeys`, `enroll_links`, and `sessions.restricted`.
+  Accounts from the passkey era have no password; they need a reset link.
+- **The Playwright sign-up test now uses a password**, so it no longer needs
+  Chromium's virtual authenticator. It's still unrun here (no Chromium). The
+  same flows were run in Firefox: sign-up, sign-in, turning on two-factor, a
+  code at sign-in, a recovery code at sign-in and in confirmation, changing the
+  password, recovery, and a reset link from the command line.

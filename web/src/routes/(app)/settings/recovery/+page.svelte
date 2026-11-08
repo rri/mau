@@ -3,7 +3,7 @@
 	import { get, post } from '#lib/api/client.ts';
 	import type { RecoveryCodes } from '#lib/api/generated/RecoveryCodes.ts';
 	import type { RecoveryStatus } from '#lib/api/generated/RecoveryStatus.ts';
-	import { withReauth } from '#lib/api/webauthn.ts';
+	import { withReauth } from '#lib/confirm.svelte.ts';
 	import { dateOfMs, fmtDate } from '#lib/dates.ts';
 	import { auth } from '#lib/auth.svelte.ts';
 	import PageHead from '#lib/components/PageHead.svelte';
@@ -70,7 +70,8 @@
 {:else if status}
 	<div class="sec">
 		<p class="help">
-			If you lose all your passkeys, a recovery code lets you sign in once to add a new one.
+			If you forget your password, a recovery code lets you set a new one. If you lose your
+			authenticator app, a recovery code works in place of its code.
 		</p>
 		<div><b class="big">{status.left}</b> <span class="help">of 10 codes left</span></div>
 		<div class="meter"><span style="width:{status.left * 10}%"></span></div>

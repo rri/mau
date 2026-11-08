@@ -5,12 +5,12 @@
 	import { auth } from '#lib/auth.svelte.ts';
 	import { library } from '#lib/library.svelte.ts';
 	import Toast from '#lib/components/Toast.svelte';
+	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 
 	let { children } = $props();
 
 	$effect(() => {
 		if (!auth.me) goto('/signin', { replaceState: true });
-		else if (auth.restricted) goto('/add-passkey', { replaceState: true });
 		else library.open(auth.me.id);
 	});
 
@@ -25,7 +25,7 @@
 	];
 </script>
 
-{#if auth.me && !auth.restricted}
+{#if auth.me}
 	<div class="shell">
 		<nav class="tabs" aria-label="Main">
 			<span class="brand">mau</span>
@@ -71,6 +71,7 @@
 		</main>
 	</div>
 	<Toast />
+	<ConfirmDialog />
 {/if}
 
 <style>

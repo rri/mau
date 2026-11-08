@@ -1,13 +1,11 @@
 <script lang="ts">
-	// The three signup steps: choose a name, create a passkey, save recovery codes.
+	// The three signup steps: choose a name, choose a password, save recovery codes.
 	import { goto } from '$app/navigation';
 	import { post } from '#lib/api/client.ts';
-	import { createPasskey, deviceName, passkeysSupported } from '#lib/api/webauthn.ts';
-	import type { CeremonyStart } from '#lib/api/generated/CeremonyStart.ts';
 	import type { RecoveryCodes } from '#lib/api/generated/RecoveryCodes.ts';
 	import type { UsernameAvailability } from '#lib/api/generated/UsernameAvailability.ts';
 	import { auth } from '#lib/auth.svelte.ts';
-	import PasskeyIcon from './PasskeyIcon.svelte';
+	import NewPassword from './NewPassword.svelte';
 
 	let {
 		invite = null,
@@ -19,7 +17,8 @@
 	let username = $state('');
 	let displayName = $state('');
 	let availability = $state<UsernameAvailability | null>(null);
-	let passkeyName = $state(deviceName());
+	let password = $state('');
+	let passwordOk = $state(false);
 	let codes = $state<string[]>([]);
 	let saved = $state(false);
 	let busy = $state(false);
@@ -42,32 +41,25 @@
 		}, 300);
 	}
 
-	function toPasskey(e: SubmitEvent) {
+	function toPassword(e: SubmitEvent) {
 		e.preventDefault();
 		if (!displayName.trim()) displayName = username;
 		step = 2;
 	}
 
-	async function create() {
+	async function create(e: SubmitEvent) {
+		e.preventDefault();
 		busy = true;
 		error = '';
 		try {
-			const res = await createPasskey(
-				() =>
-					post<CeremonyStart>('/auth/register/start', {
-						username,
-						display_name: displayName,
-						time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-						invite,
-						setup
-					}),
-				(challenge, credential) =>
-					post<RecoveryCodes>('/auth/register/finish', {
-						challenge,
-						credential,
-						passkey_name: passkeyName
-					})
-			);
+			const res = await post<RecoveryCodes>('/auth/register', {
+				username,
+				display_name: displayName,
+				time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+				password,
+				invite,
+				setup
+			});
 			codes = res.codes;
 			step = 3;
 		} catch (e) {
@@ -101,7 +93,7 @@
 {#if step === 1}
 	<p class={setup ? 'notice' : 'help'}>{intro}</p>
 	<h1>Choose your name</h1>
-	<form onsubmit={toPasskey} style="display:grid;gap:14px">
+	<form onsubmit={toPassword} style="display:grid;gap:14px">
 		<label class="field" for="su-user"
 			>Username<input
 				id="su-user"
@@ -131,30 +123,21 @@
 		<button class="btn primary" type="submit" disabled={!availability?.available}>Continue</button>
 	</form>
 {:else if step === 2}
-	<h1>Create your passkey</h1>
-	<p class="help">
-		Your passkey is how you sign in. It's stored by your device, password manager, or security key.
-		There's no password.
-	</p>
-	<label class="field" for="su-pk"
-		>Name for this passkey<input id="su-pk" bind:value={passkeyName} /></label
-	>
-	{#if !passkeysSupported()}<p class="error">This browser doesn't support passkeys.</p>{/if}
-	<button
-		class="btn primary big"
-		type="button"
-		onclick={create}
-		disabled={busy || !passkeysSupported()}
-	>
-		<PasskeyIcon />{busy ? 'Waiting for your passkey…' : 'Create passkey'}
-	</button>
-	{#if error}<p class="error" role="alert">{error}</p>{/if}
+	<h1>Choose a password</h1>
+	<form onsubmit={create} style="display:grid;gap:14px">
+		<input type="text" name="username" autocomplete="username" value={username} hidden />
+		<NewPassword bind:password bind:valid={passwordOk} id="su-pw" />
+		{#if error}<p class="error" role="alert">{error}</p>{/if}
+		<button class="btn primary" type="submit" disabled={busy || !passwordOk}
+			>{busy ? 'Creating your account…' : 'Create account'}</button
+		>
+	</form>
 	<button class="link" type="button" onclick={() => (step = 1)}>Back</button>
 {:else}
 	<h1>Save your recovery codes</h1>
 	<p class="help">
-		If you lose your passkey, one of these lets you sign in once to add a new one. They won't be
-		shown again.
+		If you forget your password or lose your authenticator app, one of these gets you back in. Each
+		works once. They won't be shown again.
 	</p>
 	<div class="codes mono">
 		{#each codes as c (c)}<span>{c}</span>{/each}

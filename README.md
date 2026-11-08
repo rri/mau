@@ -2,7 +2,8 @@
 
 A self-hosted personal library and reading tracker. Log a page with one tap,
 keep your books in your own order, track the copies you own, and publish the
-parts you want to share. Works offline; signs in with passkeys only.
+parts you want to share. Works offline; signs in with a password and, optionally, an authenticator
+app.
 
 - What it does and why: [`docs/SPEC.md`](docs/SPEC.md)
 - Choices made while building it: [`docs/DECISIONS.md`](docs/DECISIONS.md)
@@ -22,7 +23,7 @@ for the build machine's architecture.
 ## Running in production
 
 mau speaks plain HTTP on localhost. Put a reverse proxy with HTTPS in front of
-it; passkeys only work over HTTPS.
+it; passwords and session cookies must only travel over HTTPS.
 
 1. Create a user and data directory, and copy the config:
 
@@ -31,7 +32,8 @@ it; passkeys only work over HTTPS.
        install -D -m 644 mau.example.toml /etc/mau/mau.toml
 
    Set `public_url` in `/etc/mau/mau.toml` to the address people will use.
-   Passkeys are tied to that host name, so pick it before anyone signs up.
+   It appears in setup, invite, and reset links, and names the instance in
+   authenticator apps.
 
 2. Start mau (see the service files below) and look at its log. On the first
    start it prints a one-time link:
@@ -40,11 +42,6 @@ it; passkeys only work over HTTPS.
 
    Open it to create the admin account. Until an admin exists, a new link is
    printed on every start.
-
-   mau requires passkeys to check a PIN or fingerprint. A new security key
-   (such as a YubiKey) has no PIN, and not every browser offers to set one,
-   so set it first: `ykman fido access change-pin`, Yubico Authenticator, or
-   Chrome's Settings → Privacy and security → Security → Manage security keys.
 
 3. In **Settings → Admin → Signup & invites**, choose who can sign up
    (invite-only by default) and create invite links.
@@ -121,6 +118,18 @@ Logging is set with `MAU_LOG` (for example `MAU_LOG=debug`). Everything else
 (signup mode, invites, catalog providers and their API keys) is changed in the
 admin pages.
 
+### Forgotten passwords
+
+People who forget their password use one of their recovery codes on the
+sign-in page. If they've lost those too, an admin can make a one-time reset
+link in **Settings → Admin → Users**. If the admin is the one locked out, run
+this on the server (as the `mau` user, with the same config):
+
+    mau reset-password USERNAME
+
+It prints a link that works once, for 24 hours. Using it sets a new password,
+signs out the account's other devices, and turns off its two-factor.
+
 ### Data and backups
 
 `data_dir` holds:
@@ -146,9 +155,9 @@ Stop mau, replace the binary, start it. Database migrations run on start.
     just lint
 
 In development, `public_url` is `http://localhost:8370`, which browsers accept
-for passkeys without HTTPS.
+as a secure context without HTTPS.
 
-The browser tests use Playwright's Chromium and its virtual authenticator.
+The browser tests use Playwright's Chromium.
 Install the browser once with `cd web && npx playwright install chromium`.
 On Gentoo it also needs `x11-libs/libXcomposite` and `x11-libs/libXdamage`.
 

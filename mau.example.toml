@@ -5,8 +5,8 @@
 # Plain HTTP address mau listens on. Put a reverse proxy in front for HTTPS.
 listen = "127.0.0.1:8370"
 
-# The address people use to reach mau. Passkeys are tied to this host name,
-# so changing it later means everyone has to add new passkeys.
+# The address people use to reach mau. It's used in setup, invite, and reset
+# links, and names the instance in authenticator apps.
 public_url = "https://books.example.com"
 
 # Database, covers, and backups live here.

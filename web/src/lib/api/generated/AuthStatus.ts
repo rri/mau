@@ -2,11 +2,7 @@
 import type { Me } from "./Me.ts";
 import type { SignupMode } from "./SignupMode.ts";
 
-export type AuthStatus = { me: Me | null, 
-/**
- * Signed in with a recovery code or enrollment link; must add a passkey.
- */
-restricted: boolean, signup_mode: SignupMode, 
+export type AuthStatus = { me: Me | null, signup_mode: SignupMode, 
 /**
  * No admin exists yet; the setup link from the server log is needed.
  */

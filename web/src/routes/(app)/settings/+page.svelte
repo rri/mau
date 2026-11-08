@@ -38,7 +38,12 @@
 			label: auth.me?.display_name ?? 'Account',
 			sub: `@${auth.me?.username}`
 		},
-		{ href: '/settings/passkeys', label: 'Passkeys' },
+		{ href: '/settings/password', label: 'Password' },
+		{
+			href: '/settings/two-factor',
+			label: 'Two-factor',
+			value: auth.me?.two_factor ? 'On' : 'Off'
+		},
 		{ href: '/settings/sessions', label: 'Sessions' },
 		{
 			href: '/settings/recovery',

@@ -2,7 +2,6 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Page } from '@playwright/test';
 import { STATE_FILE } from './global-setup.ts';
 
 function state(): { setupToken: string; dataDir: string } {
@@ -26,22 +25,4 @@ export function seed(username: string) {
 			MAU_LOG: 'warn'
 		}
 	});
-}
-
-/** Adds a Chromium virtual authenticator that stores discoverable passkeys
- *  and always verifies the user. Shared across pages of the same context. */
-export async function addAuthenticator(page: Page) {
-	const cdp = await page.context().newCDPSession(page);
-	await cdp.send('WebAuthn.enable');
-	const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
-		options: {
-			protocol: 'ctap2',
-			transport: 'internal',
-			hasResidentKey: true,
-			hasUserVerification: true,
-			isUserVerified: true,
-			automaticPresenceSimulation: true
-		}
-	});
-	return { cdp, authenticatorId };
 }

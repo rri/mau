@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { AUTH_FILE, addAuthenticator, setupToken } from './helpers.ts';
+import { AUTH_FILE, setupToken } from './helpers.ts';
 
-test('first admin signs up with the setup link, then signs in with the passkey', async ({
+const PASSWORD = 'correct horse battery';
+
+test('first admin signs up with the setup link, then signs in with the password', async ({
 	page
 }) => {
-	await addAuthenticator(page);
 	await page.goto(`/setup/${setupToken()}`);
 	await page.getByRole('button', { name: 'Create the admin account' }).click();
 
@@ -13,7 +14,14 @@ test('first admin signs up with the setup link, then signs in with the passkey',
 	await page.getByLabel('Display name').fill('R. Reader');
 	await page.getByRole('button', { name: 'Continue' }).click();
 
-	await page.getByRole('button', { name: 'Create passkey' }).click();
+	const create = page.getByRole('button', { name: 'Create account' });
+	await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
+	await page.getByLabel('Type it again').fill('something else');
+	await expect(page.getByText("The two don't match.")).toBeVisible();
+	await expect(create).toBeDisabled();
+	await page.getByLabel('Type it again').fill(PASSWORD);
+	await create.click();
+
 	await expect(page.getByRole('heading', { name: 'Save your recovery codes' })).toBeVisible();
 	const start = page.getByRole('button', { name: 'Start using mau' });
 	await expect(start).toBeDisabled();
@@ -25,12 +33,17 @@ test('first admin signs up with the setup link, then signs in with the passkey',
 	await page.goto(`/setup/${setupToken()}`);
 	await expect(page.getByRole('heading', { name: "This setup link doesn't work" })).toBeVisible();
 
-	// Sign out by dropping the cookie, then sign in with the stored passkey.
+	// Sign out by dropping the cookie, then sign in again.
 	await page.context().clearCookies();
 	await page.evaluate(() => localStorage.clear());
 	await page.goto('/');
 	await expect(page).toHaveURL(/\/signin$/);
-	await page.getByRole('button', { name: 'Sign in with a passkey' }).click();
+	await page.getByLabel('Username').fill('rri');
+	await page.getByLabel('Password').fill('not the password');
+	await page.getByRole('button', { name: 'Sign in' }).click();
+	await expect(page.getByText("That username and password don't match.")).toBeVisible();
+	await page.getByLabel('Password').fill(PASSWORD);
+	await page.getByRole('button', { name: 'Sign in' }).click();
 	await expect(page.getByText('Welcome, R. Reader.')).toBeVisible();
 
 	// Later test files reuse this session.

@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { del, patch } from '#lib/api/client.ts';
 	import type { Me } from '#lib/api/generated/Me.ts';
-	import { withReauth } from '#lib/api/webauthn.ts';
+	import { withReauth } from '#lib/confirm.svelte.ts';
 	import { auth } from '#lib/auth.svelte.ts';
 	import { library } from '#lib/library.svelte.ts';
 	import { setAppearance, storedAppearance, type Appearance } from '#lib/theme.ts';
@@ -129,8 +129,8 @@
 <div class="sec">
 	<h2>Delete account</h2>
 	<p class="help">
-		Deletes your account and everything in it: books, readings, ratings, notes, copies, tags,
-		shares, and passkeys. This can't be undone.
+		Deletes your account and everything in it: books, readings, ratings, notes, copies, tags, and
+		shares. This can't be undone.
 	</p>
 	<div class="row-end">
 		<a class="btn" href="/settings/import">Export my data first</a>
@@ -145,8 +145,8 @@
 		<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="del-h">
 			<h3 id="del-h">Delete your account?</h3>
 			<p>
-				Everything in it is deleted right away and can't be recovered. You'll confirm with a
-				passkey.
+				Everything in it is deleted right away and can't be recovered. You'll confirm with your
+				password.
 			</p>
 			<label class="field"
 				>Type your username, {me.username}, to confirm<input

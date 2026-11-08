@@ -8,7 +8,6 @@ const CACHE_KEY = 'mau.me';
 
 class Auth {
 	me = $state<Me | null>(null);
-	restricted = $state(false);
 	status = $state<AuthStatus | null>(null);
 	/** Set once the first status check (or cache read) has finished. */
 	ready = $state(false);
@@ -19,9 +18,8 @@ class Auth {
 			const s = await get<AuthStatus>('/auth/status');
 			this.status = s;
 			this.me = s.me;
-			this.restricted = s.restricted;
 			this.offline = false;
-			if (s.me && !s.restricted) localStorage.setItem(CACHE_KEY, JSON.stringify(s.me));
+			if (s.me) localStorage.setItem(CACHE_KEY, JSON.stringify(s.me));
 			else localStorage.removeItem(CACHE_KEY);
 		} catch {
 			// Offline: trust the cached identity until the server says otherwise.
@@ -39,7 +37,6 @@ class Auth {
 
 	clear() {
 		this.me = null;
-		this.restricted = false;
 		localStorage.removeItem(CACHE_KEY);
 	}
 }

@@ -43,7 +43,7 @@
 				toasts.show(`Deleted @${user.username}`);
 				load();
 			} else {
-				link = (await post<Link>(`/admin/users/${user.id}/enroll-link`)).url;
+				link = (await post<Link>(`/admin/users/${user.id}/reset-link`)).url;
 			}
 		} catch (e) {
 			error = (e as Error).message;
@@ -63,7 +63,7 @@
 <div class="sec">
 	{#if link}
 		<div class="card">
-			<div class="name">One-time recovery link (24 hours)</div>
+			<div class="name">One-time password reset link (24 hours)</div>
 			<div class="mono" style="overflow-wrap:anywhere;font-size:14px">{link}</div>
 			<div class="acts">
 				<button class="btn sm primary" type="button" onclick={copy}>Copy</button><button
@@ -101,7 +101,7 @@
 						>{u.suspended ? 'Unsuspend' : 'Suspend'}</button
 					>
 					<button class="btn sm" type="button" onclick={() => (confirm = { kind: 'link', user: u })}
-						>Recovery link</button
+						>Reset link</button
 					>
 					<button
 						class="btn sm danger-ghost"
@@ -126,11 +126,11 @@
 					Suspending keeps their data.
 				</p>
 			{:else}
-				<h3 id="c-h">Recovery link for @{confirm.user.username}</h3>
+				<h3 id="c-h">Password reset link for @{confirm.user.username}</h3>
 				<p>
-					Use this only if they've lost all passkeys and recovery codes. The link works once, for 24
-					hours, and lets them add a new passkey. They'll be told, and it's recorded in the audit
-					log.
+					For when they've forgotten their password and lost their recovery codes. The link works
+					once, for 24 hours. It lets them set a new password and turns off their two-factor. Any
+					earlier link stops working. They'll be told, and it's recorded in the audit log.
 				</p>
 			{/if}
 			<div class="row-end">

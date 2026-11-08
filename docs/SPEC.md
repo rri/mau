@@ -15,11 +15,28 @@ document disagree, this document wins.
 ## 2. Accounts and authentication
 
 ### Sign-in
-- Passkeys only (WebAuthn, discoverable credentials). No passwords, no OAuth.
-- Sign-in screen: a single **Sign in with a passkey** button, a **Use a
-  recovery code** link, and **Create an account** only when signup is open.
-  Otherwise it says "New here? Ask for an invite link."
+- Username and password, with optional two-factor codes from an authenticator
+  app (TOTP). No passkeys, no OAuth. (Passkeys were the first design; see
+  docs/DECISIONS.md, "After launch".)
+- Sign-in screen: **Username**, **Password**, **Sign in**, a **Forgot your
+  password?** link, and **Create an account** only when signup is open.
+  Otherwise it says "New here? Ask for an invite link." With two-factor on, a
+  second step asks for the app's 6-digit code; a recovery code works instead.
 - Sessions: server-side, 30 days rolling, viewable and revocable in Settings.
+
+### Passwords
+- At least 10 characters, at most 256. No rules about character types. Refused:
+  the most common passwords (a list built into the server) and the username.
+  Stored as Argon2id hashes.
+- Changing it (Settings → Password) keeps other devices signed in. Setting a
+  new one through recovery signs out every device.
+
+### Two-factor
+- Optional, per account (Settings → Two-factor). Setup shows a QR code and the
+  key as text; it's on once the app's first code is entered.
+- Codes: 6 digits, 30 seconds, SHA-1 (what every common app supports); the
+  codes just before and after the current one are accepted too; each code
+  works once.
 
 ### Signup
 - Signup mode is set by an admin: open, invite-only (default), or closed.
@@ -27,7 +44,7 @@ document disagree, this document wins.
   set by an admin (default: admins only; optionally every user, with a
   per-user limit on pending invites).
 - Flow: choose username (availability checked live) and display name → create
-  a passkey (name suggested from browser and OS, editable) → recovery codes
+  a password (typed twice) → recovery codes
   shown once; "Start using mau" stays disabled until "I've saved these codes"
   is ticked → empty Reading view with **Add your first book** and **Import from
   Goodreads, StoryGraph…**. No tour.
@@ -42,20 +59,20 @@ document disagree, this document wins.
   profile address stops working immediately; per-item share links keep working.
 
 ### Recovery
-- 10 single-use recovery codes. Regenerating (needs a passkey) voids the old set
-  and shows the new set once. Settings shows how many are left.
-- Recovery-code sign-in asks for username and code. Afterwards the user must
-  add a new passkey before doing anything else.
-- Last resort: an admin can issue a one-time enrollment link (works once, 24 h).
-  It's recorded in the audit log and shown to the user under Recovery activity.
+- 10 single-use recovery codes, shown once at signup. Regenerating voids the
+  old set and shows the new set once. Settings shows how many are left.
+- **Forgot your password?** asks for username, a recovery code, and a new
+  password, then signs in. Two-factor stays as it was.
+- A recovery code also works in place of an authenticator code.
+- Last resort: a one-time reset link (works once, 24 h) from an admin
+  (Settings → Admin → Users) or the server command `mau reset-password
+  <username>`. It sets a new password and turns two-factor off. It's recorded
+  in the audit log and shown to the user under Recovery activity.
 
-### Passkey confirmation required for
-Adding or removing a passkey, regenerating recovery codes, deleting the
-account, and changing the username.
-
-### Passkeys
-- Several named passkeys per account; rename and remove in Settings. The last
-  one can't be removed.
+### Confirmation required for
+Changing the password or username, turning two-factor on or off, regenerating
+recovery codes, and deleting the account: the password, plus an authenticator
+(or recovery) code when two-factor is on. Valid for 10 minutes.
 
 ## 3. Data model
 
@@ -181,9 +198,9 @@ A list of sections, each its own page, then **Sign out**.
 
 - **Account:** display name, short bio (for the public profile), username,
   time zone, appearance (System / Light / Dark, remembered per device), and
-  **Delete account** (offers export first, type the username, confirm with a
-  passkey; immediate).
-- **Passkeys**, **Sessions** (device and browser, last active; no IP or
+  **Delete account** (offers export first, type the username, confirm with the
+  password; immediate).
+- **Password**, **Two-factor**, **Sessions** (device and browser, last active; no IP or
   location; sign out one or all others), **Recovery codes** (count, meter,
   regenerate, recovery activity).
 - **Sharing:** finished books, currently active, a tag, or the whole catalog.
@@ -241,7 +258,8 @@ A list of sections, each its own page, then **Sign out**.
 ## 12. Technical stack
 
 - **Server:** Rust, Axum. **Database:** SQLite via sqlx (compile-time checked
-  queries, built-in migrations). **WebAuthn:** webauthn-rs.
+  queries, built-in migrations). **Passwords:** argon2; two-factor codes
+  with hmac and sha1.
 - **Frontend:** SvelteKit with the static adapter (single-page app), embedded
   in the server binary. No Node at runtime.
 - **API:** JSON REST under `/api`, frontend types generated from Rust.
@@ -262,8 +280,7 @@ A list of sections, each its own page, then **Sign out**.
   build command produces the binary. Local git for now; hosting decided later.
 - **Tests:** unit tests (sync and merge rules, ordering, ISBN, import
   parsing), API tests against a temporary SQLite database, and Playwright
-  end-to-end tests (Reading view, signup with a virtual authenticator,
-  offline sync).
+  end-to-end tests (Reading view, signup and sign-in, offline sync).
 - **License:** AGPL-3.0.
 
 ## 13. Assumptions to confirm
@@ -278,7 +295,8 @@ These came up while writing this document and haven't been decided explicitly:
    connects, then is signed out; its unsynced changes are discarded.
 4. **Operations on deleted things** (e.g. + on a book another device removed)
    are dropped silently during sync.
-5. **Rate limits** on sign-in, recovery-code attempts, invite redemption, and
+5. **Rate limits** on sign-in (per address and per account), two-factor codes,
+   password confirmation, recovery-code attempts, invite redemption, and
    catalog search, to slow down guessing and protect provider quotas.
 6. **Provider responses** are cached on the server for 30 days.
 7. **Placement:** time zone and appearance settings go in Account (neither
