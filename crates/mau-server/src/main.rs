@@ -56,6 +56,12 @@ enum Command {
     Serve,
     /// Write a consistent copy of the database to PATH (which must not exist).
     Backup { path: PathBuf },
+    /// Print a one-time link (24 hours) for setting a new password. Using it
+    /// also turns the account's two-factor off.
+    ResetPassword {
+        /// The account's username.
+        username: String,
+    },
     /// Development only: add the sample books from the design mocks to an account.
     Seed {
         /// Username to add the books to.
@@ -84,6 +90,29 @@ async fn main() -> Result<()> {
                 "Database copied to {}. Back up {} too.",
                 path.display(),
                 covers::dir(&config.data_dir).display()
+            );
+            Ok(())
+        }
+        Command::ResetPassword { username } => {
+            let db = db::open(&config.database_path()).await?;
+            let name = username.trim().to_ascii_lowercase();
+            let mut tx = db.begin().await?;
+            let id: Option<String> = sqlx::query_scalar("SELECT id FROM users WHERE username = ?")
+                .bind(&name)
+                .fetch_optional(&mut *tx)
+                .await?;
+            let id = id.with_context(|| format!("no account is named {name}"))?;
+            let token = auth::handlers::issue_reset_link(&mut tx, &id, None).await?;
+            audit::record(
+                &mut *tx,
+                None,
+                format!("the server administrator issued a password reset link for {name}"),
+            )
+            .await?;
+            tx.commit().await?;
+            println!(
+                "Open this link within 24 hours to set a new password for @{name}:\n\n  {}/reset/{token}\n\nUsing it also turns off two-factor for the account.",
+                config.public_url
             );
             Ok(())
         }

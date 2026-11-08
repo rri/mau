@@ -44,12 +44,12 @@ impl ApiError {
     pub fn conflict(code: &'static str, message: impl Into<String>) -> Self {
         Self::new(StatusCode::CONFLICT, code, message)
     }
-    /// The action needs a passkey confirmation from the last few minutes.
+    /// The action needs a password confirmation from the last few minutes.
     pub fn reauth_required() -> Self {
         Self::new(
             StatusCode::FORBIDDEN,
             "reauth_required",
-            "Confirm with a passkey to continue.",
+            "Confirm with your password to continue.",
         )
     }
     pub fn too_many_requests() -> Self {

@@ -19,7 +19,7 @@ pub struct Config {
     /// Address to listen on for plain HTTP. HTTPS is the reverse proxy's job.
     pub listen: SocketAddr,
     /// The public address people use, e.g. `https://books.example.com`.
-    /// Passkeys are bound to this host name.
+    /// Used in links (setup, invites, resets) and the authenticator-app label.
     pub public_url: String,
     /// Directory holding the database, covers, and backups.
     pub data_dir: PathBuf,
@@ -96,7 +96,7 @@ impl Config {
         let url = self.public_url.trim_end_matches('/');
         if !(url.starts_with("https://") || url.starts_with("http://localhost")) {
             bail!(
-                "public_url must start with https:// (passkeys require HTTPS), or be http://localhost for development"
+                "public_url must start with https:// (passwords and session cookies need HTTPS), or be http://localhost for development"
             );
         }
         self.public_url = url.to_string();

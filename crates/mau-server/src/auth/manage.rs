@@ -1,4 +1,5 @@
-//! Account settings: profile, passkeys, sessions, recovery codes, deletion.
+//! Account settings: profile, password, two-factor, sessions, recovery codes,
+//! deletion.
 
 use axum::Json;
 use axum::extract::{Path, State};
@@ -10,8 +11,9 @@ use ts_rs::TS;
 use super::handlers::{
     Me, Ok_, clean_display_name, clean_time_zone, is_secure, ok, username_taken,
 };
-use super::recovery;
+use super::pending::Pending;
 use super::session::{self, Authed};
+use super::{password, recovery, totp};
 use crate::app::AppState;
 use crate::audit;
 use crate::error::{ApiError, ApiResult};
@@ -56,7 +58,7 @@ pub async fn update_account(
         let name = mau_core::username::validate(u)
             .map_err(|e| ApiError::bad_request("username", e.message()))?;
         if name != user.username {
-            s.require_recent_passkey()?;
+            s.require_recent_confirmation()?;
             if username_taken(&mut *tx, &name, Some(&user.id)).await? {
                 return Err(ApiError::conflict(
                     "username_taken",
@@ -104,7 +106,7 @@ pub async fn delete_account(
     Authed(s): Authed,
     Json(req): Json<AccountDelete>,
 ) -> ApiResult<Response> {
-    s.require_recent_passkey()?;
+    s.require_recent_confirmation()?;
     if req.username.trim().to_ascii_lowercase() != s.user.username {
         return Err(ApiError::bad_request(
             "username",
@@ -146,87 +148,127 @@ pub async fn delete_account(
 }
 
 // ---------------------------------------------------------------------------
-// Passkeys
+// Password
 
-#[derive(Serialize, TS, sqlx::FromRow)]
+#[derive(Deserialize, TS)]
 #[ts(export)]
-pub struct PasskeyInfo {
-    pub id: String,
-    pub name: String,
-    #[ts(type = "number")]
-    pub created_at: i64,
-    #[ts(type = "number | null")]
-    pub last_used_at: Option<i64>,
+pub struct PasswordChange {
+    pub password: String,
 }
 
-pub async fn list_passkeys(
+/// Sets a new password. Other sessions stay signed in; Settings → Sessions
+/// can sign them out.
+pub async fn change_password(
     State(state): State<AppState>,
     Authed(s): Authed,
-) -> ApiResult<Json<Vec<PasskeyInfo>>> {
-    let rows = sqlx::query_as("SELECT id, name, created_at, last_used_at FROM passkeys WHERE user_id = ? ORDER BY created_at")
+    Json(req): Json<PasswordChange>,
+) -> ApiResult<Json<Ok_>> {
+    s.require_recent_confirmation()?;
+    password::validate(&req.password, &s.user.username)?;
+    let hash = password::hash(&req.password).await;
+    sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?")
+        .bind(hash)
         .bind(&s.user.id)
-        .fetch_all(&state.db)
+        .execute(&state.db)
         .await?;
-    Ok(Json(rows))
+    Ok(ok())
+}
+
+// ---------------------------------------------------------------------------
+// Two-factor (authenticator app)
+
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct TotpSetup {
+    /// Send back with the first code to turn two-factor on.
+    pub ticket: String,
+    /// For typing into the app instead of scanning.
+    pub secret: String,
+    pub uri: String,
+    pub qr_svg: String,
+}
+
+pub async fn totp_setup(
+    State(state): State<AppState>,
+    Authed(s): Authed,
+) -> ApiResult<Json<TotpSetup>> {
+    s.require_recent_confirmation()?;
+    if s.user.two_factor() {
+        return Err(ApiError::conflict(
+            "two_factor_on",
+            "Two-factor is already on. Turn it off first to switch apps.",
+        ));
+    }
+    let secret = totp::new_secret();
+    let host = url_host(&state.config.public_url);
+    let uri = totp::uri(&secret, &host, &s.user.username);
+    let ticket = state.pending.insert(Pending::TotpSetup {
+        user_id: s.user.id.clone(),
+        secret: secret.clone(),
+    });
+    Ok(Json(TotpSetup {
+        ticket,
+        qr_svg: totp::qr_svg(&uri),
+        secret,
+        uri,
+    }))
+}
+
+fn url_host(url: &str) -> String {
+    let rest = url.split_once("://").map_or(url, |(_, r)| r);
+    rest.split('/').next().unwrap_or(rest).to_string()
 }
 
 #[derive(Deserialize, TS)]
 #[ts(export)]
-pub struct PasskeyRename {
-    pub name: String,
+pub struct TotpEnable {
+    pub ticket: String,
+    pub code: String,
 }
 
-pub async fn rename_passkey(
+pub async fn totp_enable(
     State(state): State<AppState>,
     Authed(s): Authed,
-    Path(id): Path<String>,
-    Json(req): Json<PasskeyRename>,
-) -> ApiResult<Json<Ok_>> {
-    let name: String = req.name.trim().chars().take(60).collect();
-    if name.is_empty() {
-        return Err(ApiError::bad_request("name", "Enter a name."));
-    }
-    let n = sqlx::query("UPDATE passkeys SET name = ? WHERE id = ? AND user_id = ?")
-        .bind(name)
-        .bind(id)
-        .bind(&s.user.id)
-        .execute(&state.db)
-        .await?
-        .rows_affected();
-    if n == 0 {
-        return Err(ApiError::not_found("No such passkey."));
-    }
-    Ok(ok())
-}
-
-pub async fn delete_passkey(
-    State(state): State<AppState>,
-    Authed(s): Authed,
-    Path(id): Path<String>,
-) -> ApiResult<Json<Ok_>> {
-    s.require_recent_passkey()?;
-    let mut tx = state.db.begin().await?;
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM passkeys WHERE user_id = ?")
-        .bind(&s.user.id)
-        .fetch_one(&mut *tx)
-        .await?;
-    if count <= 1 {
+    Json(req): Json<TotpEnable>,
+) -> ApiResult<Json<Me>> {
+    let Some(Pending::TotpSetup { user_id, secret }) = state.pending.get(&req.ticket) else {
         return Err(ApiError::bad_request(
-            "last_passkey",
-            "You need at least one passkey. Add another first.",
+            "ticket_expired",
+            "That took too long. Start again to get a new QR code.",
+        ));
+    };
+    if user_id != s.user.id {
+        return Err(ApiError::forbidden(
+            "That setup belongs to another account.",
         ));
     }
-    let n = sqlx::query("DELETE FROM passkeys WHERE id = ? AND user_id = ?")
-        .bind(id)
+    let Some(step) = totp::verify(&secret, &req.code, now_ms(), None) else {
+        return Err(ApiError::bad_request(
+            "bad_code",
+            "That code didn't match. Check that the app shows mau, and enter its current code.",
+        ));
+    };
+    state.pending.remove(&req.ticket);
+    sqlx::query("UPDATE users SET totp_secret = ?, totp_last_step = ? WHERE id = ?")
+        .bind(&secret)
+        .bind(step)
         .bind(&s.user.id)
-        .execute(&mut *tx)
-        .await?
-        .rows_affected();
-    if n == 0 {
-        return Err(ApiError::not_found("No such passkey."));
-    }
-    tx.commit().await?;
-    Ok(ok())
+        .execute(&state.db)
+        .await?;
+    let mut user = s.user.clone();
+    user.totp_secret = Some(secret);
+    Ok(Json(Me::from(&user)))
+}
+
+pub async fn totp_disable(State(state): State<AppState>, Authed(s): Authed) -> ApiResult<Json<Me>> {
+    s.require_recent_confirmation()?;
+    sqlx::query("UPDATE users SET totp_secret = NULL, totp_last_step = NULL WHERE id = ?")
+        .bind(&s.user.id)
+        .execute(&state.db)
+        .await?;
+    let mut user = s.user.clone();
+    user.totp_secret = None;
+    Ok(Json(Me::from(&user)))
 }
 
 // ---------------------------------------------------------------------------
@@ -334,7 +376,7 @@ pub async fn regenerate_codes(
     State(state): State<AppState>,
     Authed(s): Authed,
 ) -> ApiResult<Json<super::handlers::RecoveryCodes>> {
-    s.require_recent_passkey()?;
+    s.require_recent_confirmation()?;
     let mut tx = state.db.begin().await?;
     let codes = recovery::regenerate(&mut tx, &s.user.id).await?;
     tx.commit().await?;

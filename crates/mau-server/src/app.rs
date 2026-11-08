@@ -11,9 +11,8 @@ use axum::{Json, Router};
 use serde::Serialize;
 use sqlx::SqlitePool;
 use tower_http::trace::TraceLayer;
-use webauthn_rs::prelude::Webauthn;
 
-use crate::auth::ceremony::Ceremonies;
+use crate::auth::pending::PendingStore;
 use crate::auth::{handlers as auth, manage};
 use crate::config::Config;
 use crate::error::ApiError;
@@ -24,8 +23,8 @@ use crate::web;
 pub struct AppState {
     pub db: SqlitePool,
     pub config: Arc<Config>,
-    pub webauthn: Arc<Webauthn>,
-    pub ceremonies: Arc<Ceremonies>,
+    /// Sign-ins waiting for an authenticator code, two-factor setups.
+    pub pending: Arc<PendingStore>,
     /// One-time link for creating the first admin; `None` once an admin exists.
     pub setup_token: Arc<Mutex<Option<String>>>,
     /// Outgoing HTTP (catalog providers, cover downloads).
@@ -52,10 +51,9 @@ impl AppState {
             limits: Arc::new(RateLimits::default()),
             imports: Arc::new(crate::importer::Jobs::default()),
             clock: Arc::new(Mutex::new(mau_core::hlc::Clock::new("srv"))),
-            webauthn: Arc::new(crate::auth::build_webauthn(&config)?),
             db,
             config: Arc::new(config),
-            ceremonies: Arc::new(Ceremonies::default()),
+            pending: Arc::new(PendingStore::default()),
             setup_token: Arc::new(Mutex::new(None)),
         })
     }
@@ -72,30 +70,25 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/username-available", post(auth::username_available))
         .route("/auth/invite/{token}", get(auth::invite_info))
         .route("/auth/setup-check", post(auth::setup_check))
-        .route("/auth/register/start", post(auth::register_start))
-        .route("/auth/register/finish", post(auth::register_finish))
-        .route("/auth/login/start", post(auth::login_start))
-        .route("/auth/login/finish", post(auth::login_finish))
+        .route("/auth/register", post(auth::register))
+        .route("/auth/login", post(auth::login))
+        .route("/auth/login/code", post(auth::login_code))
         .route("/auth/logout", post(auth::logout))
-        .route("/auth/recovery", post(auth::recovery_sign_in))
+        .route("/auth/recovery", post(auth::recovery_reset))
         .route(
-            "/auth/enroll/{token}",
-            get(auth::enroll_info).post(auth::enroll_use),
+            "/auth/reset/{token}",
+            get(auth::reset_info).post(auth::reset_use),
         )
-        .route("/auth/reauth/start", post(auth::reauth_start))
-        .route("/auth/reauth/finish", post(auth::reauth_finish))
+        .route("/auth/confirm", post(auth::confirm))
         // Account settings
         .route(
             "/account",
             patch(manage::update_account).delete(manage::delete_account),
         )
-        .route("/passkeys", get(manage::list_passkeys))
-        .route("/passkeys/start", post(auth::passkey_add_start))
-        .route("/passkeys/finish", post(auth::passkey_add_finish))
-        .route(
-            "/passkeys/{id}",
-            patch(manage::rename_passkey).delete(manage::delete_passkey),
-        )
+        .route("/account/password", put(manage::change_password))
+        .route("/two-factor", delete(manage::totp_disable))
+        .route("/two-factor/setup", post(manage::totp_setup))
+        .route("/two-factor/enable", post(manage::totp_enable))
         .route("/sessions", get(manage::list_sessions))
         .route(
             "/sessions/revoke-others",
@@ -149,8 +142,8 @@ pub fn router(state: AppState) -> Router {
             patch(crate::admin::update_user).delete(crate::admin::delete_user),
         )
         .route(
-            "/admin/users/{id}/enroll-link",
-            post(crate::admin::enroll_link),
+            "/admin/users/{id}/reset-link",
+            post(crate::admin::reset_link),
         )
         .route(
             "/admin/signup",

@@ -45,13 +45,14 @@ impl RateLimits {
 fn rule(method: &Method, path: &str) -> Option<(&'static str, usize)> {
     let post = method == Method::POST;
     match path {
-        "/auth/login/start" | "/auth/login/finish" if post => Some(("login", 20)),
+        "/auth/login" | "/auth/login/code" if post => Some(("login", 20)),
         "/auth/recovery" if post => Some(("recovery", 5)),
-        "/auth/register/start" | "/auth/register/finish" if post => Some(("register", 20)),
+        "/auth/register" if post => Some(("register", 10)),
         "/auth/username-available" if post => Some(("username", 60)),
         "/auth/setup-check" if post => Some(("setup", 10)),
+        "/auth/confirm" if post => Some(("confirm", 10)),
         p if p.starts_with("/auth/invite/") => Some(("invite", 20)),
-        p if p.starts_with("/auth/enroll/") => Some(("enroll", 10)),
+        p if p.starts_with("/auth/reset/") => Some(("reset", 10)),
         _ => None,
     }
 }

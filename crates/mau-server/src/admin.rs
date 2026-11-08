@@ -9,7 +9,7 @@ use ts_rs::TS;
 
 use crate::app::AppState;
 use crate::audit;
-use crate::auth::handlers::{ENROLL_LINK_TTL_MS, Ok_, ok};
+use crate::auth::handlers::{Ok_, issue_reset_link, ok};
 use crate::auth::session::{Admin, Authed};
 use crate::catalog::similar_titles;
 use crate::error::{ApiError, ApiResult};
@@ -162,8 +162,9 @@ pub struct Link {
     pub url: String,
 }
 
-/// A one-time link for a locked-out user to add a passkey (24 hours).
-pub async fn enroll_link(
+/// A one-time link for a locked-out user to set a new password (24 hours).
+/// Using it also turns their two-factor off.
+pub async fn reset_link(
     State(state): State<AppState>,
     a: Admin,
     Path(id): Path<String>,
@@ -174,34 +175,16 @@ pub async fn enroll_link(
         .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(|| ApiError::not_found("No such user."))?;
-    let token = random_token();
-    let now = now_ms();
-    sqlx::query("INSERT INTO enroll_links (token_hash, user_id, created_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?)")
-        .bind(sha256(&token))
-        .bind(&id)
-        .bind(&a.0.user.id)
-        .bind(now)
-        .bind(now + ENROLL_LINK_TTL_MS)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("INSERT INTO recovery_events (user_id, at, message) VALUES (?, ?, ?)")
-        .bind(&id)
-        .bind(now)
-        .bind(format!(
-            "An admin ({}) issued a one-time link for adding a passkey to your account.",
-            a.0.user.username
-        ))
-        .execute(&mut *tx)
-        .await?;
+    let token = issue_reset_link(&mut tx, &id, Some((&a.0.user.id, &a.0.user.username))).await?;
     audit::record(
         &mut *tx,
         actor(&a),
-        format!("issued a recovery enrollment link for {username}"),
+        format!("issued a password reset link for {username}"),
     )
     .await?;
     tx.commit().await?;
     Ok(Json(Link {
-        url: format!("{}/enroll/{token}", state.config.public_url),
+        url: format!("{}/reset/{token}", state.config.public_url),
     }))
 }
 
@@ -935,7 +918,7 @@ mod tests {
             )
             .await;
         assert_eq!(status, 200);
-        let (status, _) = app.get("/api/passkeys", Some(&user)).await;
+        let (status, _) = app.get("/api/sessions", Some(&user)).await;
         assert_eq!(status, 401);
         let (_, log) = app.get("/api/admin/audit", Some(&admin)).await;
         assert_eq!(log[0]["action"], "suspended juno");

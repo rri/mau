@@ -1,4 +1,4 @@
-//! Sign-up, sign-in, recovery, and passkey confirmation endpoints.
+//! Sign-up, sign-in, recovery, and password confirmation endpoints.
 
 use axum::Json;
 use axum::extract::{Path, State};
@@ -6,17 +6,15 @@ use axum::http::{HeaderMap, header};
 use axum::response::{AppendHeaders, IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
-use webauthn_rs::prelude::{PublicKeyCredential, RegisterPublicKeyCredential, Uuid, WebauthnError};
-use webauthn_rs_proto::ResidentKeyRequirement;
 
-use super::ceremony::{Ceremony, NewAccount};
-use super::session::{self, AnySession, Authed};
-use super::{User, recovery};
+use super::pending::Pending;
+use super::session::{self, Authed};
+use super::{User, password, recovery, totp};
 use crate::app::AppState;
 use crate::audit;
 use crate::error::{ApiError, ApiResult};
 use crate::settings::{self, SignupMode};
-use crate::util::{DAY_MS, b64url, device_label, new_id, now_ms, sha256};
+use crate::util::{DAY_MS, device_label, new_id, now_ms, sha256};
 
 #[derive(Serialize, TS)]
 #[ts(export)]
@@ -27,6 +25,8 @@ pub struct Me {
     pub bio: String,
     pub time_zone: String,
     pub is_admin: bool,
+    /// Authenticator-app codes are on.
+    pub two_factor: bool,
 }
 
 impl From<&User> for Me {
@@ -38,6 +38,7 @@ impl From<&User> for Me {
             bio: u.bio.clone(),
             time_zone: u.time_zone.clone(),
             is_admin: u.is_admin,
+            two_factor: u.two_factor(),
         }
     }
 }
@@ -46,20 +47,9 @@ impl From<&User> for Me {
 #[ts(export)]
 pub struct AuthStatus {
     pub me: Option<Me>,
-    /// Signed in with a recovery code or enrollment link; must add a passkey.
-    pub restricted: bool,
     pub signup_mode: SignupMode,
     /// No admin exists yet; the setup link from the server log is needed.
     pub setup_required: bool,
-}
-
-#[derive(Serialize, TS)]
-#[ts(export)]
-pub struct CeremonyStart {
-    pub challenge: String,
-    /// WebAuthn options (`{ publicKey: ... }`) with binary fields as base64url.
-    #[ts(type = "any")]
-    pub options: serde_json::Value,
 }
 
 pub fn is_secure(state: &AppState) -> bool {
@@ -101,7 +91,6 @@ pub async fn status(
         None => None,
     };
     Ok(Json(AuthStatus {
-        restricted: session.as_ref().is_some_and(|s| s.restricted),
         me: session.as_ref().map(|s| Me::from(&s.user)),
         signup_mode: settings::signup_mode(&state.db).await?,
         setup_required: !admin_exists(&state.db).await?,
@@ -235,10 +224,11 @@ pub async fn setup_check(
 
 #[derive(Deserialize, TS)]
 #[ts(export)]
-pub struct RegisterStart {
+pub struct Register {
     pub username: String,
     pub display_name: String,
     pub time_zone: String,
+    pub password: String,
     pub invite: Option<String>,
     pub setup: Option<String>,
 }
@@ -267,23 +257,22 @@ pub fn clean_time_zone(s: &str) -> ApiResult<String> {
     Ok(s.to_string())
 }
 
-/// webauthn-rs asks for non-discoverable credentials; mau's username-less
-/// sign-in needs discoverable ones. See docs/DECISIONS.md.
-fn require_resident_key(ccr: &mut webauthn_rs::prelude::CreationChallengeResponse) {
-    if let Some(sel) = ccr.public_key.authenticator_selection.as_mut() {
-        sel.resident_key = Some(ResidentKeyRequirement::Required);
-        sel.require_resident_key = true;
-    }
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct RecoveryCodes {
+    pub codes: Vec<String>,
 }
 
-pub async fn register_start(
+pub async fn register(
     State(state): State<AppState>,
-    Json(req): Json<RegisterStart>,
-) -> ApiResult<Json<CeremonyStart>> {
+    headers: HeaderMap,
+    Json(req): Json<Register>,
+) -> ApiResult<Response> {
     let username = mau_core::username::validate(&req.username)
         .map_err(|e| ApiError::bad_request("username", e.message()))?;
     let display_name = clean_display_name(&req.display_name)?;
     let time_zone = clean_time_zone(&req.time_zone)?;
+    password::validate(&req.password, &username)?;
 
     let mode = settings::signup_mode(&state.db).await?;
     let mut first_admin = false;
@@ -313,107 +302,16 @@ pub async fn register_start(
         ));
     }
 
-    if username_taken(&state.db, &username, None).await? {
+    let hash = password::hash(&req.password).await;
+    let now = now_ms();
+    let mut tx = state.db.begin().await?;
+    if username_taken(&mut *tx, &username, None).await? {
         return Err(ApiError::conflict(
             "username_taken",
             format!("@{username} is taken."),
         ));
     }
-
-    let webauthn_id = Uuid::new_v4();
-    let (mut ccr, reg) = state
-        .webauthn
-        .start_passkey_registration(webauthn_id, &username, &display_name, None)
-        .map_err(ApiError::internal)?;
-    require_resident_key(&mut ccr);
-    let account = NewAccount {
-        username,
-        display_name,
-        time_zone,
-        webauthn_id: webauthn_id.to_string(),
-        invite_id,
-        first_admin,
-    };
-    let challenge = state.ceremonies.insert(Ceremony::Register {
-        account,
-        state: reg,
-    });
-    Ok(Json(CeremonyStart {
-        challenge,
-        options: serde_json::to_value(&ccr)?,
-    }))
-}
-
-#[derive(Deserialize, TS)]
-#[ts(export)]
-pub struct RegisterFinish {
-    pub challenge: String,
-    #[ts(type = "any")]
-    pub credential: RegisterPublicKeyCredential,
-    pub passkey_name: String,
-}
-
-#[derive(Serialize, TS)]
-#[ts(export)]
-pub struct RecoveryCodes {
-    pub codes: Vec<String>,
-}
-
-pub fn clean_passkey_name(name: &str, fallback: &str) -> String {
-    let n: String = name.trim().chars().take(60).collect();
-    if n.is_empty() {
-        fallback.to_string()
-    } else {
-        n
-    }
-}
-
-fn registration_failed(e: WebauthnError) -> ApiError {
-    match e {
-        // Security keys without a PIN can't verify the user, and some
-        // browsers don't offer to set one.
-        WebauthnError::UserNotVerified => ApiError::bad_request(
-            "passkey_no_pin",
-            "This security key didn't ask for a PIN, and mau requires one. Set a PIN on the key, then try again.",
-        ),
-        e => ApiError::bad_request(
-            "passkey",
-            format!("The passkey couldn't be registered ({e})."),
-        ),
-    }
-}
-
-fn expired() -> ApiError {
-    ApiError::bad_request("challenge_expired", "That took too long. Please try again.")
-}
-
-pub async fn register_finish(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    Json(req): Json<RegisterFinish>,
-) -> ApiResult<Response> {
-    let Some(Ceremony::Register {
-        account,
-        state: reg,
-    }) = state.ceremonies.take(&req.challenge)
-    else {
-        return Err(expired());
-    };
-    let passkey = state
-        .webauthn
-        .finish_passkey_registration(&req.credential, &reg)
-        .map_err(registration_failed)?;
-    let device = user_agent(&headers);
-    let now = now_ms();
-
-    let mut tx = state.db.begin().await?;
-    if username_taken(&mut *tx, &account.username, None).await? {
-        return Err(ApiError::conflict(
-            "username_taken",
-            format!("@{} was just taken.", account.username),
-        ));
-    }
-    if account.first_admin {
+    if first_admin {
         let exists: bool =
             sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE is_admin = 1)")
                 .fetch_one(&mut *tx)
@@ -424,7 +322,7 @@ pub async fn register_finish(
             ));
         }
     }
-    if let Some(invite_id) = &account.invite_id {
+    if let Some(invite_id) = &invite_id {
         let claimed = sqlx::query(
             "UPDATE invites SET used_at = ? WHERE id = ? AND used_at IS NULL AND revoked = 0 AND expires_at > ?",
         )
@@ -443,101 +341,44 @@ pub async fn register_finish(
 
     let user_id = new_id();
     sqlx::query(
-        "INSERT INTO users (id, username, display_name, time_zone, is_admin, webauthn_id, created_at)
+        "INSERT INTO users (id, username, display_name, time_zone, is_admin, password_hash, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&user_id)
-    .bind(&account.username)
-    .bind(&account.display_name)
-    .bind(&account.time_zone)
-    .bind(account.first_admin)
-    .bind(&account.webauthn_id)
+    .bind(&username)
+    .bind(&display_name)
+    .bind(&time_zone)
+    .bind(first_admin)
+    .bind(&hash)
     .bind(now)
     .execute(&mut *tx)
     .await?;
-    if let Some(invite_id) = &account.invite_id {
+    if let Some(invite_id) = &invite_id {
         sqlx::query("UPDATE invites SET used_by = ? WHERE id = ?")
             .bind(&user_id)
             .bind(invite_id)
             .execute(&mut *tx)
             .await?;
     }
-    insert_passkey(
-        &mut tx,
-        &user_id,
-        &clean_passkey_name(&req.passkey_name, &device),
-        &passkey,
-    )
-    .await?;
     let codes = recovery::regenerate(&mut tx, &user_id).await?;
-    let action = if account.first_admin {
-        format!(
-            "{} created the instance's first (admin) account",
-            account.username
-        )
+    let action = if first_admin {
+        format!("{username} created the instance's first (admin) account")
     } else {
-        format!("{} signed up", account.username)
+        format!("{username} signed up")
     };
-    audit::record(&mut *tx, Some((&user_id, &account.username)), action).await?;
+    audit::record(&mut *tx, Some((&user_id, &username)), action).await?;
     tx.commit().await?;
 
-    if account.first_admin {
+    if first_admin {
         state.setup_token.lock().unwrap().take();
         tracing::info!("admin account created; the setup link no longer works");
     }
-    let token = session::create(&state.db, &user_id, &device, false, true).await?;
+    let token = session::create(&state.db, &user_id, &user_agent(&headers), true).await?;
     Ok(with_cookie(&state, &token, RecoveryCodes { codes }))
-}
-
-pub async fn insert_passkey(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-    user_id: &str,
-    name: &str,
-    passkey: &webauthn_rs::prelude::Passkey,
-) -> ApiResult<String> {
-    let id = new_id();
-    sqlx::query("INSERT INTO passkeys (id, user_id, name, cred_id, data, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-        .bind(&id)
-        .bind(user_id)
-        .bind(name)
-        .bind(b64url(passkey.cred_id().as_ref()))
-        .bind(serde_json::to_string(passkey)?)
-        .bind(now_ms())
-        .execute(&mut **tx)
-        .await
-        .map_err(|e| match e {
-            sqlx::Error::Database(d) if d.is_unique_violation() => {
-                ApiError::conflict("passkey_exists", "That passkey is already registered.")
-            }
-            e => e.into(),
-        })?;
-    Ok(id)
 }
 
 // ---------------------------------------------------------------------------
 // Sign-in
-
-pub async fn login_start(State(state): State<AppState>) -> ApiResult<Json<CeremonyStart>> {
-    let (mut rcr, auth) = state
-        .webauthn
-        .start_discoverable_authentication()
-        .map_err(ApiError::internal)?;
-    // A button press opens the normal prompt, not the autofill UI.
-    rcr.mediation = None;
-    let challenge = state.ceremonies.insert(Ceremony::Login { state: auth });
-    Ok(Json(CeremonyStart {
-        challenge,
-        options: serde_json::to_value(&rcr)?,
-    }))
-}
-
-#[derive(Deserialize, TS)]
-#[ts(export)]
-pub struct AssertionFinish {
-    pub challenge: String,
-    #[ts(type = "any")]
-    pub credential: PublicKeyCredential,
-}
 
 #[derive(Serialize, TS)]
 #[ts(export)]
@@ -549,86 +390,175 @@ pub fn ok() -> Json<Ok_> {
     Json(Ok_ { ok: true })
 }
 
-/// Loads a stored passkey by credential ID, with its owner.
-async fn passkey_by_cred(
-    db: &sqlx::SqlitePool,
-    cred_id: &[u8],
-) -> sqlx::Result<Option<(String, webauthn_rs::prelude::Passkey, User)>> {
-    let row: Option<(String, String, String)> =
-        sqlx::query_as("SELECT id, data, user_id FROM passkeys WHERE cred_id = ?")
-            .bind(b64url(cred_id))
-            .fetch_optional(db)
-            .await?;
-    let Some((id, data, user_id)) = row else {
-        return Ok(None);
-    };
-    let user: User = sqlx::query_as(concat!(
+async fn user_by_name(db: &sqlx::SqlitePool, name: &str) -> sqlx::Result<Option<User>> {
+    sqlx::query_as(concat!(
+        "SELECT ",
+        crate::user_columns!(),
+        " FROM users WHERE username = ?"
+    ))
+    .bind(name.trim().to_ascii_lowercase())
+    .fetch_optional(db)
+    .await
+}
+
+async fn user_by_id(db: &sqlx::SqlitePool, id: &str) -> sqlx::Result<Option<User>> {
+    sqlx::query_as(concat!(
         "SELECT ",
         crate::user_columns!(),
         " FROM users WHERE id = ?"
     ))
-    .bind(user_id)
-    .fetch_one(db)
+    .bind(id)
+    .fetch_optional(db)
+    .await
+}
+
+fn suspended() -> ApiError {
+    ApiError::forbidden("This account is suspended. Contact an admin.")
+}
+
+#[derive(Deserialize, TS)]
+#[ts(export)]
+pub struct Login {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Serialize, TS)]
+#[ts(export)]
+pub struct LoginResult {
+    /// The password was right and an authenticator code is needed next;
+    /// send it with this ticket to `/auth/login/code`.
+    pub code_ticket: Option<String>,
+}
+
+pub async fn login(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<Login>,
+) -> ApiResult<Response> {
+    let wrong = || {
+        ApiError::new(
+            axum::http::StatusCode::UNAUTHORIZED,
+            "bad_login",
+            "That username and password don't match.",
+        )
+    };
+    let name = req.username.trim().to_ascii_lowercase();
+    // Besides the per-IP limit, slow down guessing against one account.
+    state.limits.check("login-user", &name, 10)?;
+    let user = user_by_name(&state.db, &name).await?;
+    let hash = user.as_ref().and_then(|u| u.password_hash.as_deref());
+    if !password::verify(&req.password, hash).await {
+        return Err(wrong());
+    }
+    let user = user.ok_or_else(wrong)?;
+    if user.suspended {
+        return Err(suspended());
+    }
+    if user.two_factor() {
+        let ticket = state.pending.insert(Pending::SignIn {
+            user_id: user.id,
+            attempts: 0,
+        });
+        return Ok(Json(LoginResult {
+            code_ticket: Some(ticket),
+        })
+        .into_response());
+    }
+    let token = session::create(&state.db, &user.id, &user_agent(&headers), true).await?;
+    Ok(with_cookie(
+        &state,
+        &token,
+        LoginResult { code_ticket: None },
+    ))
+}
+
+#[derive(Deserialize, TS)]
+#[ts(export)]
+pub struct LoginCode {
+    pub ticket: String,
+    /// An authenticator code, or one of the recovery codes.
+    pub code: String,
+}
+
+/// Checks an authenticator code, or else a recovery code, for `user`.
+/// Accepted authenticator codes can't be used again.
+async fn check_second_factor(
+    state: &AppState,
+    user: &User,
+    code: &str,
+    device: &str,
+) -> ApiResult<bool> {
+    let Some(secret) = &user.totp_secret else {
+        return Ok(true);
+    };
+    if totp::looks_like_code(code) {
+        let Some(step) = totp::verify(secret, code, now_ms(), user.totp_last_step) else {
+            return Ok(false);
+        };
+        // Only one request can claim a given step.
+        let claimed = sqlx::query(
+            "UPDATE users SET totp_last_step = ?1 WHERE id = ?2 AND (totp_last_step IS NULL OR totp_last_step < ?1)",
+        )
+        .bind(step)
+        .bind(&user.id)
+        .execute(&state.db)
+        .await?
+        .rows_affected();
+        return Ok(claimed == 1);
+    }
+    let mut tx = state.db.begin().await?;
+    if !recovery::consume(&mut tx, &user.id, code).await? {
+        return Ok(false);
+    }
+    record_recovery_event(
+        &mut *tx,
+        &user.id,
+        format!("A recovery code was used instead of an authenticator code on {device}."),
+    )
     .await?;
-    let passkey = serde_json::from_str(&data).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
-    Ok(Some((id, passkey, user)))
+    tx.commit().await?;
+    Ok(true)
 }
 
-/// Saves the updated signature counter and the last-used time.
-async fn touch_passkey(
-    db: &sqlx::SqlitePool,
-    id: &str,
-    passkey: &mut webauthn_rs::prelude::Passkey,
-    result: &webauthn_rs::prelude::AuthenticationResult,
-) -> ApiResult<()> {
-    passkey.update_credential(result);
-    sqlx::query("UPDATE passkeys SET data = ?, last_used_at = ? WHERE id = ?")
-        .bind(serde_json::to_string(passkey)?)
-        .bind(now_ms())
-        .bind(id)
-        .execute(db)
-        .await?;
-    Ok(())
-}
-
-fn unknown_passkey() -> ApiError {
+fn bad_code() -> ApiError {
     ApiError::new(
         axum::http::StatusCode::UNAUTHORIZED,
-        "unknown_passkey",
-        "That passkey isn't registered on this instance.",
+        "bad_code",
+        "That code didn't work. Codes change every 30 seconds; try the current one.",
     )
 }
 
-pub async fn login_finish(
+pub async fn login_code(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(req): Json<AssertionFinish>,
+    Json(req): Json<LoginCode>,
 ) -> ApiResult<Response> {
-    let Some(Ceremony::Login { state: auth }) = state.ceremonies.take(&req.challenge) else {
-        return Err(expired());
+    let start_over = || {
+        ApiError::bad_request(
+            "ticket_expired",
+            "Please sign in again: that took too long, or there were too many wrong codes.",
+        )
     };
-    let (user_handle, cred_id) = state
-        .webauthn
-        .identify_discoverable_authentication(&req.credential)
-        .map_err(|_| unknown_passkey())?;
-    let (pk_id, mut passkey, user) = passkey_by_cred(&state.db, cred_id)
+    let Some(Pending::SignIn { user_id, .. }) = state.pending.get(&req.ticket) else {
+        return Err(start_over());
+    };
+    let user = user_by_id(&state.db, &user_id)
         .await?
-        .ok_or_else(unknown_passkey)?;
-    if user.webauthn_id != user_handle.to_string() {
-        return Err(unknown_passkey());
+        .ok_or_else(start_over)?;
+    let device = user_agent(&headers);
+    if !check_second_factor(&state, &user, &req.code, &device).await? {
+        if !state.pending.count_attempt(&req.ticket) {
+            return Err(start_over());
+        }
+        return Err(bad_code());
     }
-    let result = state
-        .webauthn
-        .finish_discoverable_authentication_v2(&req.credential, auth, &passkey)
-        .map_err(|_| unknown_passkey())?;
+    state.pending.remove(&req.ticket);
     if user.suspended {
-        return Err(ApiError::forbidden(
-            "This account is suspended. Contact an admin.",
-        ));
+        return Err(suspended());
     }
-    touch_passkey(&state.db, &pk_id, &mut passkey, &result).await?;
-    let token = session::create(&state.db, &user.id, &user_agent(&headers), false, true).await?;
-    Ok(with_cookie(&state, &token, Ok_ { ok: true }))
+    let token = session::create(&state.db, &user.id, &device, true).await?;
+    Ok(with_cookie(&state, &token, ok().0))
 }
 
 pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
@@ -649,25 +579,61 @@ pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> ApiRes
 }
 
 // ---------------------------------------------------------------------------
-// Recovery codes and enrollment links
+// Forgotten passwords: recovery codes and reset links
+
+pub async fn record_recovery_event(
+    db: impl sqlx::SqliteExecutor<'_>,
+    user_id: &str,
+    message: String,
+) -> sqlx::Result<()> {
+    sqlx::query("INSERT INTO recovery_events (user_id, at, message) VALUES (?, ?, ?)")
+        .bind(user_id)
+        .bind(now_ms())
+        .bind(message)
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
+/// Sets a new password and signs out every session.
+async fn reset_password(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    user_id: &str,
+    hash: &str,
+) -> sqlx::Result<()> {
+    sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?")
+        .bind(hash)
+        .bind(user_id)
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query("DELETE FROM sessions WHERE user_id = ?")
+        .bind(user_id)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
 
 #[derive(Deserialize, TS)]
 #[ts(export)]
-pub struct RecoverySignIn {
+pub struct RecoveryReset {
     pub username: String,
     pub code: String,
+    pub password: String,
 }
 
 #[derive(Serialize, TS)]
 #[ts(export)]
-pub struct RecoverySignedIn {
+pub struct RecoveryDone {
+    #[ts(type = "number")]
     pub codes_left: i64,
 }
 
-pub async fn recovery_sign_in(
+/// A recovery code sets a new password and signs in. Two-factor stays as it
+/// was; the code stands in for it this time.
+pub async fn recovery_reset(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(req): Json<RecoverySignIn>,
+    Json(req): Json<RecoveryReset>,
 ) -> ApiResult<Response> {
     let wrong = || {
         ApiError::new(
@@ -677,59 +643,91 @@ pub async fn recovery_sign_in(
         )
     };
     let name = req.username.trim().to_ascii_lowercase();
-    // Besides the per-IP limit, slow down guessing against one account.
     state.limits.check("recovery-user", &name, 5)?;
-    let user: Option<User> = sqlx::query_as(concat!(
-        "SELECT ",
-        crate::user_columns!(),
-        " FROM users WHERE username = ?"
-    ))
-    .bind(&name)
-    .fetch_optional(&state.db)
-    .await?;
-    let user = user.ok_or_else(wrong)?;
+    let user = user_by_name(&state.db, &name).await?.ok_or_else(wrong)?;
+    password::validate(&req.password, &user.username)?;
+    let hash = password::hash(&req.password).await;
+    let device = user_agent(&headers);
     let mut tx = state.db.begin().await?;
     if !recovery::consume(&mut tx, &user.id, &req.code).await? {
         return Err(wrong());
     }
     if user.suspended {
-        return Err(ApiError::forbidden(
-            "This account is suspended. Contact an admin.",
-        ));
+        return Err(suspended());
     }
-    sqlx::query("INSERT INTO recovery_events (user_id, at, message) VALUES (?, ?, ?)")
-        .bind(&user.id)
-        .bind(now_ms())
-        .bind(format!(
-            "Signed in with a recovery code on {}.",
-            user_agent(&headers)
-        ))
-        .execute(&mut *tx)
-        .await?;
+    reset_password(&mut tx, &user.id, &hash).await?;
+    record_recovery_event(
+        &mut *tx,
+        &user.id,
+        format!("A recovery code was used to set a new password on {device}."),
+    )
+    .await?;
     let left = recovery::remaining(&mut *tx, &user.id).await?;
     tx.commit().await?;
-    let token = session::create(&state.db, &user.id, &user_agent(&headers), true, false).await?;
+    let token = session::create(&state.db, &user.id, &device, true).await?;
     Ok(with_cookie(
         &state,
         &token,
-        RecoverySignedIn { codes_left: left },
+        RecoveryDone { codes_left: left },
     ))
+}
+
+/// How long reset links work.
+pub const RESET_LINK_TTL_MS: i64 = DAY_MS;
+
+/// Makes a one-time reset link for `user_id` and returns its token.
+/// `by` is the admin who asked for it; `None` means the `mau reset-password`
+/// command.
+pub async fn issue_reset_link(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    user_id: &str,
+    by: Option<(&str, &str)>,
+) -> sqlx::Result<String> {
+    let token = crate::util::random_token();
+    let now = now_ms();
+    // Only the newest link works.
+    sqlx::query("UPDATE reset_links SET used_at = ? WHERE user_id = ? AND used_at IS NULL")
+        .bind(now)
+        .bind(user_id)
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query("INSERT INTO reset_links (token_hash, user_id, created_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?)")
+        .bind(sha256(&token))
+        .bind(user_id)
+        .bind(by.map(|(id, _)| id))
+        .bind(now)
+        .bind(now + RESET_LINK_TTL_MS)
+        .execute(&mut **tx)
+        .await?;
+    let who = match by {
+        Some((_, name)) => format!("An admin ({name})"),
+        None => "The server administrator".to_string(),
+    };
+    record_recovery_event(
+        &mut **tx,
+        user_id,
+        format!("{who} issued a one-time link for setting a new password."),
+    )
+    .await?;
+    Ok(token)
 }
 
 #[derive(Serialize, TS)]
 #[ts(export)]
-pub struct EnrollInfo {
+pub struct ResetInfo {
     pub valid: bool,
     pub username: Option<String>,
+    /// Using the link turns two-factor off; the page says so.
+    pub two_factor: bool,
 }
 
-async fn live_enroll_link(
+async fn live_reset_link(
     db: impl sqlx::SqliteExecutor<'_>,
     token: &str,
-) -> sqlx::Result<Option<(String, String)>> {
+) -> sqlx::Result<Option<(String, String, bool)>> {
     sqlx::query_as(
-        "SELECT e.user_id, u.username FROM enroll_links e JOIN users u ON u.id = e.user_id
-         WHERE e.token_hash = ? AND e.used_at IS NULL AND e.expires_at > ?",
+        "SELECT r.user_id, u.username, u.totp_secret IS NOT NULL FROM reset_links r JOIN users u ON u.id = r.user_id
+         WHERE r.token_hash = ? AND r.used_at IS NULL AND r.expires_at > ?",
     )
     .bind(sha256(token))
     .bind(now_ms())
@@ -737,112 +735,108 @@ async fn live_enroll_link(
     .await
 }
 
-pub async fn enroll_info(
+pub async fn reset_info(
     State(state): State<AppState>,
     Path(token): Path<String>,
-) -> ApiResult<Json<EnrollInfo>> {
-    let link = live_enroll_link(&state.db, &token).await?;
-    Ok(Json(EnrollInfo {
-        valid: link.is_some(),
-        username: link.map(|(_, u)| u),
+) -> ApiResult<Json<ResetInfo>> {
+    let link = live_reset_link(&state.db, &token).await?;
+    Ok(Json(match link {
+        Some((_, username, two_factor)) => ResetInfo {
+            valid: true,
+            username: Some(username),
+            two_factor,
+        },
+        None => ResetInfo {
+            valid: false,
+            username: None,
+            two_factor: false,
+        },
     }))
 }
 
-/// Uses an admin-issued enrollment link: signs in with a restricted session
-/// whose only option is adding a passkey.
-pub async fn enroll_use(
+#[derive(Deserialize, TS)]
+#[ts(export)]
+pub struct ResetUse {
+    pub password: String,
+}
+
+/// Uses a reset link: sets the new password, turns two-factor off (the
+/// person may have lost their authenticator too), and signs in.
+pub async fn reset_use(
     State(state): State<AppState>,
     headers: HeaderMap,
     Path(token): Path<String>,
+    Json(req): Json<ResetUse>,
 ) -> ApiResult<Response> {
+    let gone = || ApiError::forbidden("This link has expired or has already been used.");
+    let (user_id, username, _) = live_reset_link(&state.db, &token).await?.ok_or_else(gone)?;
+    password::validate(&req.password, &username)?;
+    let hash = password::hash(&req.password).await;
+    let device = user_agent(&headers);
     let mut tx = state.db.begin().await?;
-    let (user_id, _) = live_enroll_link(&mut *tx, &token)
-        .await?
-        .ok_or_else(|| ApiError::forbidden("This link has expired or has already been used."))?;
-    sqlx::query("UPDATE enroll_links SET used_at = ? WHERE token_hash = ?")
-        .bind(now_ms())
-        .bind(sha256(&token))
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("INSERT INTO recovery_events (user_id, at, message) VALUES (?, ?, ?)")
+    let claimed = sqlx::query(
+        "UPDATE reset_links SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?",
+    )
+    .bind(now_ms())
+    .bind(sha256(&token))
+    .bind(now_ms())
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if claimed == 0 {
+        return Err(gone());
+    }
+    reset_password(&mut tx, &user_id, &hash).await?;
+    sqlx::query("UPDATE users SET totp_secret = NULL, totp_last_step = NULL WHERE id = ?")
         .bind(&user_id)
-        .bind(now_ms())
-        .bind(format!(
-            "An admin's one-time enrollment link was used on {}.",
-            user_agent(&headers)
-        ))
         .execute(&mut *tx)
         .await?;
+    record_recovery_event(
+        &mut *tx,
+        &user_id,
+        format!("A one-time link was used to set a new password on {device}. Two-factor is off."),
+    )
+    .await?;
     tx.commit().await?;
-    let token = session::create(&state.db, &user_id, &user_agent(&headers), true, false).await?;
-    Ok(with_cookie(&state, &token, Ok_ { ok: true }))
+    let token = session::create(&state.db, &user_id, &device, true).await?;
+    Ok(with_cookie(&state, &token, ok().0))
 }
-
-/// How long admin-issued enrollment links work.
-pub const ENROLL_LINK_TTL_MS: i64 = DAY_MS;
 
 // ---------------------------------------------------------------------------
-// Passkey confirmation for sensitive actions
+// Confirmation for sensitive actions
 
-async fn user_passkeys(
-    db: &sqlx::SqlitePool,
-    user_id: &str,
-) -> ApiResult<Vec<(String, webauthn_rs::prelude::Passkey)>> {
-    let rows: Vec<(String, String)> =
-        sqlx::query_as("SELECT id, data FROM passkeys WHERE user_id = ?")
-            .bind(user_id)
-            .fetch_all(db)
-            .await?;
-    rows.into_iter()
-        .map(|(id, d)| Ok((id, serde_json::from_str(&d)?)))
-        .collect()
+#[derive(Deserialize, TS)]
+#[ts(export)]
+pub struct Confirm {
+    pub password: String,
+    /// Needed when two-factor is on: an authenticator or recovery code.
+    pub code: Option<String>,
 }
 
-pub async fn reauth_start(
+pub async fn confirm(
     State(state): State<AppState>,
-    AnySession(s): AnySession,
-) -> ApiResult<Json<CeremonyStart>> {
-    let keys = user_passkeys(&state.db, &s.user.id).await?;
-    if keys.is_empty() {
-        return Err(ApiError::bad_request("no_passkeys", "Add a passkey first."));
-    }
-    let creds: Vec<_> = keys.into_iter().map(|(_, k)| k).collect();
-    let (rcr, auth) = state
-        .webauthn
-        .start_passkey_authentication(&creds)
-        .map_err(ApiError::internal)?;
-    let challenge = state.ceremonies.insert(Ceremony::Reauth {
-        user_id: s.user.id,
-        state: auth,
-    });
-    Ok(Json(CeremonyStart {
-        challenge,
-        options: serde_json::to_value(&rcr)?,
-    }))
-}
-
-pub async fn reauth_finish(
-    State(state): State<AppState>,
+    headers: HeaderMap,
     Authed(s): Authed,
-    Json(req): Json<AssertionFinish>,
+    Json(req): Json<Confirm>,
 ) -> ApiResult<Json<Ok_>> {
-    let Some(Ceremony::Reauth {
-        user_id,
-        state: auth,
-    }) = state.ceremonies.take(&req.challenge)
-    else {
-        return Err(expired());
-    };
-    if user_id != s.user.id {
-        return Err(expired());
+    state.limits.check("confirm-user", &s.user.id, 5)?;
+    if !password::verify(&req.password, s.user.password_hash.as_deref()).await {
+        return Err(ApiError::new(
+            axum::http::StatusCode::UNAUTHORIZED,
+            "bad_password",
+            "That password isn't right.",
+        ));
     }
-    let result = state
-        .webauthn
-        .finish_passkey_authentication(&req.credential, &auth)
-        .map_err(|_| unknown_passkey())?;
-    for (id, mut key) in user_passkeys(&state.db, &s.user.id).await? {
-        if key.cred_id() == result.cred_id() {
-            touch_passkey(&state.db, &id, &mut key, &result).await?;
+    if s.user.two_factor() {
+        let code = req.code.as_deref().unwrap_or("").trim();
+        if code.is_empty() {
+            return Err(ApiError::bad_request(
+                "code_required",
+                "Enter the code from your authenticator app.",
+            ));
+        }
+        if !check_second_factor(&state, &s.user, code, &user_agent(&headers)).await? {
+            return Err(bad_code());
         }
     }
     sqlx::query("UPDATE sessions SET reauth_at = ? WHERE id = ?")
@@ -850,84 +844,5 @@ pub async fn reauth_finish(
         .bind(&s.id)
         .execute(&state.db)
         .await?;
-    Ok(ok())
-}
-
-/// Starts adding a passkey to the signed-in account. Restricted sessions
-/// (recovery) may do this without confirmation; others need a recent passkey.
-pub async fn passkey_add_start(
-    State(state): State<AppState>,
-    AnySession(s): AnySession,
-) -> ApiResult<Json<CeremonyStart>> {
-    if !s.restricted {
-        s.require_recent_passkey()?;
-    }
-    let existing: Vec<_> = user_passkeys(&state.db, &s.user.id)
-        .await?
-        .into_iter()
-        .map(|(_, k)| k.cred_id().clone())
-        .collect();
-    let uuid = Uuid::parse_str(&s.user.webauthn_id).map_err(ApiError::internal)?;
-    let (mut ccr, reg) = state
-        .webauthn
-        .start_passkey_registration(uuid, &s.user.username, &s.user.display_name, Some(existing))
-        .map_err(ApiError::internal)?;
-    require_resident_key(&mut ccr);
-    let challenge = state.ceremonies.insert(Ceremony::AddPasskey {
-        user_id: s.user.id,
-        state: reg,
-    });
-    Ok(Json(CeremonyStart {
-        challenge,
-        options: serde_json::to_value(&ccr)?,
-    }))
-}
-
-#[derive(Deserialize, TS)]
-#[ts(export)]
-pub struct PasskeyAddFinish {
-    pub challenge: String,
-    #[ts(type = "any")]
-    pub credential: RegisterPublicKeyCredential,
-    pub name: String,
-}
-
-pub async fn passkey_add_finish(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    AnySession(s): AnySession,
-    Json(req): Json<PasskeyAddFinish>,
-) -> ApiResult<Json<Ok_>> {
-    let Some(Ceremony::AddPasskey {
-        user_id,
-        state: reg,
-    }) = state.ceremonies.take(&req.challenge)
-    else {
-        return Err(expired());
-    };
-    if user_id != s.user.id {
-        return Err(expired());
-    }
-    let passkey = state
-        .webauthn
-        .finish_passkey_registration(&req.credential, &reg)
-        .map_err(registration_failed)?;
-    let mut tx = state.db.begin().await?;
-    insert_passkey(
-        &mut tx,
-        &s.user.id,
-        &clean_passkey_name(&req.name, &user_agent(&headers)),
-        &passkey,
-    )
-    .await?;
-    if s.restricted {
-        // Recovery is complete: this session becomes a normal one.
-        sqlx::query("UPDATE sessions SET restricted = 0, reauth_at = ? WHERE id = ?")
-            .bind(now_ms())
-            .bind(&s.id)
-            .execute(&mut *tx)
-            .await?;
-    }
-    tx.commit().await?;
     Ok(ok())
 }

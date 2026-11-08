@@ -12,20 +12,18 @@ use crate::util::{DAY_MS, HOUR_MS, MINUTE_MS, now_ms, random_token, sha256, shor
 
 pub const COOKIE: &str = "mau_session";
 const LIFETIME_MS: i64 = 30 * DAY_MS;
-/// Sensitive actions need a passkey confirmation at most this old.
-pub const REAUTH_WINDOW_MS: i64 = 5 * MINUTE_MS;
+/// Sensitive actions need a password confirmation at most this old.
+pub const REAUTH_WINDOW_MS: i64 = 10 * MINUTE_MS;
 
 #[derive(Debug, Clone)]
 pub struct Session {
     pub id: String,
     pub user: User,
-    /// Signed in with a recovery code or enrollment link: may only add a passkey.
-    pub restricted: bool,
     pub reauth_at: Option<i64>,
 }
 
 impl Session {
-    pub fn require_recent_passkey(&self) -> Result<(), ApiError> {
+    pub fn require_recent_confirmation(&self) -> Result<(), ApiError> {
         match self.reauth_at {
             Some(at) if now_ms() - at <= REAUTH_WINDOW_MS => Ok(()),
             _ => Err(ApiError::reauth_required()),
@@ -38,14 +36,13 @@ pub async fn create(
     db: &SqlitePool,
     user_id: &str,
     device: &str,
-    restricted: bool,
     reauthed: bool,
 ) -> sqlx::Result<String> {
     let token = random_token();
     let now = now_ms();
     sqlx::query(
-        "INSERT INTO sessions (id, token_hash, user_id, device, created_at, last_seen_at, expires_at, restricted, reauth_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO sessions (id, token_hash, user_id, device, created_at, last_seen_at, expires_at, reauth_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(short_id())
     .bind(sha256(&token))
@@ -54,7 +51,6 @@ pub async fn create(
     .bind(now)
     .bind(now)
     .bind(now + LIFETIME_MS)
-    .bind(restricted)
     .bind(reauthed.then_some(now))
     .execute(db)
     .await?;
@@ -93,14 +89,14 @@ pub fn token_from_headers(headers: &HeaderMap) -> Option<String> {
 /// Looks up a live session by cookie value and extends it if due.
 pub async fn lookup(db: &SqlitePool, token: &str) -> sqlx::Result<Option<Session>> {
     let now = now_ms();
-    let row: Option<(String, bool, Option<i64>, i64)> = sqlx::query_as(
-        "SELECT id, restricted, reauth_at, last_seen_at FROM sessions WHERE token_hash = ? AND expires_at > ?",
+    let row: Option<(String, Option<i64>, i64)> = sqlx::query_as(
+        "SELECT id, reauth_at, last_seen_at FROM sessions WHERE token_hash = ? AND expires_at > ?",
     )
     .bind(sha256(token))
     .bind(now)
     .fetch_optional(db)
     .await?;
-    let Some((id, restricted, reauth_at, last_seen)) = row else {
+    let Some((id, reauth_at, last_seen)) = row else {
         return Ok(None);
     };
     let user: Option<User> = sqlx::query_as(concat!(
@@ -126,46 +122,29 @@ pub async fn lookup(db: &SqlitePool, token: &str) -> sqlx::Result<Option<Session
     Ok(Some(Session {
         id,
         user,
-        restricted,
         reauth_at,
     }))
 }
 
-/// Any signed-in session, including restricted ones.
-pub struct AnySession(pub Session);
-
-/// A full (unrestricted) session.
+/// A signed-in session.
 pub struct Authed(pub Session);
 
-/// A full session belonging to an admin.
+/// A session belonging to an admin.
 pub struct Admin(pub Session);
 
-impl FromRequestParts<AppState> for AnySession {
+impl FromRequestParts<AppState> for Authed {
     type Rejection = ApiError;
 
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, ApiError> {
         if let Some(s) = parts.extensions.get::<Session>() {
-            return Ok(AnySession(s.clone()));
+            return Ok(Authed(s.clone()));
         }
         let token = token_from_headers(&parts.headers).ok_or_else(ApiError::unauthorized)?;
         let session = lookup(&state.db, &token)
             .await?
             .ok_or_else(ApiError::unauthorized)?;
         parts.extensions.insert(session.clone());
-        Ok(AnySession(session))
-    }
-}
-
-impl FromRequestParts<AppState> for Authed {
-    type Rejection = ApiError;
-
-    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, ApiError> {
-        let AnySession(s) = AnySession::from_request_parts(parts, state).await?;
-        if s.restricted {
-            return Err(ApiError::forbidden("Add a passkey before continuing.")
-                .with_code("enroll_required"));
-        }
-        Ok(Authed(s))
+        Ok(Authed(session))
     }
 }
 
@@ -178,12 +157,5 @@ impl FromRequestParts<AppState> for Admin {
             return Err(ApiError::forbidden("Only admins can do that."));
         }
         Ok(Admin(s))
-    }
-}
-
-impl ApiError {
-    pub fn with_code(mut self, code: &'static str) -> Self {
-        self.code = code;
-        self
     }
 }

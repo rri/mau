@@ -58,12 +58,7 @@ pub fn sha256(input: &str) -> String {
     URL_SAFE_NO_PAD.encode(Sha256::digest(input.as_bytes()))
 }
 
-pub fn b64url(bytes: &[u8]) -> String {
-    URL_SAFE_NO_PAD.encode(bytes)
-}
-
-/// "Firefox on Linux" from a User-Agent header, for session lists and
-/// suggested passkey names.
+/// "Firefox on Linux" from a User-Agent header, for session lists.
 pub fn device_label(user_agent: &str) -> String {
     let ua = user_agent;
     let browser = if ua.contains("Firefox/") {
