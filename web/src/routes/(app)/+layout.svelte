@@ -29,7 +29,7 @@
 {#if auth.me}
 	<div class="shell">
 		<nav class="tabs" aria-label="Main">
-			<img class="brand" src="/logo.svg" alt="mau" width="96" height="96" />
+			<img class="brand" src="/logo.svg" alt="mau" width="176" height="176" />
 			{#each tabs as t (t.href)}
 				<a href={t.href} class="tab" aria-current={t.match(page.url.pathname) ? 'page' : undefined}>
 					{#if t.label === 'Reading'}
@@ -138,8 +138,11 @@
 			background: none;
 			backdrop-filter: none;
 		}
+		/* As wide as the tab buttons below it. */
 		.brand {
 			display: block;
+			width: 100%;
+			height: auto;
 			margin: 0 0 20px;
 		}
 		.tab {

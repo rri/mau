@@ -281,8 +281,8 @@ A list of sections, each its own page, then **Sign out**.
   inactive books have desaturated covers and grey titles. In the grid,
   active covers have an accent outline.
 - Logo: two Bengal cats reading an open book on a navy badge
-  (web/static/logo.svg). It's the favicon and every app icon, a 96px badge at
-  the top of the wide-screen sidebar, and a 112px badge on the sign-in,
+  (web/static/logo.svg). It's the favicon and every app icon, a badge as wide
+  as the tab buttons (176px) at the top of the wide-screen sidebar, and a 112px badge on the sign-in,
   sign-up, invite, reset, and setup pages. Installed-app splash screens are
   navy (#1E242B) to match.
 - Bottom tab bar: Reading · Catalog · Settings. On wide screens it becomes a

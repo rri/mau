@@ -649,3 +649,8 @@ Mine:
   dark backgrounds; the corner radius (22.5%) matches the artwork's.
 - On sign-in, the tagline ("Your library and reading log") is now the page's
   h1. Setup lost its duplicate h1.
+
+- (Later the same day, asked by the user) The sidebar logo is as wide as the
+  tab buttons: 100% of the sidebar's inner width, 176px. Public pages keep
+  112px: matching their full-width buttons (about 340px) would push the
+  sign-in form off a phone screen.
