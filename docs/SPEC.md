@@ -270,15 +270,21 @@ A list of sections, each its own page, then **Sign out**.
 
 ## 10. Visual design
 
-- "Paper and print": warm paper background, Newsreader typeface throughout
-  (self-hosted), deep teal accent (#1f5e5b light, #7fc4bf dark).
+- "Clean and crisp": cool neutral greys, white surfaces (near-black in dark
+  mode), Geist typeface throughout (self-hosted), vivid emerald accent
+  (#047857 light, #34d399 dark). Every text pair is at least 4.5:1.
 - Follows the system light or dark mode, with an override in Settings.
-- Compact density: 60px rows, 44px round **+**.
+- Comfortable density: 64px rows, 42px round **+**, 20px side padding.
+- Active books sit on a softly tinted card with an accent bar on the left;
+  inactive books have desaturated covers and grey titles. In the grid,
+  active covers have an accent outline.
 - Bottom tab bar: Reading · Catalog · Settings. On wide screens it becomes a
-  left sidebar.
+  sidebar docked to the left of a 720px content panel; the content stays
+  centered on screen (from 1120px wide; narrower, the pair is centered).
 - Covers: real covers everywhere. Without one, a generated image that looks
-  like a book cover with the title and author.
-- Reference: the styled progress view mock.
+  like a book cover with the title and author, lettered in Geist.
+- Public pages use the same font and colors.
+- Reference: mocks/style2.html (Geist, Emerald, Tinted cards, Docked sidebar).
 
 ## 11. Offline and sync
 

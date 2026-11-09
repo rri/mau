@@ -82,10 +82,10 @@
 				x="100"
 				y={titleY + i * 20 - (lines.length - 1) * 10}
 				text-anchor="middle"
-				font-family="Newsreader Variable, Georgia, serif"
-				font-weight="600"
-				font-size="17"
-				letter-spacing="1"
+				font-family="Geist Variable, system-ui, sans-serif"
+				font-weight="700"
+				font-size="16"
+				letter-spacing="0.5"
 				fill={fg}>{l}</text
 			>
 		{/each}
@@ -93,9 +93,10 @@
 			x="100"
 			y={style === 3 ? 262 : 280}
 			text-anchor="middle"
-			font-family="Newsreader Variable, Georgia, serif"
-			font-size="11"
-			letter-spacing="1.5"
+			font-family="Geist Variable, system-ui, sans-serif"
+			font-size="10"
+			font-weight="500"
+			letter-spacing="1.2"
 			fill={fg}
 			opacity=".85">{author.toUpperCase()}</text
 		>
@@ -108,8 +109,10 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-		border-radius: 2px;
-		box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+		border-radius: 4px;
+		box-shadow:
+			0 1px 2px rgb(0 0 0 / 0.18),
+			0 0 0 1px rgb(0 0 0 / 0.06);
 		background: var(--line);
 	}
 </style>

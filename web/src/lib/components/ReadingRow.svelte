@@ -250,31 +250,45 @@
 <style>
 	.row {
 		display: grid;
-		grid-template-columns: 18px 32px minmax(0, 1fr) auto;
-		gap: 10px;
+		grid-template-columns: 16px 36px minmax(0, 1fr) auto;
+		gap: 12px;
 		align-items: center;
-		min-height: 60px;
-		padding: 7px 12px 7px 6px;
-		border-bottom: 1px solid var(--line);
+		min-height: 64px;
+		padding: 11px 12px 11px 6px;
+		margin-bottom: 2px;
+		border-radius: 12px;
 		position: relative;
 		background: var(--surface);
+	}
+	/* Active books sit on a tinted card with an accent bar; inactive ones are
+	   quiet: desaturated cover, grey title. */
+	.row.active {
+		background: var(--active-bg);
 	}
 	.row.active::before {
 		content: '';
 		position: absolute;
 		left: 0;
-		top: 8px;
-		bottom: 8px;
-		width: 2px;
+		top: 12px;
+		bottom: 12px;
+		width: 3px;
+		border-radius: 3px;
 		background: var(--accent);
 	}
-	.row.idle .title,
 	.row.idle .cover {
+		filter: saturate(0.25);
 		opacity: 0.7;
+	}
+	.row.idle .title {
+		color: var(--muted);
+		font-weight: 500;
+	}
+	.row.idle .pos {
+		color: var(--muted);
 	}
 	.row.dragging {
 		z-index: 5;
-		box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+		box-shadow: 0 10px 28px rgb(0 0 0 / 0.18);
 	}
 	.handle {
 		width: 18px;
@@ -294,36 +308,39 @@
 		opacity: 1;
 	}
 	.cover {
-		width: 32px;
-		height: 46px;
+		width: 36px;
+		height: 52px;
 	}
 	.title {
 		font-weight: 600;
 		font-size: 15.5px;
-		line-height: 1.2;
+		letter-spacing: -0.01em;
+		line-height: 1.3;
 		color: var(--ink);
 		text-decoration: none;
 	}
 	.author {
-		font-size: 13px;
+		font-size: 13.5px;
 		color: var(--muted);
-		line-height: 1.25;
+		line-height: 1.3;
 	}
 	.bar {
-		height: 3px;
+		height: 4px;
 		background: var(--line);
-		margin: 5px 0 3px;
-		border-radius: 2px;
+		margin: 7px 0 4px;
+		border-radius: 99px;
 		overflow: hidden;
 	}
 	.bar span {
 		display: block;
 		height: 100%;
+		border-radius: 99px;
 		background: var(--accent);
 		transition: width 0.3s;
 	}
 	.row.idle .bar span {
 		background: var(--muted);
+		opacity: 0.6;
 	}
 	.bar.empty {
 		background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 10px);
@@ -368,7 +385,7 @@
 	}
 	.today {
 		color: var(--accent);
-		font-weight: 500;
+		font-weight: 600;
 	}
 	.actions {
 		display: flex;
@@ -377,8 +394,8 @@
 	}
 	.plus,
 	.play {
-		width: 44px;
-		height: 44px;
+		width: 42px;
+		height: 42px;
 		border-radius: 50%;
 		cursor: pointer;
 		display: grid;
@@ -387,14 +404,19 @@
 	.plus {
 		border: 0;
 		background: var(--accent);
-		color: var(--surface);
-		font-size: 25px;
+		color: var(--on-accent);
+		font-size: 24px;
 		line-height: 1;
+		box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 35%, transparent);
 	}
 	.play {
 		border: 1px solid var(--line);
-		background: transparent;
+		background: var(--surface);
+		color: var(--muted);
+	}
+	.play:hover {
 		color: var(--accent);
+		border-color: var(--accent);
 	}
 	.plus:active,
 	.play:active {
@@ -405,7 +427,7 @@
 		height: 30px;
 		border-radius: 50%;
 		border: 1px solid var(--line);
-		background: transparent;
+		background: var(--surface);
 		color: var(--muted);
 		cursor: pointer;
 		display: grid;

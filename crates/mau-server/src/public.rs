@@ -127,31 +127,32 @@ async fn items(state: &AppState, owner: &str, s: &ShareRow) -> sqlx::Result<Vec<
 }
 
 const STYLE: &str = r#"
-:root{--bg:#f4efe6;--surface:#fbf8f2;--ink:#23201b;--muted:#6e6658;--line:#e2dacb;--accent:#1f5e5b;color-scheme:light}
-@media (prefers-color-scheme:dark){:root{--bg:#1b1915;--surface:#23201b;--ink:#ece4d6;--muted:#a99f8f;--line:#3a352d;--accent:#7fc4bf;color-scheme:dark}}
+:root{--bg:#f5f7f6;--surface:#fff;--ink:#0d1512;--muted:#56635d;--line:#e1e7e4;--accent:#047857;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0a0f0d;--surface:#131a17;--ink:#e9f0ec;--muted:#95a59e;--line:#25302b;--accent:#34d399;color-scheme:dark}}
 *{box-sizing:border-box}html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font:17px/1.45 'Newsreader',Georgia,serif;font-variant-numeric:lining-nums}
-main{max-width:720px;margin:0 auto;padding:28px 18px 40px}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+main{max-width:720px;min-height:100vh;margin:0 auto;padding:36px 24px 48px;background:var(--surface);border-left:1px solid var(--line);border-right:1px solid var(--line)}
 a{color:var(--accent)}
-.head h1{margin:0;font-size:30px;font-weight:600;line-height:1.15}
+.head h1{margin:0;font-size:28px;font-weight:700;letter-spacing:-.025em;line-height:1.15}
 .user{color:var(--muted)}
 .bio{margin:10px 0 0;max-width:60ch}
-section{margin-top:28px;padding-top:16px;border-top:1px solid var(--line)}
-h2{margin:0 0 12px;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:baseline}
-h2 a{font-size:15px;letter-spacing:0;text-transform:none;font-weight:500}
-.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:16px 12px;list-style:none;margin:0;padding:0}
-.bk{display:grid;gap:4px;font-size:14px}
-.cover{aspect-ratio:2/3;border-radius:2px;box-shadow:0 1px 3px rgb(0 0 0/.25);overflow:hidden;display:grid;place-items:center;text-align:center;padding:8px;font-weight:600;font-size:13px;line-height:1.2;color:#f3ead8}
+section{margin-top:32px;padding-top:20px;border-top:1px solid var(--line)}
+h2{margin:0 0 14px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:baseline}
+h2 a{font-size:14px;letter-spacing:0;text-transform:none;font-weight:500}
+.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:22px 16px;list-style:none;margin:0;padding:0}
+.bk{display:grid;gap:6px;font-size:13.5px}
+.cover{aspect-ratio:2/3;border-radius:5px;box-shadow:0 1px 2px rgb(0 0 0/.18),0 0 0 1px rgb(0 0 0/.06);overflow:hidden;display:grid;place-items:center;text-align:center;padding:8px;font-weight:700;font-size:12px;line-height:1.2;text-transform:uppercase;color:#f3f6f4}
 .cover img{width:100%;height:100%;object-fit:cover;display:block}
 .cover.img{padding:0}
-.t{font-weight:600;line-height:1.25}
-.d{color:var(--muted);font-size:13px}
+.t{font-weight:600;line-height:1.3;letter-spacing:-.01em}
+.d{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
 .stars{color:var(--accent);letter-spacing:1px}
-.reading{display:grid;grid-template-columns:52px minmax(0,1fr);gap:14px;align-items:center;margin-bottom:12px}
-.bar{height:4px;border-radius:2px;background:var(--line);overflow:hidden;margin-top:6px}
-.bar span{display:block;height:100%;background:var(--accent)}
+.reading{display:grid;grid-template-columns:52px minmax(0,1fr);gap:14px;align-items:center;margin-bottom:14px}
+.bar{height:4px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:7px}
+.bar span{display:block;height:100%;border-radius:99px;background:var(--accent)}
 .empty{color:var(--muted);padding:30px 0}
-footer{margin-top:40px;font-size:14px;color:var(--muted)}
+footer{margin-top:48px;font-size:13.5px;color:var(--muted)}
+@media (max-width:760px){main{border:0}}
 "#;
 
 fn hue(s: &str) -> u32 {
@@ -230,7 +231,7 @@ fn section(s: &ShareRow, list: &[Item], limit: Option<usize>) -> Markup {
 }
 
 fn page(title: &str, description: &str, body: Markup, public_url: &str) -> Markup {
-    let font = crate::web::asset_path("newsreader-latin-opsz-normal");
+    let font = crate::web::asset_path("geist-latin-wght-normal");
     html! {
         (DOCTYPE)
         html lang="en" {
@@ -241,7 +242,7 @@ fn page(title: &str, description: &str, body: Markup, public_url: &str) -> Marku
                 meta name="description" content=(description);
                 @if let Some(f) = &font {
                     link rel="preload" href=(f) as="font" type="font/woff2" crossorigin;
-                    style { (PreEscaped(format!("@font-face{{font-family:'Newsreader';font-style:normal;font-weight:200 800;font-display:swap;src:url({f}) format('woff2')}}"))) }
+                    style { (PreEscaped(format!("@font-face{{font-family:'Geist';font-style:normal;font-weight:100 900;font-display:swap;src:url({f}) format('woff2')}}"))) }
                 }
                 style { (PreEscaped(STYLE)) }
             }

@@ -507,3 +507,40 @@ Implementation details (mine):
   minimum, not 96px) so pause and + fit on the cover.
 - The Reading header lost its bottom border; the search area carries it, as
   in the Catalog.
+
+## Restyle: sans-serif, fresh colors, docked sidebar
+
+Asked and chosen by the user (2026-11-09), from mocks/style2.html:
+
+- Typeface **Geist** (over Inter and Plus Jakarta Sans), self-hosted via
+  @fontsource-variable/geist; Newsreader is removed.
+- Palette **Emerald** (over Indigo and Ocean blue).
+- Active vs inactive: **tinted cards** (no divider; the spec's "no section
+  headers" rule stands).
+- Wide-screen navigation: **docked sidebar** (over a top bar or an icon rail).
+- Content width **720px** (was 640px).
+- Generated covers are lettered in Geist.
+- Public pages get the same look.
+
+Implementation details (mine):
+
+- Tokens: light bg #f5f7f6, surface #fff, ink #0d1512, muted #56635d, line
+  #e1e7e4, accent #047857, accent-soft #dcf5ea, active-bg #effbf5, danger
+  #c8283f, warn #8a5a00. Dark: bg #0a0f0d, surface #131a17, ink #e9f0ec,
+  muted #95a59e, line #25302b, accent #34d399, accent-soft #163a2b, active-bg
+  #112620, danger #ff7a8a, warn #f0b84a. Contrast checked with a script; the
+  lowest text pair is accent on accent-soft in light mode (4.78:1).
+- New tokens: `--on-accent` (text on accent or danger fills: white in light,
+  dark green in dark mode, since the dark accent is bright), `--active-bg`,
+  `--warn`, `--shadow`.
+- Base text is 15px/1.5 (was 16px/1.45); inputs stay 16px so phones don't
+  zoom. Headings are 700 weight with slight negative letter-spacing.
+- The content column is a white panel with thin side lines on wide screens,
+  and white on phones too, so the tinted cards read against it. The phone tab
+  bar is slightly translucent with a blur.
+- Layout grid: from 900px, `1fr 200px 720px 1fr` (the pair centered); from
+  1120px a 200px spacer on the right keeps the content itself centered.
+- Fields and search boxes are filled with the background colour and get an
+  accent focus ring.
+- Fixed while restyling: the book page's "‹ Catalog" link was styled by the
+  reading-activity `.back` class (muted italic); that class is now `.rewind`.

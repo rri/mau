@@ -553,13 +553,13 @@
 						{#each lines as l, j (j)}
 							<li>
 								<span class="muted">{fmtMonthDay(l.date)}</span>
-								{#if l.rewind}<span class="back">moved back page {l.from} → {l.to}</span><span
+								{#if l.rewind}<span class="rewind">moved back page {l.from} → {l.to}</span><span
 									></span>
 								{:else}<span>page {l.from} → {l.to}</span><span class="delta">+{l.to - l.from}</span
 									>{/if}
 							</li>
 						{:else}
-							<li><span></span><span class="back">No progress yet</span><span></span></li>
+							<li><span></span><span class="rewind">No progress yet</span><span></span></li>
 						{/each}
 					</ul>
 				</details>
@@ -658,7 +658,7 @@
 	h1 {
 		margin: 0;
 		font-size: 24px;
-		font-weight: 600;
+		font-weight: 700;
 		line-height: 1.2;
 		text-wrap: balance;
 	}
@@ -796,7 +796,7 @@
 		border-radius: 50%;
 		border: 0;
 		background: var(--accent);
-		color: var(--surface);
+		color: var(--on-accent);
 		font-size: 25px;
 		cursor: pointer;
 	}
@@ -949,7 +949,7 @@
 		color: var(--accent);
 		font-weight: 500;
 	}
-	.back {
+	.rewind {
 		color: var(--muted);
 		font-style: italic;
 	}

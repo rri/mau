@@ -1,5 +1,6 @@
 <script lang="ts">
-	// Signed-in app shell: a bottom tab bar on phones, a left sidebar on wide screens.
+	// Signed-in app shell: a bottom tab bar on phones; on wide screens a sidebar
+	// docked to the left of the content, with the content centered on screen.
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { auth } from '#lib/auth.svelte.ts';
@@ -28,7 +29,7 @@
 {#if auth.me}
 	<div class="shell">
 		<nav class="tabs" aria-label="Main">
-			<span class="brand">mau</span>
+			<span class="brand"><i aria-hidden="true"></i>mau</span>
 			{#each tabs as t (t.href)}
 				<a href={t.href} class="tab" aria-current={t.match(page.url.pathname) ? 'page' : undefined}>
 					{#if t.label === 'Reading'}
@@ -83,9 +84,10 @@
 	.content {
 		flex: 1;
 		width: 100%;
-		max-width: 640px;
+		max-width: 720px;
 		margin: 0 auto;
-		padding-bottom: 72px;
+		padding-bottom: 76px;
+		background: var(--surface);
 	}
 	.tabs {
 		position: fixed;
@@ -95,7 +97,8 @@
 		z-index: 20;
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
-		background: var(--surface);
+		background: color-mix(in srgb, var(--surface) 92%, transparent);
+		backdrop-filter: blur(12px);
 		border-top: 1px solid var(--line);
 		padding-bottom: env(safe-area-inset-bottom);
 	}
@@ -105,9 +108,10 @@
 	.tab {
 		display: grid;
 		justify-items: center;
-		gap: 2px;
+		gap: 3px;
 		padding: 8px 0 10px;
-		font-size: 13px;
+		font-size: 12px;
+		font-weight: 500;
 		color: var(--muted);
 		text-decoration: none;
 	}
@@ -116,41 +120,68 @@
 		font-weight: 600;
 	}
 	@media (min-width: 900px) {
+		/* The sidebar and content side by side, centered as a pair. */
 		.shell {
-			flex-direction: row;
+			display: grid;
+			grid-template-columns: minmax(0, 1fr) 200px minmax(0, 720px) minmax(0, 1fr);
 		}
 		.tabs {
+			grid-column: 2;
 			position: sticky;
 			top: 0;
 			height: 100vh;
-			width: 200px;
-			flex: none;
 			display: flex;
 			flex-direction: column;
 			gap: 2px;
-			padding: 20px 12px;
+			padding: 24px 12px;
 			border-top: 0;
-			border-right: 1px solid var(--line);
+			background: none;
+			backdrop-filter: none;
 		}
 		.brand {
-			display: block;
-			font-size: 26px;
-			font-weight: 600;
-			padding: 0 10px 18px;
+			display: flex;
+			align-items: center;
+			gap: 9px;
+			font-size: 20px;
+			font-weight: 700;
+			letter-spacing: -0.02em;
+			padding: 0 12px 22px;
+		}
+		.brand i {
+			width: 22px;
+			height: 22px;
+			border-radius: 7px;
+			background: var(--accent);
 		}
 		.tab {
 			display: flex;
 			gap: 10px;
 			align-items: center;
-			padding: 9px 10px;
+			padding: 8px 12px;
 			border-radius: 10px;
-			font-size: 16px;
+			font-size: 14.5px;
+		}
+		.tab:hover {
+			color: var(--ink);
 		}
 		.tab[aria-current='page'] {
 			background: var(--accent-soft);
+			color: var(--accent);
 		}
 		.content {
-			padding: 12px 0 40px;
+			grid-column: 3;
+			max-width: none;
+			margin: 0;
+			min-height: 100vh;
+			padding: 8px 0 48px;
+			border-left: 1px solid var(--line);
+			border-right: 1px solid var(--line);
+		}
+	}
+	@media (min-width: 1120px) {
+		/* Wide enough to center the content itself, with the sidebar beside it. */
+		.shell {
+			grid-template-columns: minmax(0, 1fr) 200px 720px 200px minmax(0, 1fr);
 		}
 	}
 </style>

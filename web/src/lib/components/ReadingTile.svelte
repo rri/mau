@@ -67,7 +67,7 @@
 <style>
 	.tile {
 		display: grid;
-		gap: 5px;
+		gap: 7px;
 		align-content: start;
 	}
 	.art {
@@ -78,9 +78,19 @@
 		display: block;
 		height: 100%;
 	}
-	.idle .art > a,
-	.idle .t {
+	/* Active covers get an accent outline; inactive ones are desaturated. */
+	.tile:not(.idle) .art > a {
+		border-radius: 5px;
+		outline: 2.5px solid var(--accent);
+		outline-offset: 3px;
+	}
+	.idle .art > a {
+		filter: saturate(0.25);
 		opacity: 0.7;
+	}
+	.idle .t {
+		color: var(--muted);
+		font-weight: 500;
 	}
 	.actions {
 		position: absolute;
@@ -107,8 +117,8 @@
 	.plus {
 		border: 0;
 		background: var(--accent);
-		color: var(--surface);
-		font-size: 23px;
+		color: var(--on-accent);
+		font-size: 22px;
 		line-height: 1;
 	}
 	.play {
@@ -129,7 +139,7 @@
 	}
 	.mini {
 		height: 3px;
-		border-radius: 2px;
+		border-radius: 99px;
 		background: var(--line);
 		overflow: hidden;
 	}
@@ -144,8 +154,8 @@
 	}
 	.t {
 		font-weight: 600;
-		font-size: 13px;
-		line-height: 1.25;
+		font-size: 13.5px;
+		line-height: 1.3;
 		color: var(--ink);
 		text-decoration: none;
 		display: -webkit-box;
@@ -155,8 +165,8 @@
 		overflow: hidden;
 	}
 	.pages {
-		margin-top: -3px;
-		font-size: 12px;
+		margin-top: -4px;
+		font-size: 12.5px;
 		color: var(--muted);
 		font-variant-numeric: tabular-nums;
 	}

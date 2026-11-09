@@ -480,7 +480,7 @@
 	.chip[aria-pressed='true'] {
 		background: var(--accent);
 		border-color: var(--accent);
-		color: var(--surface);
+		color: var(--on-accent);
 	}
 	.rows {
 		list-style: none;

@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mau — style 2 (sans, fresh colors, navigation)</title>
+<style>
+@font-face{font-family:'Inter';src:url(fonts/inter-latin-wght-normal.woff2) format('woff2');font-weight:100 900}
+@font-face{font-family:'Geist';src:url(fonts/geist-latin-wght-normal.woff2) format('woff2');font-weight:100 900}
+@font-face{font-family:'Plus Jakarta Sans';src:url(fonts/plus-jakarta-sans-latin-wght-normal.woff2) format('woff2');font-weight:200 800}
+
+/* ---- Palettes (all pairs checked: text >= 4.5:1 in both modes) ---- */
+[data-pal=indigo]{--bg:#f5f6f8;--surface:#fff;--ink:#0e1220;--muted:#5a6274;--line:#e3e6ec;--accent:#4f46e5;--on-accent:#fff;--accent-soft:#eceaff;--active-bg:#f4f3ff;--danger:#d92d4a}
+[data-pal=indigo][data-mode=dark]{--bg:#0b0d12;--surface:#141821;--ink:#eceef3;--muted:#9aa2b4;--line:#272c38;--accent:#8f8cff;--on-accent:#0b0d12;--accent-soft:#25264a;--active-bg:#1a1c33;--danger:#ff7a8a}
+[data-pal=emerald]{--bg:#f5f7f6;--surface:#fff;--ink:#0d1512;--muted:#56635d;--line:#e1e7e4;--accent:#047857;--on-accent:#fff;--accent-soft:#dcf5ea;--active-bg:#effbf5;--danger:#d92d4a}
+[data-pal=emerald][data-mode=dark]{--bg:#0a0f0d;--surface:#131a17;--ink:#e9f0ec;--muted:#95a59e;--line:#25302b;--accent:#34d399;--on-accent:#06281b;--accent-soft:#163a2b;--active-bg:#112620;--danger:#ff7a8a}
+[data-pal=ocean]{--bg:#f4f7fb;--surface:#fff;--ink:#0b1324;--muted:#55617a;--line:#e1e7f0;--accent:#1d5fe0;--on-accent:#fff;--accent-soft:#e2ecff;--active-bg:#f0f5ff;--danger:#d92d4a}
+[data-pal=ocean][data-mode=dark]{--bg:#0a0e16;--surface:#121824;--ink:#e8edf6;--muted:#96a3b8;--line:#243044;--accent:#5ea0ff;--on-accent:#06122a;--accent-soft:#1a2d50;--active-bg:#14223c;--danger:#ff7a8a}
+
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,sans-serif;background:#ddd;color:#111}
+.controls{position:sticky;top:0;z-index:99;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;padding:10px 16px;background:#1d1d1f;color:#eee;font:13px system-ui,sans-serif}
+.controls b{font-weight:600;color:#aaa;margin-right:4px}
+.controls label{display:inline-flex;gap:4px;align-items:center;margin-right:8px;cursor:pointer}
+.note{padding:8px 16px;font:13px system-ui;color:#333;background:#f1f1f1;border-bottom:1px solid #ccc}
+
+/* ---- The app ---- */
+.app{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:calc(100vh - 90px);-webkit-font-smoothing:antialiased;font-feature-settings:'cv11','ss01';letter-spacing:-.005em}
+[data-font=inter]{--font:'Inter',system-ui,sans-serif}
+[data-font=geist]{--font:'Geist',system-ui,sans-serif}
+[data-font=jakarta]{--font:'Plus Jakarta Sans',system-ui,sans-serif}
+.app button,.app input{font-family:inherit;color:inherit}
+
+/* Navigation variants (wide screens) */
+.shell{display:flex;justify-content:center;gap:0}
+.nav{flex:none;display:flex;flex-direction:column;gap:2px;padding:24px 12px}
+.brand{font-weight:700;font-size:20px;letter-spacing:-.02em;padding:0 12px 20px;display:flex;align-items:center;gap:8px}
+.brand i{width:22px;height:22px;border-radius:7px;background:var(--accent);display:inline-block}
+.tab{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;color:var(--muted);text-decoration:none;font-weight:500;font-size:14.5px}
+.tab[aria-current]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.tab svg{flex:none}
+.main{width:100%;max-width:720px;min-width:0}
+/* A: docked — sidebar sits right beside the content, the pair centered */
+[data-nav=docked] .nav{width:200px;position:sticky;top:44px;height:calc(100vh - 44px)}
+[data-nav=docked] .main{border-left:1px solid var(--line);border-right:1px solid var(--line);background:var(--surface);min-height:calc(100vh - 90px)}
+/* B: top bar — nav runs across the top, content centered under it */
+[data-nav=top] .shell{flex-direction:column;align-items:center}
+[data-nav=top] .nav{flex-direction:row;width:100%;max-width:720px;padding:14px 16px;align-items:center;gap:4px;border-bottom:1px solid var(--line)}
+[data-nav=top] .brand{padding:0 16px 0 0;margin-right:auto}
+/* C: rail — a narrow icon rail docked to the content */
+[data-nav=rail] .nav{width:76px;align-items:center;padding:20px 8px;position:sticky;top:44px;height:calc(100vh - 44px)}
+[data-nav=rail] .brand span{display:none}
+[data-nav=rail] .brand{padding:0 0 18px}
+[data-nav=rail] .tab{flex-direction:column;gap:3px;font-size:11.5px;padding:8px 6px;width:64px}
+[data-nav=rail] .main{border-left:1px solid var(--line);border-right:1px solid var(--line);background:var(--surface);min-height:calc(100vh - 90px)}
+[data-nav=rail] .shell{margin-left:-76px}
+[data-nav=docked] .shell{margin-left:-200px}
+/* Phone width: bottom tabs */
+.phone .shell{justify-content:center;margin:0}
+.phone .main{max-width:400px;border:1px solid var(--line);background:var(--surface);position:relative;padding-bottom:64px}
+.phone .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:400px;height:auto;top:auto;flex-direction:row;justify-content:space-around;padding:6px 0 10px;background:var(--surface);border-top:1px solid var(--line);z-index:5}
+.phone .brand{display:none}
+.phone .tab{flex-direction:column;gap:2px;font-size:11.5px;padding:4px 14px;background:none!important}
+
+.head{display:flex;align-items:center;justify-content:space-between;padding:22px 20px 12px}
+h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.025em}
+.toggle{display:flex;gap:2px;padding:3px;border-radius:10px;background:var(--bg);border:1px solid var(--line)}
+.toggle button{width:32px;height:28px;border:0;border-radius:7px;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.toggle button[aria-pressed=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0/.12)}
+.search{margin:0 20px 14px;display:flex;align-items:center;gap:8px;padding:0 12px;height:40px;border-radius:10px;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
+.search input{border:0;background:none;outline:0;flex:1;font-size:15px}
+.list{list-style:none;margin:0;padding:0 12px 24px}
+.row{display:grid;grid-template-columns:14px 36px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 12px 12px 6px;border-radius:12px;position:relative;margin-bottom:2px}
+.handle{color:var(--muted);opacity:.45;font-size:12px;letter-spacing:-2px}
+.cov{width:36px;height:52px;border-radius:4px;box-shadow:0 1px 2px rgb(0 0 0/.18),0 0 0 1px rgb(0 0 0/.06);display:grid;place-items:center;color:#fff;font-size:7px;font-weight:700;text-align:center;padding:3px;line-height:1.1;text-transform:uppercase}
+.t{font-weight:600;font-size:15.5px;letter-spacing:-.01em;line-height:1.3}
+.a{font-size:13.5px;color:var(--muted)}
+.bar{height:4px;border-radius:99px;background:var(--line);margin:7px 0 5px;overflow:hidden}
+.bar span{display:block;height:100%;border-radius:99px;background:var(--accent)}
+.meta{display:flex;gap:12px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.meta .pg{color:var(--ink);font-weight:500}
+.meta .today{color:var(--accent);font-weight:600}
+.acts{display:flex;gap:8px;align-items:center}
+.plus{width:42px;height:42px;border-radius:50%;border:0;background:var(--accent);color:var(--on-accent);font-size:22px;font-weight:400;display:grid;place-items:center;box-shadow:0 2px 6px color-mix(in srgb,var(--accent) 35%,transparent)}
+.pause{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--muted);display:grid;place-items:center}
+.play{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--muted);display:grid;place-items:center}
+.sep{display:none;align-items:center;gap:10px;margin:14px 6px 6px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.sep::after{content:'';flex:1;height:1px;background:var(--line)}
+
+/* Active vs inactive variants */
+/* 1. Tint: active rows on a tinted card with an accent bar; inactive are plain and quiet */
+[data-dist=tint] .row.on,[data-dist=both] .row.on{background:var(--active-bg)}
+[data-dist=tint] .row.on::before,[data-dist=both] .row.on::before,[data-dist=divider] .row.on::before{content:'';position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:3px;background:var(--accent)}
+.row.off .cov{filter:saturate(.25);opacity:.7}
+.row.off .t{color:var(--muted);font-weight:500}
+.row.off .bar span{background:var(--muted);opacity:.6}
+.row.off .meta .pg{color:var(--muted)}
+/* 2. Divider: a quiet labelled line between the groups */
+[data-dist=divider] .sep,[data-dist=both] .sep{display:flex}
+
+/* Grid */
+.grid{display:none;list-style:none;margin:0;padding:4px 20px 28px;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:22px 16px}
+[data-view=grid] .grid{display:grid}
+[data-view=grid] .list{display:none}
+.tile{display:grid;gap:7px;align-content:start}
+.art{position:relative;aspect-ratio:2/3;border-radius:6px;box-shadow:0 2px 6px rgb(0 0 0/.15),0 0 0 1px rgb(0 0 0/.06);display:grid;place-items:center;color:#fff;font-weight:700;font-size:11px;text-transform:uppercase;text-align:center;padding:10px;line-height:1.15}
+.art .acts{position:absolute;right:6px;bottom:6px}
+.art .plus{width:36px;height:36px;font-size:20px}
+.art .pause,.art .play{border:0;box-shadow:0 1px 4px rgb(0 0 0/.25)}
+.tile .t{font-size:13.5px}
+.tile .pgs{font-size:12.5px;color:var(--muted);margin-top:-4px;font-variant-numeric:tabular-nums}
+.tile .bar{margin:0;height:3px}
+.tile.off .art{filter:saturate(.25);opacity:.7}
+.tile.off .t{color:var(--muted);font-weight:500}
+.tile.off .bar span{background:var(--muted)}
+[data-dist=tint] .tile.on .art,[data-dist=both] .tile.on .art{outline:2.5px solid var(--accent);outline-offset:3px}
+
+.wrap{padding:0}
+.label{font:600 12px system-ui;color:#555;padding:14px 16px 6px;text-transform:uppercase;letter-spacing:.05em}
+</style>
+</head>
+<body>
+<div class="controls" id="c">
+  <span><b>Font</b>
+    <label><input type="radio" name="font" value="inter" checked>Inter</label>
+    <label><input type="radio" name="font" value="geist">Geist</label>
+    <label><input type="radio" name="font" value="jakarta">Plus Jakarta Sans</label></span>
+  <span><b>Colors</b>
+    <label><input type="radio" name="pal" value="indigo" checked>Indigo</label>
+    <label><input type="radio" name="pal" value="emerald">Emerald</label>
+    <label><input type="radio" name="pal" value="ocean">Ocean blue</label></span>
+  <span><b>Mode</b>
+    <label><input type="radio" name="mode" value="light" checked>Light</label>
+    <label><input type="radio" name="mode" value="dark">Dark</label></span>
+  <span><b>Active vs inactive</b>
+    <label><input type="radio" name="dist" value="tint" checked>Tinted cards</label>
+    <label><input type="radio" name="dist" value="divider">Divider line</label>
+    <label><input type="radio" name="dist" value="both">Both</label></span>
+  <span><b>Wide-screen nav</b>
+    <label><input type="radio" name="nav" value="docked" checked>Docked sidebar</label>
+    <label><input type="radio" name="nav" value="top">Top bar</label>
+    <label><input type="radio" name="nav" value="rail">Icon rail</label>
+    <label><input type="radio" name="nav" value="phone">(Phone width)</label></span>
+  <span><b>View</b>
+    <label><input type="radio" name="view" value="list" checked>List</label>
+    <label><input type="radio" name="view" value="grid">Grid</label></span>
+</div>
+<div class="note">Mock of the Reading view only. The same tokens (font, colors, lines, spacing) apply to every page, including the public profile pages. Make the window wider than 1100px to judge the navigation.</div>
+
+<div class="app" id="app" data-font="inter" data-pal="indigo" data-mode="light" data-dist="tint" data-nav="docked" data-view="list">
+  <div class="shell">
+    <nav class="nav">
+      <div class="brand"><i></i><span>mau</span></div>
+      <a class="tab" aria-current="page"><svg width="19" height="19" viewBox="0 0 20 20"><path d="M3 4.5C5.5 3.5 8 3.8 10 5.2c2-1.4 4.5-1.7 7-.7v11c-2.5-1-5-.7-7 .7-2-1.4-4.5-1.7-7-.7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M10 5.2v11" stroke="currentColor" stroke-width="1.7"/></svg><span>Reading</span></a>
+      <a class="tab"><svg width="19" height="19" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="3" height="14" rx="1"/><rect x="8" y="3" width="3" height="14" rx="1"/><path d="M13 4.2l2.8-.8 2.2 13.4-2.8.8z" stroke-linejoin="round"/></g></svg><span>Catalog</span></a>
+      <a class="tab"><svg width="19" height="19" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6"/></g></svg><span>Settings</span></a>
+    </nav>
+    <div class="main">
+      <div class="head"><h1>Reading</h1>
+        <div class="toggle"><button aria-pressed="true" data-v="list"><svg width="15" height="15" viewBox="0 0 16 16"><g fill="currentColor"><rect x="1" y="2" width="14" height="2" rx="1"/><rect x="1" y="7" width="14" height="2" rx="1"/><rect x="1" y="12" width="14" height="2" rx="1"/></g></svg></button><button aria-pressed="false" data-v="grid"><svg width="15" height="15" viewBox="0 0 16 16"><g fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></g></svg></button></div>
+      </div>
+      <label class="search"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 10.6L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><input placeholder="Search title or author"></label>
+      <ul class="list" id="list"></ul>
+      <ul class="grid" id="grid"></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+const books = [
+  ['The Left Hand of Darkness','Ursula K. Le Guin',140,304,'+6 pages today',1,200],
+  ['Middlemarch','George Eliot',299,880,'last read yesterday',1,340],
+  ['Gödel, Escher, Bach','Douglas Hofstadter',212,777,'+18 pages today',1,220],
+  ['Station Eleven','Emily St. John Mandel',0,0,'added 3 days ago',0,90],
+  ['The Brothers Karamazov','Fyodor Dostoevsky',310,796,'last read 2 weeks ago',0,10],
+  ['Thinking, Fast and Slow','Daniel Kahneman',120,499,'last read Mar 2',0,40],
+  ['Pale Fire','Vladimir Nabokov',0,0,'added Oct 30',0,160],
+  ['The Name of the Rose','Umberto Eco',44,536,'last read Aug 12',0,190],
+];
+const pause = '<svg width="10" height="10" viewBox="0 0 14 14"><rect x="3" y="2" width="3" height="10" rx="1" fill="currentColor"/><rect x="8" y="2" width="3" height="10" rx="1" fill="currentColor"/></svg>';
+const play = '<svg width="13" height="13" viewBox="0 0 16 16"><path d="M4.5 2.5v11a.6.6 0 0 0 .9.5l9-5.5a.6.6 0 0 0 0-1l-9-5.5a.6.6 0 0 0-.9.5z" fill="currentColor"/></svg>';
+const cov = (h) => `background:linear-gradient(160deg,hsl(${h} 55% 42%),hsl(${(h+30)%360} 60% 28%))`;
+let L = '', G = '';
+books.forEach(([t,a,p,n,m,on,h],i) => {
+  if (i === 3) L += `<li class="sep">Not reading now · 5</li>`;
+  const pct = n ? Math.round(100*p/n) : 0;
+  const acts = on ? `<button class="pause">${pause}</button><button class="plus">+</button>` : `<button class="play">${play}</button>`;
+  L += `<li class="row ${on?'on':'off'}"><span class="handle">⋮⋮</span><span class="cov" style="${cov(h)}">${t}</span>
+    <div><div class="t">${t}</div><div class="a">${a}</div><div class="bar"><span style="width:${pct}%"></span></div>
+    <div class="meta">${n?`<span class="pg">page ${p} of ${n}</span>`:'<span>Not started</span>'}<span class="${m.startsWith('+')?'today':''}">${m}</span></div></div>
+    <div class="acts">${acts}</div></li>`;
+  G += `<li class="tile ${on?'on':'off'}"><div class="art" style="${cov(h)}">${t}<div class="acts">${acts}</div></div>
+    ${n?`<div class="bar"><span style="width:${pct}%"></span></div>`:''}<div class="t">${t}</div>${n?`<div class="pgs">p. ${p} of ${n}</div>`:''}</li>`;
+});
+list.innerHTML = L; grid.innerHTML = G;
+const app = document.getElementById('app');
+document.getElementById('c').addEventListener('change', (e) => {
+  const {name, value} = e.target;
+  if (name === 'nav') { app.classList.toggle('phone', value === 'phone'); if (value !== 'phone') app.dataset.nav = value; else app.dataset.nav = 'docked'; return; }
+  app.dataset[name] = value;
+  if (name === 'view') document.querySelectorAll('.toggle button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === value));
+});
+document.querySelectorAll('.toggle button').forEach(b => b.onclick = () => { document.querySelector(`input[name=view][value=${b.dataset.v}]`).click(); });
+</script>
+</body>
+</html>

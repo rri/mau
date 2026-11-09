@@ -206,7 +206,7 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 10px;
-		padding: 14px 14px 8px 16px;
+		padding: 22px 20px 12px;
 	}
 	.title {
 		display: flex;
@@ -220,16 +220,27 @@
 	.filters {
 		display: grid;
 		gap: 8px;
-		padding: 0 14px 12px;
+		padding: 0 20px 14px;
 		border-bottom: 1px solid var(--line);
 	}
 	.search {
 		width: 100%;
-		padding: 9px 12px;
+		height: 40px;
+		padding: 0 12px 0 36px;
 		border: 1px solid var(--line);
 		border-radius: 10px;
-		background: var(--surface);
-		font-size: 16px;
+		background: var(--bg)
+			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2395a59e' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='4.8'/%3E%3Cpath d='M10.6 10.6 14 14'/%3E%3C/svg%3E")
+			no-repeat 12px center;
+		font-size: 15px;
+		transition:
+			border-color 0.15s,
+			box-shadow 0.15s;
+	}
+	.search:focus {
+		outline: none;
+		border-color: var(--accent);
+		box-shadow: 0 0 0 3px var(--accent-soft);
 	}
 	.count {
 		display: flex;
@@ -240,15 +251,15 @@
 	.grid {
 		list-style: none;
 		margin: 0;
-		padding: 14px;
+		padding: 16px 20px 24px;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-		gap: 16px 12px;
+		grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+		gap: 22px 16px;
 	}
 	h1 {
 		margin: 0;
-		font-size: 23px;
-		font-weight: 600;
+		font-size: 24px;
+		font-weight: 700;
 	}
 	.status {
 		font-size: 13px;
@@ -264,7 +275,7 @@
 	.list {
 		list-style: none;
 		margin: 0;
-		padding: 0;
+		padding: 10px 12px 16px;
 	}
 	.drop {
 		position: absolute;
@@ -284,7 +295,7 @@
 		right: 0;
 		top: -22px;
 		font-size: 12px;
-		color: var(--surface);
+		color: var(--on-accent);
 		background: var(--accent);
 		padding: 1px 7px;
 		border-radius: 6px;
