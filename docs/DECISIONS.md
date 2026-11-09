@@ -544,3 +544,47 @@ Implementation details (mine):
   accent focus ring.
 - Fixed while restyling: the book page's "‹ Catalog" link was styled by the
   reading-activity `.back` class (muted italic); that class is now `.rewind`.
+
+## Audit and threat model (2026-11-09)
+
+The audit and its findings are in docs/THREAT_MODEL.md (STRIDE, OWASP risk
+rating). Chosen by the user:
+
+- **Code lockout with a warning:** 10 wrong second-factor codes (authenticator
+  or recovery) for an account within an hour block codes for 15 minutes, and
+  a recovery-activity line tells the owner someone had their password.
+- **A password change signs out every other device** (this one stays).
+- **One import in progress per user** (matching or saving); a second start
+  gets 409 "Finish or cancel your current import first." An import waiting in
+  review doesn't block a new one.
+- **Profiles with nothing published return the not-found page** (spec §9
+  changed).
+
+Fixed without asking, as plain hardening (no visible behavior change):
+
+- The data directory is set to mode 700 on every start (all commands), with
+  a log line when it changes. README: `install -d -m 700`, OpenRC `umask=077`,
+  systemd `UMask=0077` plus NoNewPrivileges, ProtectSystem=strict,
+  ProtectHome, PrivateTmp, ReadWritePaths.
+- Image decoding: 10,000 px a side, 256 MB allocation, two decodes at once
+  (a semaphore).
+- Outbound HTTP (providers and covers): redirects only to https domain names,
+  never IP literals or localhost, at most 5. Cover bodies are read in chunks
+  and dropped past 10 MB.
+- Sync: IDs of new records must be 1–64 characters of `[A-Za-z0-9_-]`; cover
+  overrides must be a 32-hex stored hash or empty.
+- Content-Security-Policy on every response: `default-src 'self'`; scripts
+  from self plus the SPA shell's inline script by SHA-256 (computed at start
+  from the embedded 200.html) and `'wasm-unsafe-eval'` for the barcode
+  decoder; inline styles allowed (Svelte style attributes, public pages);
+  images from self, data: (QR code) and blob:; `frame-ancestors 'none'`,
+  `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`.
+- HSTS `max-age=31536000` when `public_url` is https (no includeSubDomains or
+  preload, so other hosts on the domain aren't affected).
+- Lockout columns: `users.code_failures`, `code_failures_since`,
+  `code_locked_until` (migration 0008). A reset link clears them along with
+  two-factor. The lockout applies to sign-in codes and to confirmations.
+
+Not fixed (recorded as residual risk in the threat model): the bundled SQLite
+advisory (sqlx 0.9 caps libsqlite3-sys below the patched 0.39); a dev-only
+npm advisory; plain-text TOTP secrets and API keys at rest.
