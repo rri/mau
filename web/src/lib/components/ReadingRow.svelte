@@ -90,6 +90,12 @@
 		node.focus();
 		node.select();
 	}
+
+	// Inline forms can open near the bottom of the screen; bring the whole
+	// form into view (scroll-padding keeps it clear of the phone tab bar).
+	function reveal(node: HTMLElement) {
+		requestAnimationFrame(() => node.scrollIntoView({ block: 'nearest' }));
+	}
 </script>
 
 <li
@@ -135,7 +141,13 @@
 			{#if !r}
 				<span>Not started</span><span>added {ago(addedOn, today)}</span>
 			{:else if editing}
-				<span class="edit" role="group" aria-label="Edit pages" onfocusout={editFocusOut}>
+				<span
+					class="edit"
+					role="group"
+					aria-label="Edit pages"
+					onfocusout={editFocusOut}
+					use:reveal
+				>
 					page <input
 						type="number"
 						inputmode="numeric"
@@ -217,7 +229,7 @@
 		</div>
 	{/if}
 	{#if setup}
-		<form class="setup" onsubmit={startSetup}>
+		<form class="setup" onsubmit={startSetup} use:reveal>
 			<label class="field" for="setup-{info.book.id}"
 				>How many pages does your copy have?
 				<input
