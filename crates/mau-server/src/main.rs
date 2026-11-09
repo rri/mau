@@ -80,6 +80,7 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
     let config = config::Config::load(cli.config.as_deref())?;
+    private_data_dir(&config.data_dir)?;
 
     match cli.command.unwrap_or(Command::Serve) {
         Command::Serve => serve(config).await,
@@ -140,6 +141,26 @@ async fn serve(config: config::Config) -> Result<()> {
     .with_graceful_shutdown(shutdown_signal())
     .await?;
     db.close().await;
+    Ok(())
+}
+
+/// The data directory holds password hashes, two-factor secrets, API keys,
+/// and backups, so only the account running mau may enter it.
+fn private_data_dir(dir: &std::path::Path) -> Result<()> {
+    std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(dir)?.permissions().mode() & 0o777;
+        if mode & 0o077 != 0 {
+            std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
+                .with_context(|| format!("making {} private", dir.display()))?;
+            tracing::info!(
+                "made {} private to this account (was {mode:o})",
+                dir.display()
+            );
+        }
+    }
     Ok(())
 }
 

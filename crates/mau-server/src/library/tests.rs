@@ -335,3 +335,36 @@ async fn private_manual_works_are_visible_only_to_their_owner() {
     .await;
     assert_eq!(res["dropped"], json!(["b2"]));
 }
+
+#[tokio::test]
+async fn odd_ids_and_cover_names_are_rejected() {
+    let (app, cookie) = setup().await;
+    let t1 = h(2000, "aaa");
+    let long = "x".repeat(65);
+    let res = sync(
+        &app,
+        &cookie,
+        0,
+        json!([
+            op("o3", &t1, json!({"type": "book.create", "id": "../b2", "work_id": "w1", "rank": "W", "added_at": 2})),
+            op("o4", &t1, json!({"type": "book.create", "id": long, "work_id": "w1", "rank": "W", "added_at": 2})),
+            op("o5", &t1, json!({"type": "book.set", "id": "b1", "fields": {"cover_override": "../../api/export.json?"}})),
+            op("o6", &t1, json!({"type": "book.set", "id": "b1", "fields": {"cover_override": "0123456789abcdef0123456789abcdef"}})),
+        ]),
+    )
+    .await;
+    let rejected: Vec<&str> = res["rejected"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(rejected, ["o3", "o4", "o5"], "{res}");
+    let book = res["changes"]["books"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|b| b["id"] == "b1")
+        .unwrap();
+    assert_eq!(book["cover_override"], "0123456789abcdef0123456789abcdef");
+}

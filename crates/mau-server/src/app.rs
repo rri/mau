@@ -45,6 +45,24 @@ impl AppState {
                 config.public_url
             ))
             .timeout(std::time::Duration::from_secs(20))
+            .redirect(reqwest::redirect::Policy::custom(|attempt| {
+                let url = attempt.url();
+                let ok_host = url.host_str().is_some_and(|h| {
+                    h.trim_start_matches('[')
+                        .trim_end_matches(']')
+                        .parse::<std::net::IpAddr>()
+                        .is_err()
+                        && h != "localhost"
+                        && !h.ends_with(".localhost")
+                });
+                if attempt.previous().len() >= 5 {
+                    attempt.error("too many redirects")
+                } else if url.scheme() != "https" || !ok_host {
+                    attempt.stop()
+                } else {
+                    attempt.follow()
+                }
+            }))
             .build()?;
         Ok(Self {
             http,
@@ -203,7 +221,10 @@ pub fn router(state: AppState) -> Router {
         .route("/u/{username}", get(crate::public::profile))
         .route("/s/{token}", get(crate::public::share))
         .fallback(web::serve)
-        .layer(middleware::from_fn(security_headers))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            security_headers,
+        ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             crate::client_ip::layer,
@@ -234,9 +255,18 @@ async fn check_origin(
 }
 
 /// Conservative headers on every response.
-async fn security_headers(req: Request, next: Next) -> Response {
+async fn security_headers(State(state): State<AppState>, req: Request, next: Next) -> Response {
     let mut res = next.run(req).await;
     let h = res.headers_mut();
+    if let Ok(v) = header::HeaderValue::from_str(web::content_security_policy()) {
+        h.insert(header::CONTENT_SECURITY_POLICY, v);
+    }
+    if state.config.public_url.starts_with("https://") {
+        h.insert(
+            header::STRICT_TRANSPORT_SECURITY,
+            header::HeaderValue::from_static("max-age=31536000"),
+        );
+    }
     h.insert(
         "x-content-type-options",
         header::HeaderValue::from_static("nosniff"),

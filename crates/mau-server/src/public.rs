@@ -334,6 +334,11 @@ pub async fn profile(
         return Ok(not_found(url));
     };
     let shares = shares_of(&state, &owner.id).await?;
+    // Until something is published, the profile doesn't exist publicly, so
+    // names and bios can't be looked up.
+    if shares.is_empty() {
+        return Ok(not_found(url));
+    }
     let mut sections = Vec::new();
     for s in &shares {
         let list = items(&state, &owner.id, s).await?;
@@ -341,7 +346,6 @@ pub async fn profile(
     }
     let body = html! {
         (header(&owner))
-        @if sections.is_empty() { p.empty { "Nothing shared yet." } }
         @for s in sections { (s) }
     };
     let description = if owner.bio.is_empty() {
@@ -424,10 +428,10 @@ mod tests {
             .execute(&app.state.db)
             .await
             .unwrap();
-        // Empty profile.
+        // Nothing published: the profile looks like an unknown name.
         let html = get_html(&app, "/u/rri").await;
-        assert!(html.contains("Nothing shared yet."));
-        assert!(html.contains("Slow reader."));
+        assert!(html.contains("Nothing here"));
+        assert!(!html.contains("Slow reader."));
         // Unknown user.
         assert!(get_html(&app, "/u/nobody").await.contains("Nothing here"));
 

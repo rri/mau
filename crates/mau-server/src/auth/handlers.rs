@@ -524,6 +524,87 @@ async fn check_second_factor(
     Ok(true)
 }
 
+/// Wrong codes allowed per account within `CODE_WINDOW_MS` before codes are
+/// blocked for `CODE_LOCK_MS`.
+pub const MAX_CODE_FAILURES: i64 = 10;
+const CODE_WINDOW_MS: i64 = crate::util::HOUR_MS;
+pub const CODE_LOCK_MS: i64 = 15 * crate::util::MINUTE_MS;
+
+fn codes_locked(minutes: i64) -> ApiError {
+    ApiError::new(
+        axum::http::StatusCode::TOO_MANY_REQUESTS,
+        "codes_locked",
+        format!(
+            "Too many wrong codes for this account. Try again in {minutes} minute{}.",
+            if minutes == 1 { "" } else { "s" }
+        ),
+    )
+}
+
+/// [`check_second_factor`] with the per-account limit: refuses while codes are
+/// blocked, counts wrong codes, and blocks (with a note in the account's
+/// recovery activity) after too many.
+async fn guarded_second_factor(
+    state: &AppState,
+    user: &User,
+    code: &str,
+    device: &str,
+) -> ApiResult<bool> {
+    let now = now_ms();
+    let (failures, since, locked_until): (i64, Option<i64>, Option<i64>) = sqlx::query_as(
+        "SELECT code_failures, code_failures_since, code_locked_until FROM users WHERE id = ?",
+    )
+    .bind(&user.id)
+    .fetch_one(&state.db)
+    .await?;
+    if let Some(until) = locked_until.filter(|u| *u > now) {
+        return Err(codes_locked((until - now + 59_999) / 60_000));
+    }
+    if check_second_factor(state, user, code, device).await? {
+        if failures > 0 {
+            sqlx::query(
+                "UPDATE users SET code_failures = 0, code_failures_since = NULL WHERE id = ?",
+            )
+            .bind(&user.id)
+            .execute(&state.db)
+            .await?;
+        }
+        return Ok(true);
+    }
+    let (failures, since) = match since {
+        Some(t) if now - t <= CODE_WINDOW_MS => (failures + 1, t),
+        _ => (1, now),
+    };
+    if failures >= MAX_CODE_FAILURES {
+        let mut tx = state.db.begin().await?;
+        sqlx::query(
+            "UPDATE users SET code_failures = 0, code_failures_since = NULL, code_locked_until = ? WHERE id = ?",
+        )
+        .bind(now + CODE_LOCK_MS)
+        .bind(&user.id)
+        .execute(&mut *tx)
+        .await?;
+        record_recovery_event(
+            &mut *tx,
+            &user.id,
+            format!(
+                "Someone entered your password correctly, then {failures} wrong codes (last on {device}). \
+                 Codes were blocked for 15 minutes. If this wasn't you, change your password."
+            ),
+        )
+        .await?;
+        tx.commit().await?;
+        return Err(codes_locked(CODE_LOCK_MS / 60_000));
+    }
+    sqlx::query("UPDATE users SET code_failures = ?, code_failures_since = ? WHERE id = ?")
+        .bind(failures)
+        .bind(since)
+        .bind(&user.id)
+        .execute(&state.db)
+        .await?;
+    Ok(false)
+}
+
 fn bad_code() -> ApiError {
     ApiError::new(
         axum::http::StatusCode::UNAUTHORIZED,
@@ -550,7 +631,7 @@ pub async fn login_code(
         .await?
         .ok_or_else(start_over)?;
     let device = user_agent(&headers);
-    if !check_second_factor(&state, &user, &req.code, &device).await? {
+    if !guarded_second_factor(&state, &user, &req.code, &device).await? {
         if !state.pending.count_attempt(&req.ticket) {
             return Err(start_over());
         }
@@ -790,7 +871,7 @@ pub async fn reset_use(
         return Err(gone());
     }
     reset_password(&mut tx, &user_id, &hash).await?;
-    sqlx::query("UPDATE users SET totp_secret = NULL, totp_last_step = NULL WHERE id = ?")
+    sqlx::query("UPDATE users SET totp_secret = NULL, totp_last_step = NULL, code_failures = 0, code_failures_since = NULL, code_locked_until = NULL WHERE id = ?")
         .bind(&user_id)
         .execute(&mut *tx)
         .await?;
@@ -838,7 +919,7 @@ pub async fn confirm(
                 "Enter the code from your authenticator app.",
             ));
         }
-        if !check_second_factor(&state, &s.user, code, &user_agent(&headers)).await? {
+        if !guarded_second_factor(&state, &s.user, code, &user_agent(&headers)).await? {
             return Err(bad_code());
         }
     }

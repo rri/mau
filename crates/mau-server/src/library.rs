@@ -320,6 +320,37 @@ fn check_pages(p: i64) -> ApiResult<()> {
     }
 }
 
+/// IDs of new records come from clients (UUIDs today); keep them short and plain.
+fn check_id(id: &str) -> ApiResult<()> {
+    if id.is_empty()
+        || id.len() > 64
+        || !id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    {
+        return Err(bad("bad id"));
+    }
+    Ok(())
+}
+
+/// The IDs an operation would create.
+fn new_ids(op: &OpKind) -> Vec<&str> {
+    use OpKind::*;
+    match op {
+        BookCreate { id, .. } | CopyCreate { id, .. } | ReadingCreate { id, .. } => vec![id],
+        Progress { event_id, .. } => vec![event_id],
+        WorkCreate { work } => std::iter::once(work.id.as_str())
+            .chain(work.edition.as_ref().map(|e| e.id.as_str()))
+            .collect(),
+        _ => vec![],
+    }
+}
+
+/// Stored covers are named by a 32-character hex hash (see `covers::store`).
+pub fn is_cover_hash(s: &str) -> bool {
+    s.len() == 32 && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
 fn check_hlc(h: &str) -> ApiResult<()> {
     h.parse::<Hlc>()
         .map(|_| ())
@@ -439,6 +470,9 @@ pub async fn apply(
     chain: Option<ChainCtx<'_>>,
 ) -> ApiResult<Applied> {
     check_hlc(&op.hlc)?;
+    for id in new_ids(&op.op) {
+        check_id(id)?;
+    }
     let hlc = op.hlc.as_str();
     use OpKind::*;
     match &op.op {
@@ -563,6 +597,12 @@ pub async fn apply(
                     authors_o = (!names.is_empty()).then(|| serde_json::to_string(&names).unwrap());
                     changed = true;
                 }
+            }
+            if let Some(v) = &fields.cover_override
+                && !v.is_empty()
+                && !is_cover_hash(v)
+            {
+                return Err(bad("bad cover"));
             }
             if let Some(v) = &fields.cover_override
                 && claim(&mut clock, "cover_override", hlc)

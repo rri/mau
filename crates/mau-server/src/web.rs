@@ -8,6 +8,7 @@ use axum::body::Body;
 use axum::http::{HeaderValue, StatusCode, Uri, header};
 use axum::response::{IntoResponse, Response};
 use rust_embed::RustEmbed;
+use std::sync::LazyLock;
 
 #[derive(RustEmbed)]
 #[folder = "../../web/build"]
@@ -62,4 +63,73 @@ pub fn asset_path(prefix: &str) -> Option<String> {
                     .is_some_and(|name| name.starts_with(prefix))
         })
         .map(|p| format!("/{p}"))
+}
+
+/// The Content-Security-Policy for every response. Scripts may only come from
+/// this site, plus the app shell's inline start-up script (allowed by its
+/// hash) and the barcode decoder's WebAssembly. Styles may be inline (Svelte
+/// sets style attributes); images may be data: URLs (generated QR codes).
+pub fn content_security_policy() -> &'static str {
+    static CSP: LazyLock<String> = LazyLock::new(|| {
+        let hashes: String = Assets::get(SPA_SHELL)
+            .map(|f| inline_script_hashes(&String::from_utf8_lossy(&f.data)))
+            .unwrap_or_default()
+            .iter()
+            .map(|h| format!(" 'sha256-{h}'"))
+            .collect();
+        format!(
+            "default-src 'self'; script-src 'self'{hashes} 'wasm-unsafe-eval'; \
+             style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; \
+             connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; \
+             base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        )
+    });
+    &CSP
+}
+
+/// Base64 SHA-256 hashes of the inline `<script>` elements in `html`.
+fn inline_script_hashes(html: &str) -> Vec<String> {
+    use base64::Engine;
+    use sha2::{Digest, Sha256};
+    let mut out = Vec::new();
+    let mut rest = html;
+    while let Some(start) = rest.find("<script") {
+        let after = &rest[start..];
+        let Some(open_end) = after.find('>') else {
+            break;
+        };
+        let tag = &after[..open_end];
+        let body = &after[open_end + 1..];
+        let Some(close) = body.find("</script>") else {
+            break;
+        };
+        if !tag.contains(" src=") {
+            let digest = Sha256::digest(&body.as_bytes()[..close]);
+            out.push(base64::engine::general_purpose::STANDARD.encode(digest));
+        }
+        rest = &body[close..];
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hashes_inline_scripts_only() {
+        let html = r#"<script src="/a.js"></script><p>x</p><script>go()</script>"#;
+        // printf 'go()' | openssl dgst -sha256 -binary | base64
+        assert_eq!(
+            inline_script_hashes(html),
+            vec!["5KYv+PUboo5h+0+YAtGRPbwv5d/QxzHslP4YGnUaxRw=".to_string()]
+        );
+    }
+
+    #[test]
+    fn the_shell_script_is_allowed() {
+        if Assets::get(SPA_SHELL).is_some() {
+            assert!(content_security_policy().contains("'sha256-"));
+        }
+    }
 }

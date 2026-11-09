@@ -580,3 +580,100 @@ async fn responses_carry_security_headers() {
     assert_eq!(res.headers()["x-content-type-options"], "nosniff");
     assert_eq!(res.headers()["x-frame-options"], "DENY");
 }
+
+#[tokio::test]
+async fn wrong_codes_across_sign_ins_lock_the_account() {
+    let app = TestApp::new().await;
+    let (id, _) = app.user("rri", false).await;
+    let secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+    sqlx::query("UPDATE users SET totp_secret = ? WHERE id = ?")
+        .bind(secret)
+        .bind(&id)
+        .execute(&app.state.db)
+        .await
+        .unwrap();
+    // Two sign-ins of five wrong codes each: the tenth wrong code locks.
+    let mut last = Value::Null;
+    for _ in 0..2 {
+        let (_, body, _) = login(&app, "rri", PASSWORD).await;
+        let ticket = body["code_ticket"].clone();
+        for _ in 0..5 {
+            last = app
+                .post(
+                    "/api/auth/login/code",
+                    json!({"ticket": ticket, "code": "zzzzz-zzzzz"}),
+                    None,
+                )
+                .await
+                .1;
+        }
+    }
+    assert_eq!(last["error"], "codes_locked", "{last}");
+    // Even the right code is refused while locked.
+    let (_, body, _) = login(&app, "rri", PASSWORD).await;
+    let (status, err) = app
+        .post(
+            "/api/auth/login/code",
+            json!({"ticket": body["code_ticket"], "code": current_code(secret)}),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(err["error"], "codes_locked");
+    // The account owner is told.
+    let warned: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM recovery_events WHERE user_id = ? AND message LIKE '%wrong codes%')",
+    )
+    .bind(&id)
+    .fetch_one(&app.state.db)
+    .await
+    .unwrap();
+    assert!(warned);
+    // After the block, the right code works and the count starts over.
+    sqlx::query("UPDATE users SET code_locked_until = 0 WHERE id = ?")
+        .bind(&id)
+        .execute(&app.state.db)
+        .await
+        .unwrap();
+    let (status, err) = app
+        .post(
+            "/api/auth/login/code",
+            json!({"ticket": body["code_ticket"], "code": current_code(secret)}),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{err}");
+}
+
+#[tokio::test]
+async fn a_new_password_signs_out_other_devices() {
+    let app = TestApp::new().await;
+    let (_, here) = app.user("rri", false).await;
+    let (_, _, other) = login(&app, "rri", PASSWORD).await;
+    let other = other.unwrap();
+    let (status, _, _) = app
+        .request(
+            "PUT",
+            "/api/account/password",
+            Some(json!({"password": "a different passphrase"})),
+            Some(&here),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, st) = app.get("/api/auth/status", Some(&other)).await;
+    assert_eq!(st["me"], Value::Null);
+    let (_, st) = app.get("/api/auth/status", Some(&here)).await;
+    assert_eq!(st["me"]["username"], "rri");
+}
+
+#[tokio::test]
+async fn responses_carry_a_content_security_policy() {
+    let app = TestApp::new().await;
+    let req = Request::get("/api/health").body(Body::empty()).unwrap();
+    let res = router(app.state.clone()).oneshot(req).await.unwrap();
+    let csp = res.headers()["content-security-policy"].to_str().unwrap();
+    assert!(csp.contains("default-src 'self'"));
+    assert!(csp.contains("frame-ancestors 'none'"));
+    // The test instance's public_url is http://localhost: no HSTS.
+    assert!(res.headers().get("strict-transport-security").is_none());
+}

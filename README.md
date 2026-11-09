@@ -28,7 +28,7 @@ it; passwords and session cookies must only travel over HTTPS.
 1. Create a user and data directory, and copy the config:
 
        useradd --system --home /var/lib/mau mau
-       install -d -o mau -g mau /var/lib/mau
+       install -d -m 700 -o mau -g mau /var/lib/mau
        install -D -m 644 mau.example.toml /etc/mau/mau.toml
 
    Set `public_url` in `/etc/mau/mau.toml` to the address people will use.
@@ -72,6 +72,12 @@ nginx:
 If the proxy isn't on the same machine, add its address to `trusted_proxies`
 so rate limits see real client addresses.
 
+mau sends `Strict-Transport-Security` itself when `public_url` is https, so
+the proxy doesn't need to. On start it makes the data directory private
+(mode 700) because it holds password hashes, two-factor secrets, API keys,
+and backups. See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for what mau
+defends against and what it leaves to the host.
+
 ### Service files
 
 OpenRC (`/etc/init.d/mau`):
@@ -81,6 +87,7 @@ OpenRC (`/etc/init.d/mau`):
     command=/usr/local/bin/mau
     command_args="serve"
     command_user="mau:mau"
+    umask=077
     command_background=true
     pidfile="/run/mau.pid"
     output_log="/var/log/mau.log"
@@ -97,6 +104,12 @@ systemd (`/etc/systemd/system/mau.service`):
     User=mau
     ExecStart=/usr/local/bin/mau serve
     Restart=on-failure
+    UMask=0077
+    NoNewPrivileges=yes
+    ProtectSystem=strict
+    ProtectHome=yes
+    PrivateTmp=yes
+    ReadWritePaths=/var/lib/mau
 
     [Install]
     WantedBy=multi-user.target

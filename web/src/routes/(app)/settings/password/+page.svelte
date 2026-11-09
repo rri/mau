@@ -19,7 +19,7 @@
 		error = '';
 		try {
 			await withReauth(() => put('/account/password', { password }));
-			toasts.show('Password changed');
+			toasts.show('Password changed. Other devices were signed out.');
 			password = '';
 			round++;
 		} catch (err) {
@@ -34,8 +34,8 @@
 
 <div class="sec">
 	<p class="help">
-		You'll confirm with your current password first. Devices that are signed in stay signed in; sign
-		them out under Sessions if you need to.
+		You'll confirm with your current password first. Changing it signs out every other device; this
+		one stays signed in.
 	</p>
 	<form onsubmit={submit} style="display:grid;gap:14px">
 		<input type="text" name="username" autocomplete="username" value={auth.me?.username} hidden />

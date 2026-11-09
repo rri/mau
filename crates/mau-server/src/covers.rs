@@ -25,6 +25,11 @@ use crate::error::{ApiError, ApiResult};
 
 pub const MAX_BYTES: usize = 10 * 1024 * 1024;
 const SIZES: [(&str, u32); 3] = [("s", 120), ("m", 300), ("l", 600)];
+/// A small file can still claim huge dimensions ("decompression bomb"), so
+/// decoding is capped in size and memory, and only two images decode at once.
+const MAX_SIDE: u32 = 10_000;
+const MAX_DECODE_BYTES: u64 = 256 * 1024 * 1024;
+static DECODING: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
 
 pub fn dir(data_dir: &Path) -> PathBuf {
     data_dir.join("covers")
@@ -33,6 +38,7 @@ pub fn dir(data_dir: &Path) -> PathBuf {
 /// Decodes, resizes, and stores an image. Returns its hash.
 pub async fn store(data_dir: &Path, bytes: Vec<u8>) -> ApiResult<String> {
     let dir = dir(data_dir);
+    let _permit = DECODING.acquire().await.map_err(ApiError::internal)?;
     tokio::task::spawn_blocking(move || store_blocking(&dir, &bytes))
         .await
         .map_err(ApiError::internal)?
@@ -46,16 +52,20 @@ fn store_blocking(dir: &Path, bytes: &[u8]) -> ApiResult<String> {
     if dir.join(format!("{hash}-s.jpg")).exists() {
         return Ok(hash);
     }
-    let img = ImageReader::new(Cursor::new(bytes))
+    let mut reader = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()
-        .map_err(ApiError::internal)?
-        .decode()
-        .map_err(|_| {
-            ApiError::bad_request(
-                "bad_image",
-                "That file isn't an image mau can read (JPEG, PNG, WebP, or GIF).",
-            )
-        })?;
+        .map_err(ApiError::internal)?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_SIDE);
+    limits.max_image_height = Some(MAX_SIDE);
+    limits.max_alloc = Some(MAX_DECODE_BYTES);
+    reader.limits(limits);
+    let img = reader.decode().map_err(|_| {
+        ApiError::bad_request(
+            "bad_image",
+            "That file isn't an image mau can read (JPEG, PNG, WebP, or GIF).",
+        )
+    })?;
     if img.width() < 8 || img.height() < 8 {
         return Err(ApiError::bad_request(
             "bad_image",
@@ -115,9 +125,17 @@ pub async fn fetch_bytes(http: &reqwest::Client, url: &str) -> Option<Vec<u8>> {
     if res.content_length().is_some_and(|n| n as usize > MAX_BYTES) {
         return None;
     }
-    let bytes = res.bytes().await.ok()?;
+    // Read in chunks so a response without a length can't grow past the cap.
+    let mut res = res;
+    let mut bytes = Vec::new();
+    while let Some(chunk) = res.chunk().await.ok()? {
+        if bytes.len() + chunk.len() > MAX_BYTES {
+            return None;
+        }
+        bytes.extend_from_slice(&chunk);
+    }
     // Open Library answers missing covers with a 1×1 placeholder.
-    (bytes.len() > 1000 && bytes.len() <= MAX_BYTES).then(|| bytes.to_vec())
+    (bytes.len() > 1000).then_some(bytes)
 }
 
 pub async fn fetch_and_store(state: &AppState, url: &str) -> Option<String> {
@@ -218,6 +236,18 @@ mod tests {
             assert_eq!(saved.width(), width);
         }
         assert_eq!(store_blocking(dir.path(), &png).unwrap(), hash);
+    }
+
+    #[test]
+    fn refuses_huge_dimensions() {
+        // Wider than any cover could need.
+        let img = image::GrayImage::new(MAX_SIDE + 1, 8);
+        let mut png = Vec::new();
+        img.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)
+            .unwrap();
+        assert!(png.len() < MAX_BYTES);
+        let dir = tempfile::tempdir().unwrap();
+        assert!(store_blocking(dir.path(), &png).is_err());
     }
 
     #[test]

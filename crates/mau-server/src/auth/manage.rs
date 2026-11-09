@@ -166,11 +166,19 @@ pub async fn change_password(
     s.require_recent_confirmation()?;
     password::validate(&req.password, &s.user.username)?;
     let hash = password::hash(&req.password).await;
+    // A new password signs out every other device, in case the old one leaked.
+    let mut tx = state.db.begin().await?;
     sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?")
         .bind(hash)
         .bind(&s.user.id)
-        .execute(&state.db)
+        .execute(&mut *tx)
         .await?;
+    sqlx::query("DELETE FROM sessions WHERE user_id = ? AND id != ?")
+        .bind(&s.user.id)
+        .bind(&s.id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
     Ok(ok())
 }
 

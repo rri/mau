@@ -265,7 +265,8 @@ A list of sections, each its own page, then **Sign out**.
   progress bars for currently active. Finish month and year; ratings if the
   user chose; pages only on active books. Footer links to the instance.
 - Each published item also has its own link.
-- Nothing published: the profile shows "Nothing shared yet".
+- Nothing published: the profile shows the same "not found" page as an
+  unknown name, so names and bios can't be looked up.
 - Search engines may index profiles and shared pages.
 
 ## 10. Visual design

@@ -108,7 +108,9 @@ pub struct Jobs {
 }
 
 impl Jobs {
-    fn insert(&self, job: Job) -> String {
+    /// Adds a job, unless the same user already has one matching or saving
+    /// (one import at a time keeps provider traffic and memory bounded).
+    fn insert(&self, job: Job) -> Option<String> {
         let id = new_id();
         let mut map = self.inner.lock().unwrap();
         let cutoff = now_ms() - 6 * HOUR_MS;
@@ -116,8 +118,15 @@ impl Jobs {
             let j = j.lock().unwrap();
             j.created_at > cutoff || j.saving_now()
         });
+        let busy = map.values().any(|j| {
+            let j = j.lock().unwrap();
+            j.user_id == job.user_id && (!j.matched() || j.saving_now())
+        });
+        if busy {
+            return None;
+        }
         map.insert(id.clone(), Arc::new(Mutex::new(job)));
-        id
+        Some(id)
     }
 
     fn get(&self, id: &str, user_id: &str) -> Option<Arc<Mutex<Job>>> {
@@ -258,16 +267,24 @@ pub async fn start(
         ));
     }
     let total = rows.len();
-    let job = state.imports.insert(Job {
-        user_id: s.user.id.clone(),
-        results: vec![None; total],
-        rows,
-        mau,
-        strip_notes: req.source == "dinky",
-        google_key: s.user.google_books_key.clone(),
-        saving: None,
-        created_at: now_ms(),
-    });
+    let job = state
+        .imports
+        .insert(Job {
+            user_id: s.user.id.clone(),
+            results: vec![None; total],
+            rows,
+            mau,
+            strip_notes: req.source == "dinky",
+            google_key: s.user.google_books_key.clone(),
+            saving: None,
+            created_at: now_ms(),
+        })
+        .ok_or_else(|| {
+            ApiError::conflict(
+                "import_running",
+                "Finish or cancel your current import first.",
+            )
+        })?;
     let handle = state.imports.get(&job, &s.user.id).expect("just inserted");
     tokio::spawn(match_all(state.clone(), s.user.id.clone(), handle));
     Ok(Json(ImportStarted { job, total }))
@@ -1239,6 +1256,33 @@ mod tests {
     use super::*;
     use crate::app_tests::TestApp;
     use serde_json::{Value, json};
+
+    fn job(user: &str) -> Job {
+        Job {
+            user_id: user.into(),
+            rows: vec![],
+            mau: None,
+            strip_notes: false,
+            google_key: None,
+            results: vec![None],
+            saving: None,
+            created_at: now_ms(),
+        }
+    }
+
+    #[test]
+    fn one_import_at_a_time_per_user() {
+        let jobs = Jobs::default();
+        let first = jobs.insert(job("u1")).unwrap();
+        // Still matching: a second import for the same user waits.
+        assert!(jobs.insert(job("u1")).is_none());
+        // Other users aren't affected.
+        assert!(jobs.insert(job("u2")).is_some());
+        // Matched and in review: a new import may start.
+        jobs.get(&first, "u1").unwrap().lock().unwrap().results =
+            vec![Some(Matched::of(MatchKind::Unmatched))];
+        assert!(jobs.insert(job("u1")).is_some());
+    }
 
     /// Starts an import and waits for matching; returns the job and its rows.
     async fn start_import(

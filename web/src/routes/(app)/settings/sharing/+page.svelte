@@ -80,7 +80,8 @@
 		your profile at
 		<a class="link" href="/u/{auth.me?.username}" target="_blank" rel="noopener"
 			>{profileUrl.replace(/^https?:\/\//, '')}</a
-		>, each has its own link, and search engines may index them. Notes are never shared.
+		>, each has its own link, and search engines may index them. Notes are never shared. Until you
+		publish something, your profile doesn't exist publicly.
 	</p>
 	<div class="cards">
 		{#each shares as s (s.id)}
