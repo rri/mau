@@ -645,8 +645,11 @@ Mine:
   inside Android's 80% safe circle. The iOS icon uses 86%, because iOS rounds
   the corners itself and transparent corners would show black.
 - `favicon.ico` holds 16, 32, and 48px renders.
-- A 1px ring in the line colour and a soft shadow give the badge an edge on
-  dark backgrounds; the corner radius (22.5%) matches the artwork's.
+- A 1px ring in the line colour gives the badge an edge on dark backgrounds;
+  the corner radius (22.5%) matches the artwork's. The ring is drawn inside
+  the image and there's no blurred shadow, so the logo's visible edges are
+  its box: 12px from the main panel, like the tab buttons (an outside ring
+  and shadow had made that gap look narrower).
 - On sign-in, the tagline ("Your library and reading log") is now the page's
   h1. Setup lost its duplicate h1.
 

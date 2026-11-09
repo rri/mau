@@ -98,12 +98,13 @@ h3 {
 	letter-spacing: -0.02em;
 }
 /* The logo badge: a hairline ring so its dark navy keeps an edge on dark
-   backgrounds (the corner radius matches the artwork's, 115 / 512). */
+   backgrounds. It's drawn inside the image (and there's no blurred shadow)
+   so the logo's edges are exactly its box, lining up with the tab buttons.
+   The corner radius matches the artwork's, 115 / 512. */
 img[src='/logo.svg'] {
 	border-radius: 22.5%;
-	box-shadow:
-		0 0 0 1px var(--line),
-		0 2px 8px rgb(0 0 0 / 0.12);
+	outline: 1px solid var(--line);
+	outline-offset: -1px;
 }
 ::selection {
 	background: var(--accent-soft);
