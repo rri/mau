@@ -478,3 +478,32 @@ Newest entries at the bottom of each section.
   `covers.openlibrary.org/b/isbn/{isbn}-L.jpg?default=false`, then Google's
   thumbnail. This applies wherever a Google result is added (import or Add).
 
+
+## Reading view: search and grid
+
+Asked and chosen by the user (2026-11-09):
+
+- Grid tiles have quick actions: + and pause on active tiles, play on
+  inactive ones; tapping opens the book page. Reordering stays in the list.
+- No dragging while a search is typed (handles hide).
+- The search box is always visible, as in the Catalog.
+- The list/grid choice is remembered separately from the Catalog's.
+- First play of a never-started book in the grid asks for the total pages in
+  a small dialog.
+- Tiles show the title and "p. X of Y"; today's pages and "last read" stay in
+  the list.
+
+Implementation details (mine):
+
+- The search matches the same way as the Catalog's (case-insensitive
+  substring of the title or any author), via a shared `matchesSearch`. It
+  starts empty each visit, like Catalog filters.
+- The preference key is `mau.reading.layout`; the default is list.
+- The search box and toggle are hidden while the Reading list is empty
+  (the welcome screen stays as it was). No matches shows "No books you're
+  reading match “…”".
+- The list/grid buttons became a shared `LayoutToggle` component, used in
+  both headers. The grid uses slightly wider tiles than the Catalog's (104px
+  minimum, not 96px) so pause and + fit on the cover.
+- The Reading header lost its bottom border; the search area carries it, as
+  in the Catalog.

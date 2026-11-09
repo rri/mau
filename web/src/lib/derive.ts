@@ -132,3 +132,12 @@ export function readingList(d: Data): BookInfo[] {
 		...books.filter((b) => b.state === 'inactive').sort(byRank)
 	];
 }
+
+/** Whether `needle` (already lowercased and trimmed) is in the title or an author. */
+export function matchesSearch(b: BookInfo, needle: string): boolean {
+	return (
+		!needle ||
+		b.title.toLocaleLowerCase().includes(needle) ||
+		b.authors.some((a) => a.toLocaleLowerCase().includes(needle))
+	);
+}

@@ -131,6 +131,17 @@ recovery codes, and deleting the account: the password, plus an authenticator
 - Rows show cover thumbnail, title, author, thin progress bar, "page X of Y",
   and "+N pages today" or "last read …". Active rows have a teal edge, a pause
   button, and a solid round **+**. Inactive rows are dimmed and have a play button.
+- **Search** (always visible under the header): title or author, among the
+  unfinished books only, with "N of M books" and **Clear search** while typed.
+  It starts empty on each visit. Drag handles hide while searching; +, pause,
+  play and page edits still work on the results.
+- **List or grid**, switchable in the header and remembered on this device
+  separately from the Catalog's. Grid tiles keep the same order and show the
+  cover, a progress bar and "p. X of Y" if started, and the title (two lines
+  at most). Active tiles have pause and a round **+** on the cover; inactive
+  tiles are dimmed and have play. Tapping the cover or title opens the book
+  page. Page edits and reordering are list only. Play on a never-started tile
+  asks for the total pages in a small dialog (with the catalog hint).
 
 ## 5. Catalog view
 

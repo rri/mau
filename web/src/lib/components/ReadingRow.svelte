@@ -13,6 +13,7 @@
 		editing = false,
 		setup = false,
 		dragging = false,
+		draggable = true,
 		dy = 0,
 		onedit,
 		onsetup,
@@ -25,6 +26,8 @@
 		editing?: boolean;
 		setup?: boolean;
 		dragging?: boolean;
+		/** False while searching: the handle is hidden and its column kept. */
+		draggable?: boolean;
 		dy?: number;
 		onedit: () => void;
 		onsetup: () => void;
@@ -96,27 +99,31 @@
 	class:dragging
 	style={dragging ? `transform: translateY(${dy}px)` : undefined}
 >
-	<button
-		class="handle"
-		type="button"
-		aria-label="Drag to reorder {info.title}"
-		title="Drag to reorder"
-		onpointerdown={ongrab}
-	>
-		<svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true"
-			><g fill="currentColor"
-				><circle cx="3" cy="3" r="1.3" /><circle cx="7" cy="3" r="1.3" /><circle
-					cx="3"
-					cy="8"
-					r="1.3"
-				/><circle cx="7" cy="8" r="1.3" /><circle cx="3" cy="13" r="1.3" /><circle
-					cx="7"
-					cy="13"
-					r="1.3"
-				/></g
-			></svg
+	{#if draggable}
+		<button
+			class="handle"
+			type="button"
+			aria-label="Drag to reorder {info.title}"
+			title="Drag to reorder"
+			onpointerdown={ongrab}
 		>
-	</button>
+			<svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true"
+				><g fill="currentColor"
+					><circle cx="3" cy="3" r="1.3" /><circle cx="7" cy="3" r="1.3" /><circle
+						cx="3"
+						cy="8"
+						r="1.3"
+					/><circle cx="7" cy="8" r="1.3" /><circle cx="3" cy="13" r="1.3" /><circle
+						cx="7"
+						cy="13"
+						r="1.3"
+					/></g
+				></svg
+			>
+		</button>
+	{:else}
+		<span></span>
+	{/if}
 	<a class="cover" href="/catalog/{info.book.id}" tabindex="-1" aria-hidden="true"
 		><Cover title={info.title} author={info.authors[0] ?? ''} cover={info.cover} /></a
 	>

@@ -1,11 +1,12 @@
 <script lang="ts">
 	// The catalog: every book on the user's list, in a list or grid.
 	import { library } from '#lib/library.svelte.ts';
-	import { liveBooks, type BookInfo, type BookState } from '#lib/derive.ts';
+	import { liveBooks, matchesSearch, type BookInfo, type BookState } from '#lib/derive.ts';
 	import { getPref, setPref } from '#lib/prefs.ts';
 	import { authorKey, titleKey } from '#lib/sorting.ts';
 	import Cover from '#lib/components/Cover.svelte';
 	import StateText from '#lib/components/StateText.svelte';
+	import LayoutToggle from '#lib/components/LayoutToggle.svelte';
 
 	const LAYOUTS = ['list', 'grid'] as const;
 	const SORTS = ['added', 'title', 'author', 'finished'] as const;
@@ -42,9 +43,7 @@
 				states.includes(b.state) &&
 				(!ownedOnly || b.owned) &&
 				tags.every((t) => b.tags.includes(t)) &&
-				(!needle ||
-					b.title.toLocaleLowerCase().includes(needle) ||
-					b.authors.some((a) => a.toLocaleLowerCase().includes(needle)))
+				matchesSearch(b, needle)
 		);
 		const byAdded = (a: BookInfo, b: BookInfo) => b.book.added_at - a.book.added_at;
 		const cmp: Record<(typeof SORTS)[number], (a: BookInfo, b: BookInfo) => number> = {
@@ -76,48 +75,7 @@
 <header class="head">
 	<h1>Catalog</h1>
 	<div class="head-actions">
-		<button
-			class="icon"
-			type="button"
-			aria-label="List layout"
-			aria-pressed={layout === 'list'}
-			onclick={() => (layout = 'list')}
-			><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"
-				><g fill="currentColor"
-					><rect x="1" y="2" width="14" height="2" rx="1" /><rect
-						x="1"
-						y="7"
-						width="14"
-						height="2"
-						rx="1"
-					/><rect x="1" y="12" width="14" height="2" rx="1" /></g
-				></svg
-			></button
-		>
-		<button
-			class="icon"
-			type="button"
-			aria-label="Grid layout"
-			aria-pressed={layout === 'grid'}
-			onclick={() => (layout = 'grid')}
-			><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"
-				><g fill="currentColor"
-					><rect x="1" y="1" width="6" height="6" rx="1.5" /><rect
-						x="9"
-						y="1"
-						width="6"
-						height="6"
-						rx="1.5"
-					/><rect x="1" y="9" width="6" height="6" rx="1.5" /><rect
-						x="9"
-						y="9"
-						width="6"
-						height="6"
-						rx="1.5"
-					/></g
-				></svg
-			></button
-		>
+		<LayoutToggle bind:layout />
 		<a class="icon add" href="/add" aria-label="Add a book" title="Add a book">+</a>
 	</div>
 </header>
@@ -274,11 +232,6 @@
 		cursor: pointer;
 		color: var(--ink);
 		text-decoration: none;
-	}
-	.icon[aria-pressed='true'] {
-		background: var(--accent-soft);
-		color: var(--accent);
-		border-color: transparent;
 	}
 	.icon.add {
 		background: var(--accent);
