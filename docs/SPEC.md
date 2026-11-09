@@ -137,9 +137,9 @@ recovery codes, and deleting the account: the password, plus an authenticator
   play and page edits still work on the results.
 - **List or grid**, switchable in the header and remembered on this device
   separately from the Catalog's. Grid tiles keep the same order and show the
-  cover, a progress bar and "p. X of Y" if started, and the title (two lines
-  at most). Active tiles have pause and a round **+** on the cover; inactive
-  tiles are dimmed and have play. Tapping the cover or title opens the book
+  clean cover, a progress bar, a row with "p. X/Y" (or "Not started") and
+  pause and a round **+** (inactive tiles: play, dimmed), then the title (two
+  lines at most). Nothing sits on the cover. Tapping the cover or title opens the book
   page. Page edits and reordering are list only. Play on a never-started tile
   asks for the total pages in a small dialog (with the catalog hint).
 
@@ -160,8 +160,9 @@ recovery codes, and deleting the account: the password, plus an authenticator
 - List rows: cover, title, author, state ("Inactive" with pages if any
   progress; "Finished · date" with only the latest date), up to two tags, and a
   shelf icon if owned.
-- Grid tiles: cover with badges (active, finished, owned), progress bar if
-  started and unfinished, title below.
+- Grid tiles: cover with badges (active or finished top-left, owned
+  top-right), progress bar if started and unfinished (its space is always
+  kept so titles line up), title below.
 - **+** in the header opens Add a book.
 
 ## 6. Book detail page

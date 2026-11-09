@@ -28,15 +28,15 @@
 	.card :global(h1) {
 		margin: 0;
 		font-size: 24px;
-		font-weight: 600;
+		font-weight: 700;
 		text-wrap: balance;
 	}
 	.card :global(.brand) {
 		margin: 0;
 		font-size: 40px;
-		font-weight: 600;
+		font-weight: 700;
 		line-height: 1;
-		letter-spacing: -0.01em;
+		letter-spacing: -0.03em;
 	}
 	.card :global(.tagline) {
 		margin: -8px 0 0;

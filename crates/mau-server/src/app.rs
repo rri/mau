@@ -229,6 +229,9 @@ pub fn router(state: AppState) -> Router {
             state.clone(),
             crate::client_ip::layer,
         ))
+        // Text responses are compressed (gzip or brotli, as the browser
+        // asks); images and tiny bodies aren't (tower-http's default rule).
+        .layer(tower_http::compression::CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
@@ -258,7 +261,7 @@ async fn check_origin(
 async fn security_headers(State(state): State<AppState>, req: Request, next: Next) -> Response {
     let mut res = next.run(req).await;
     let h = res.headers_mut();
-    if let Ok(v) = header::HeaderValue::from_str(web::content_security_policy()) {
+    if let Ok(v) = header::HeaderValue::from_str(&web::content_security_policy()) {
         h.insert(header::CONTENT_SECURITY_POLICY, v);
     }
     if state.config.public_url.starts_with("https://") {

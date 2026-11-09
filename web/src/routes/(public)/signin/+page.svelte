@@ -57,7 +57,7 @@
 	}
 </script>
 
-<p class="brand">mau</p>
+<h1 class="brand">mau</h1>
 <p class="tagline">Your library and reading log</p>
 
 {#if auth.status?.setup_required}

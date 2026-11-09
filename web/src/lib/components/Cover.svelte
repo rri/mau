@@ -39,7 +39,19 @@
 	const fg = $derived(`hsl(${(h + 40) % 360} 70% 86%)`);
 	const mid = $derived(`hsl(${(h + 180) % 360} 55% 58%)`);
 	const lines = $derived(wrap(title.toUpperCase(), 11));
-	const titleY = $derived(style === 3 ? 238 : style === 2 ? 50 : 232);
+	const authorY = $derived(style === 3 ? 262 : 280);
+	// Lines are 20 units apart, centered on the style's title position, but
+	// the last line always stays 22 units above the author.
+	const firstY = $derived(
+		Math.min(
+			(style === 3 ? 238 : style === 2 ? 50 : 232) - (lines.length - 1) * 10,
+			authorY - 22 - (lines.length - 1) * 20
+		)
+	);
+	const sunY = $derived(firstY + (lines.length - 1) * 20 + 30);
+	// The diamond (style 3) ends above the title's first line.
+	const gemBottom = $derived(Math.min(210, firstY - 26));
+	const gemMid = $derived((90 + gemBottom) / 2);
 </script>
 
 {#if (src || cover) && !failed}
@@ -66,21 +78,21 @@
 				<rect x="0" y={98 + i * 18} width="200" height="9" fill={mid} opacity={0.9 - i * 0.13} />
 			{/each}
 		{:else if style === 2}
-			<path
+			<!-- The sun sits below the title, behind the mountains. -->
+			<circle cx="150" cy={sunY} r="16" fill={fg} /><path
 				d="M0 210 L60 120 L95 165 L140 95 L200 190 L200 300 L0 300Z"
 				fill={mid}
-				opacity=".8"
-			/><circle cx="150" cy="70" r="16" fill={fg} />
+			/>
 		{:else}
 			<rect x="22" y="22" width="156" height="256" fill="none" stroke={fg} stroke-width="2" /><path
-				d="M100 90 L140 150 L100 210 L60 150Z"
+				d="M100 90 L140 {gemMid} L100 {gemBottom} L60 {gemMid}Z"
 				fill={mid}
 			/>
 		{/if}
 		{#each lines as l, i (i)}
 			<text
 				x="100"
-				y={titleY + i * 20 - (lines.length - 1) * 10}
+				y={firstY + i * 20}
 				text-anchor="middle"
 				font-family="Geist Variable, system-ui, sans-serif"
 				font-weight="700"
@@ -91,7 +103,7 @@
 		{/each}
 		<text
 			x="100"
-			y={style === 3 ? 262 : 280}
+			y={authorY}
 			text-anchor="middle"
 			font-family="Geist Variable, system-ui, sans-serif"
 			font-size="10"

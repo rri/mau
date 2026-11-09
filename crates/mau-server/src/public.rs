@@ -240,6 +240,9 @@ fn page(title: &str, description: &str, body: Markup, public_url: &str) -> Marku
                 meta name="viewport" content="width=device-width, initial-scale=1";
                 title { (title) }
                 meta name="description" content=(description);
+                meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)";
+                meta name="theme-color" content="#131a17" media="(prefers-color-scheme: dark)";
+                link rel="icon" href="/icon.svg" type="image/svg+xml";
                 @if let Some(f) = &font {
                     link rel="preload" href=(f) as="font" type="font/woff2" crossorigin;
                     style { (PreEscaped(format!("@font-face{{font-family:'Geist';font-style:normal;font-weight:100 900;font-display:swap;src:url({f}) format('woff2')}}"))) }

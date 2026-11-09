@@ -7,6 +7,7 @@
 	import Cover from '#lib/components/Cover.svelte';
 	import StateText from '#lib/components/StateText.svelte';
 	import LayoutToggle from '#lib/components/LayoutToggle.svelte';
+	import Icon from '#lib/components/Icon.svelte';
 
 	const LAYOUTS = ['list', 'grid'] as const;
 	const SORTS = ['added', 'title', 'author', 'finished'] as const;
@@ -76,7 +77,9 @@
 	<h1>Catalog</h1>
 	<div class="head-actions">
 		<LayoutToggle bind:layout />
-		<a class="icon add" href="/add" aria-label="Add a book" title="Add a book">+</a>
+		<a class="icon add" href="/add" aria-label="Add a book" title="Add a book"
+			><Icon name="plus" size={18} /></a
+		>
 	</div>
 </header>
 
@@ -185,20 +188,35 @@
 	<ul class="grid">
 		{#each shown as b (b.book.id)}
 			<li>
-				<a class="tile" href="/catalog/{b.book.id}" aria-label="{b.title}, {b.authors.join(', ')}">
+				<a class="tile" href="/catalog/{b.book.id}">
 					<span class="art">
 						<Cover title={b.title} author={b.authors[0] ?? ''} cover={b.cover} size="m" />
-						{#if b.state === 'finished'}<span class="badge tl" title="Finished">✓</span>{/if}
-						{#if b.state === 'active'}<span class="badge tl dot" title="Active">●</span>{/if}
-						{#if b.owned}<span class="badge br" title="Owned">⌂</span>{/if}
+						{#if b.state === 'finished'}<span class="badge tl" title="Finished"
+								><Icon name="check" size={12} /></span
+							>{/if}
+						{#if b.state === 'active'}<span class="badge tl" title="Active"
+								><span class="dot"></span></span
+							>{/if}
+						{#if b.owned}<span class="badge tr" title="Owned"><Icon name="shelf" size={12} /></span
+							>{/if}
 					</span>
-					{#if b.reading && b.state !== 'finished' && b.reading.pos > 0}
-						<span class="mini" class:idle={b.state === 'inactive'}
-							><span style="width:{Math.round((100 * b.reading.pos) / b.reading.total)}%"
-							></span></span
-						>
-					{/if}
+					<!-- Always there, so titles line up across a row. -->
+					<span
+						class="mini"
+						class:idle={b.state === 'inactive'}
+						class:none={!(b.reading && b.state !== 'finished' && b.reading.pos > 0)}
+						>{#if b.reading && b.state !== 'finished' && b.reading.pos > 0}<span
+								style="width:{Math.round((100 * b.reading.pos) / b.reading.total)}%"
+							></span>{/if}</span
+					>
 					<span class="t">{b.title}</span>
+					<span class="sr-only"
+						>, {b.authors.join(', ')}{b.state === 'inactive'
+							? ''
+							: b.state === 'active'
+								? ', active'
+								: ', finished'}{b.owned ? ', owned' : ''}</span
+					>
 				</a>
 			</li>
 		{/each}
@@ -415,26 +433,32 @@
 		color: var(--ink);
 		display: grid;
 		place-items: center;
-		font-size: 12px;
 		box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
 	}
 	.badge.tl {
-		left: 5px;
-		top: 5px;
+		left: 6px;
+		top: 6px;
 		color: var(--accent);
 	}
-	.badge.dot {
-		font-size: 10px;
+	.badge.tr {
+		right: 6px;
+		top: 6px;
+		color: var(--muted);
 	}
-	.badge.br {
-		right: 5px;
-		bottom: 5px;
+	.dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--accent);
 	}
 	.mini {
 		height: 3px;
-		border-radius: 2px;
+		border-radius: 99px;
 		background: var(--line);
 		overflow: hidden;
+	}
+	.mini.none {
+		background: none;
 	}
 	.mini span {
 		display: block;

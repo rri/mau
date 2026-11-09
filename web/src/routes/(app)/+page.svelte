@@ -251,10 +251,10 @@
 	.grid {
 		list-style: none;
 		margin: 0;
-		padding: 16px 20px 24px;
+		padding: 18px 14px 24px;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
-		gap: 22px 16px;
+		grid-template-columns: repeat(auto-fill, minmax(122px, 1fr));
+		gap: 22px 12px;
 	}
 	h1 {
 		margin: 0;

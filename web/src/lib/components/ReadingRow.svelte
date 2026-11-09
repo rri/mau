@@ -6,6 +6,7 @@
 	import { auth } from '../auth.svelte.ts';
 	import { pause, plusOne, resume, setPages } from '../actions.ts';
 	import Cover from './Cover.svelte';
+	import Icon from './Icon.svelte';
 
 	let {
 		info,
@@ -193,23 +194,13 @@
 					type="button"
 					onclick={() => pause(info)}
 					aria-label="Pause {info.title}"
-					title="Pause"
-					><svg width="11" height="11" viewBox="0 0 14 14" aria-hidden="true"
-						><rect x="3" y="2" width="3" height="10" rx="1" fill="currentColor" /><rect
-							x="8"
-							y="2"
-							width="3"
-							height="10"
-							rx="1"
-							fill="currentColor"
-						/></svg
-					></button
+					title="Pause"><Icon name="pause" size={14} /></button
 				>
 				<button
 					class="plus"
 					type="button"
 					onclick={() => plusOne(info)}
-					aria-label="Add 1 page to {info.title}">+</button
+					aria-label="Add 1 page to {info.title}"><Icon name="plus" size={20} /></button
 				>
 			{:else}
 				<button
@@ -217,13 +208,7 @@
 					type="button"
 					onclick={() => (r ? resume(info) : onsetup())}
 					aria-label="{r ? 'Resume' : 'Start'} {info.title}"
-					title={r ? 'Resume' : 'Start'}
-					><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"
-						><path
-							d="M4.5 2.5v11a.6.6 0 0 0 .9.5l9-5.5a.6.6 0 0 0 0-1l-9-5.5a.6.6 0 0 0-.9.5z"
-							fill="currentColor"
-						/></svg
-					></button
+					title={r ? 'Resume' : 'Start'}><Icon name="play" size={18} /></button
 				>
 			{/if}
 		</div>
@@ -262,8 +247,8 @@
 <style>
 	.row {
 		display: grid;
-		grid-template-columns: 16px 36px minmax(0, 1fr) auto;
-		gap: 12px;
+		grid-template-columns: 14px 36px minmax(0, 1fr) auto;
+		gap: 10px;
 		align-items: center;
 		min-height: 64px;
 		padding: 11px 12px 11px 6px;
@@ -375,8 +360,9 @@
 		color: var(--ink);
 		font-weight: 500;
 		cursor: text;
-		text-decoration: underline dotted var(--muted);
-		text-underline-offset: 3px;
+		text-decoration: underline dashed color-mix(in srgb, currentColor 35%, transparent);
+		text-decoration-thickness: 1px;
+		text-underline-offset: 4px;
 	}
 	.pos:hover {
 		background: var(--accent-soft);
@@ -405,6 +391,11 @@
 		align-items: center;
 	}
 	.plus,
+	.play,
+	.pause {
+		padding: 0;
+	}
+	.plus,
 	.play {
 		width: 42px;
 		height: 42px;
@@ -417,8 +408,6 @@
 		border: 0;
 		background: var(--accent);
 		color: var(--on-accent);
-		font-size: 24px;
-		line-height: 1;
 		box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 35%, transparent);
 	}
 	.play {

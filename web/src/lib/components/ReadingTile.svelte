@@ -1,8 +1,10 @@
 <script lang="ts">
-	// One book in the Reading view's grid: cover with play, or pause and +.
+	// One book in the Reading view's grid: a clean cover, then the progress,
+	// a row with the pages and pause / + (or play), then the title.
 	import type { BookInfo } from '../derive.ts';
 	import { pause, plusOne, resume } from '../actions.ts';
 	import Cover from './Cover.svelte';
+	import Icon from './Icon.svelte';
 
 	let { info, onsetup }: { info: BookInfo; onsetup: () => void } = $props();
 
@@ -11,125 +13,130 @@
 </script>
 
 <li class="tile" class:idle={info.state !== 'active'}>
-	<div class="art">
-		<a href="/catalog/{info.book.id}" aria-label="{info.title}, {info.authors.join(', ')}"
-			><Cover title={info.title} author={info.authors[0] ?? ''} cover={info.cover} size="m" /></a
-		>
-		<div class="actions">
-			{#if info.state === 'active'}
-				<button
-					class="pause"
-					type="button"
-					onclick={() => pause(info)}
-					aria-label="Pause {info.title}"
-					title="Pause"
-					><svg width="10" height="10" viewBox="0 0 14 14" aria-hidden="true"
-						><rect x="3" y="2" width="3" height="10" rx="1" fill="currentColor" /><rect
-							x="8"
-							y="2"
-							width="3"
-							height="10"
-							rx="1"
-							fill="currentColor"
-						/></svg
-					></button
-				>
-				<button
-					class="plus"
-					type="button"
-					onclick={() => plusOne(info)}
-					aria-label="Add 1 page to {info.title}">+</button
-				>
-			{:else}
-				<button
-					class="play"
-					type="button"
-					onclick={() => (r ? resume(info) : onsetup())}
-					aria-label="{r ? 'Resume' : 'Start'} {info.title}"
-					title={r ? 'Resume' : 'Start'}
-					><svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"
-						><path
-							d="M4.5 2.5v11a.6.6 0 0 0 .9.5l9-5.5a.6.6 0 0 0 0-1l-9-5.5a.6.6 0 0 0-.9.5z"
-							fill="currentColor"
-						/></svg
-					></button
-				>
-			{/if}
-		</div>
+	<a class="art" href="/catalog/{info.book.id}" tabindex="-1" aria-hidden="true"
+		><Cover title={info.title} author={info.authors[0] ?? ''} cover={info.cover} size="m" /></a
+	>
+	<span class="mini" class:empty={!r}><span style="width:{pct}%"></span></span>
+	<div class="controls">
+		<span class="pages">{r ? `p. ${r.pos}/${r.total}` : 'Not started'}</span>
+		{#if info.state === 'active'}
+			<button
+				class="pause"
+				type="button"
+				onclick={() => pause(info)}
+				aria-label="Pause {info.title}"
+				title="Pause"><Icon name="pause" size={11} /></button
+			>
+			<button
+				class="plus"
+				type="button"
+				onclick={() => plusOne(info)}
+				aria-label="Add 1 page to {info.title}"><Icon name="plus" size={16} /></button
+			>
+		{:else}
+			<button
+				class="play"
+				type="button"
+				onclick={() => (r ? resume(info) : onsetup())}
+				aria-label="{r ? 'Resume' : 'Start'} {info.title}"
+				title={r ? 'Resume' : 'Start'}><Icon name="play" size={14} /></button
+			>
+		{/if}
 	</div>
-	{#if r}
-		<span class="mini"><span style="width:{pct}%"></span></span>
-	{/if}
-	<a class="t" href="/catalog/{info.book.id}" tabindex="-1">{info.title}</a>
-	{#if r}<span class="pages">p. {r.pos} of {r.total}</span>{/if}
+	<a class="t" href="/catalog/{info.book.id}">{info.title}</a>
 </li>
 
 <style>
 	.tile {
 		display: grid;
-		gap: 7px;
+		gap: 8px;
 		align-content: start;
+		min-width: 0;
 	}
 	.art {
-		position: relative;
-		aspect-ratio: 2 / 3;
-	}
-	.art > a {
 		display: block;
-		height: 100%;
+		aspect-ratio: 2 / 3;
+		border-radius: 4px;
 	}
-	/* Active covers get an accent outline; inactive ones are desaturated. */
-	.tile:not(.idle) .art > a {
-		border-radius: 5px;
-		outline: 2.5px solid var(--accent);
+	/* Active covers get an accent ring; inactive ones are desaturated. */
+	.tile:not(.idle) .art {
+		outline: 2px solid var(--accent);
 		outline-offset: 3px;
 	}
-	.idle .art > a {
+	.idle .art {
 		filter: saturate(0.25);
 		opacity: 0.7;
 	}
-	.idle .t {
-		color: var(--muted);
-		font-weight: 500;
+	.mini {
+		height: 3px;
+		margin-top: 2px;
+		border-radius: 99px;
+		background: var(--line);
+		overflow: hidden;
 	}
-	.actions {
-		position: absolute;
-		right: 5px;
-		bottom: 5px;
+	.mini.empty {
+		background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 10px);
+	}
+	.mini span {
+		display: block;
+		height: 100%;
+		border-radius: 99px;
+		background: var(--accent);
+		transition: width 0.3s;
+	}
+	.idle .mini span {
+		background: var(--muted);
+		opacity: 0.6;
+	}
+	.controls {
 		display: flex;
-		gap: 5px;
 		align-items: center;
+		gap: 4px;
+		min-height: 32px;
+	}
+	.pages {
+		flex: 1;
+		min-width: 0;
+		font-size: 12px;
+		color: var(--muted);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.plus,
 	.play,
 	.pause {
-		border-radius: 50%;
-		cursor: pointer;
+		flex: none;
 		display: grid;
 		place-items: center;
-		box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
-	}
-	.plus,
-	.play {
-		width: 38px;
-		height: 38px;
+		padding: 0;
+		border-radius: 50%;
+		cursor: pointer;
 	}
 	.plus {
+		width: 32px;
+		height: 32px;
 		border: 0;
 		background: var(--accent);
 		color: var(--on-accent);
-		font-size: 22px;
-		line-height: 1;
+		box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 35%, transparent);
 	}
 	.play {
-		border: 0;
+		width: 32px;
+		height: 32px;
+		border: 1px solid var(--line);
 		background: var(--surface);
+		color: var(--muted);
+	}
+	.play:hover {
 		color: var(--accent);
+		border-color: var(--accent);
 	}
 	.pause {
-		width: 28px;
-		height: 28px;
-		border: 0;
+		width: 24px;
+		height: 24px;
+		border: 1px solid var(--line);
 		background: var(--surface);
 		color: var(--muted);
 	}
@@ -137,25 +144,12 @@
 	.play:active {
 		transform: scale(0.94);
 	}
-	.mini {
-		height: 3px;
-		border-radius: 99px;
-		background: var(--line);
-		overflow: hidden;
-	}
-	.mini span {
-		display: block;
-		height: 100%;
-		background: var(--accent);
-		transition: width 0.3s;
-	}
-	.idle .mini span {
-		background: var(--muted);
-	}
 	.t {
+		margin-top: -2px;
 		font-weight: 600;
 		font-size: 13.5px;
 		line-height: 1.3;
+		letter-spacing: -0.01em;
 		color: var(--ink);
 		text-decoration: none;
 		display: -webkit-box;
@@ -164,10 +158,8 @@
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 	}
-	.pages {
-		margin-top: -4px;
-		font-size: 12.5px;
+	.idle .t {
 		color: var(--muted);
-		font-variant-numeric: tabular-nums;
+		font-weight: 500;
 	}
 </style>

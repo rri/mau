@@ -588,3 +588,37 @@ Fixed without asking, as plain hardening (no visible behavior change):
 Not fixed (recorded as residual risk in the threat model): the bundled SQLite
 advisory (sqlx 0.9 caps libsqlite3-sys below the patched 0.39); a dev-only
 npm advisory; plain-text TOTP secrets and API keys at rest.
+
+## Polish pass and Lighthouse-style audit (2026-11-09)
+
+Chosen by the user: Reading grid controls move **under the cover** (pages,
+pause, +), so covers stay clean.
+
+Mine:
+
+- Control icons (plus, pause, play, star, check, shelf) are SVGs on a 24-unit
+  grid in one `Icon` component; text glyphs (+, ❚❚, ▶, ★, ✓, ⌂) sat
+  off-center.
+- Grid tiles show "p. 140/304" (not "of") to fit pause and + at the 122px
+  minimum tile width (three columns on a 420px phone).
+- Empty rating stars are outlines at 70% muted (3:1, WCAG non-text contrast);
+  they were solid at the line colour (1.3:1).
+- Generated covers: the title's last line stays 22 units above the author;
+  style 2's sun sits below the title and behind the mountains; style 3's
+  diamond ends above the title.
+- Catalog grid: owned badge moved to top-right (it covered the author);
+  the progress bar's space is always kept so titles line up.
+- Row metadata underline is a light 1px dash.
+- Accessibility (axe-core, WCAG 2.1 AA + best practice; 0 violations on 16
+  pages × 2 themes × 2 widths): sign-in and setup use an h1 for "mau"; tile
+  links are named by their visible title (catalog tiles add author and
+  state as screen-reader text); the reading-activity day list scrolls inside
+  a focusable, labelled region.
+- Text responses are compressed (brotli or gzip, tower-http CompressionLayer;
+  images aren't).
+- App icons, manifest colours and `theme-color` (white light, #131a17 dark)
+  use the new palette; a real /favicon.ico; public pages link the icon.
+- Debug builds recompute the CSP on every response (they read web/build from
+  disk, so a rebuilt shell's script hash changes); release builds hash once.
+- Real Lighthouse needs Chrome, which won't start here without
+  libXcomposite and libXdamage.

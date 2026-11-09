@@ -69,8 +69,18 @@ pub fn asset_path(prefix: &str) -> Option<String> {
 /// this site, plus the app shell's inline start-up script (allowed by its
 /// hash) and the barcode decoder's WebAssembly. Styles may be inline (Svelte
 /// sets style attributes); images may be data: URLs (generated QR codes).
-pub fn content_security_policy() -> &'static str {
-    static CSP: LazyLock<String> = LazyLock::new(|| {
+pub fn content_security_policy() -> std::borrow::Cow<'static, str> {
+    // Debug builds read web/build from disk, so a rebuilt shell must be
+    // picked up without restarting; release builds embed it, so hash once.
+    if cfg!(debug_assertions) {
+        return build_csp().into();
+    }
+    static CSP: LazyLock<String> = LazyLock::new(build_csp);
+    CSP.as_str().into()
+}
+
+fn build_csp() -> String {
+    {
         let hashes: String = Assets::get(SPA_SHELL)
             .map(|f| inline_script_hashes(&String::from_utf8_lossy(&f.data)))
             .unwrap_or_default()
@@ -83,8 +93,7 @@ pub fn content_security_policy() -> &'static str {
              connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; \
              base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         )
-    });
-    &CSP
+    }
 }
 
 /// Base64 SHA-256 hashes of the inline `<script>` elements in `html`.

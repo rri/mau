@@ -14,6 +14,7 @@
 	import ActivityCalendar from '#lib/components/ActivityCalendar.svelte';
 	import Cover from '#lib/components/Cover.svelte';
 	import TagInput from '#lib/components/TagInput.svelte';
+	import Icon from '#lib/components/Icon.svelte';
 
 	const FORMATS = ['Hardcover', 'Paperback', 'Ebook', 'Audiobook'];
 
@@ -401,14 +402,15 @@
 							type="button"
 							aria-label="Pause"
 							title="Pause"
-							onclick={() => pause(info)}>❚❚</button
+							onclick={() => pause(info)}><Icon name="pause" size={14} /></button
 						>
 						<button class="plus" type="button" aria-label="Add 1 page" onclick={() => plusOne(info)}
-							>+</button
+							><Icon name="plus" size={20} /></button
 						>
 					{:else}
 						<button class="play" type="button" onclick={play}
-							>▶ {info.state === 'finished' ? 'Re-read' : r ? 'Resume' : 'Start'}</button
+							><Icon name="play" size={14} />
+							{info.state === 'finished' ? 'Re-read' : r ? 'Resume' : 'Start'}</button
 						>
 					{/if}
 				</div>
@@ -448,7 +450,8 @@
 					aria-checked={info.book.rating === n}
 					aria-label="{n} {n === 1 ? 'star' : 'stars'}"
 					class:on={n <= info.book.rating}
-					onclick={() => rate(n)}>★</button
+					onclick={() => rate(n)}
+					><Icon name="star" size={28} filled={n <= info.book.rating} /></button
 				>
 			{/each}
 		</div>
@@ -549,19 +552,29 @@
 							>{fmtDate(rd.started_on)} – {rd.finished_on ? fmtDate(rd.finished_on) : 'now'}</span
 						></summary
 					>
-					<ul class="days">
-						{#each lines as l, j (j)}
-							<li>
-								<span class="muted">{fmtMonthDay(l.date)}</span>
-								{#if l.rewind}<span class="rewind">moved back page {l.from} → {l.to}</span><span
-									></span>
-								{:else}<span>page {l.from} → {l.to}</span><span class="delta">+{l.to - l.from}</span
-									>{/if}
-							</li>
-						{:else}
-							<li><span></span><span class="rewind">No progress yet</span><span></span></li>
-						{/each}
-					</ul>
+					<!-- Scrolls when long, so keyboard users need to reach it (WCAG 2.1.1). -->
+					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+					<div
+						class="days-scroll"
+						role="region"
+						tabindex="0"
+						aria-label="Days read in reading {info.readings.length - i}"
+					>
+						<ul class="days">
+							{#each lines as l, j (j)}
+								<li>
+									<span class="muted">{fmtMonthDay(l.date)}</span>
+									{#if l.rewind}<span class="rewind">moved back page {l.from} → {l.to}</span><span
+										></span>
+									{:else}<span>page {l.from} → {l.to}</span><span class="delta"
+											>+{l.to - l.from}</span
+										>{/if}
+								</li>
+							{:else}
+								<li><span></span><span class="rewind">No progress yet</span><span></span></li>
+							{/each}
+						</ul>
+					</div>
 				</details>
 			{/each}
 		{:else}
@@ -764,8 +777,9 @@
 		color: var(--ink);
 		font-weight: 500;
 		cursor: text;
-		text-decoration: underline dotted var(--muted);
-		text-underline-offset: 3px;
+		text-decoration: underline dashed color-mix(in srgb, currentColor 35%, transparent);
+		text-decoration-thickness: 1px;
+		text-underline-offset: 4px;
 	}
 	.edit {
 		display: inline-flex;
@@ -790,35 +804,49 @@
 		gap: 6px;
 		align-items: center;
 	}
+	.plus,
+	.pause,
+	.play {
+		display: grid;
+		place-items: center;
+		padding: 0;
+		cursor: pointer;
+	}
 	.plus {
-		width: 44px;
-		height: 44px;
+		width: 42px;
+		height: 42px;
 		border-radius: 50%;
 		border: 0;
 		background: var(--accent);
 		color: var(--on-accent);
-		font-size: 25px;
-		cursor: pointer;
+		box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 35%, transparent);
 	}
 	.pause {
 		width: 30px;
 		height: 30px;
 		border-radius: 50%;
 		border: 1px solid var(--line);
-		background: none;
+		background: var(--surface);
 		color: var(--muted);
-		font-size: 10px;
-		cursor: pointer;
 	}
 	.play {
-		height: 44px;
-		padding: 0 14px;
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		height: 40px;
+		padding: 0 16px 0 14px;
 		border-radius: 999px;
 		border: 1px solid var(--line);
-		background: none;
+		background: var(--surface);
 		color: var(--accent);
-		font-weight: 500;
-		cursor: pointer;
+		font-weight: 550;
+	}
+	.play:hover {
+		border-color: var(--accent);
+	}
+	.plus:active,
+	.play:active {
+		transform: scale(0.94);
 	}
 	.stars {
 		display: flex;
@@ -827,10 +855,9 @@
 	.stars button {
 		background: none;
 		border: 0;
-		font-size: 28px;
-		line-height: 1;
-		padding: 0 2px;
-		color: var(--line);
+		padding: 2px;
+		/* 3:1 against the page in both modes (WCAG non-text contrast). */
+		color: color-mix(in srgb, var(--muted) 70%, var(--surface));
 		cursor: pointer;
 	}
 	.stars button.on {
@@ -937,6 +964,8 @@
 		gap: 2px;
 		font-size: 14px;
 		font-variant-numeric: tabular-nums;
+	}
+	.days-scroll {
 		max-height: 260px;
 		overflow-y: auto;
 	}
