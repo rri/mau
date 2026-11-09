@@ -4,6 +4,7 @@
 
 <main class="public">
 	<div class="card">
+		<img class="logo" src="/logo.svg" alt="mau" width="112" height="112" />
 		{@render children()}
 	</div>
 </main>
@@ -31,16 +32,16 @@
 		font-weight: 700;
 		text-wrap: balance;
 	}
-	.card :global(.brand) {
-		margin: 0;
-		font-size: 40px;
-		font-weight: 700;
-		line-height: 1;
-		letter-spacing: -0.03em;
+	.logo {
+		display: block;
+		margin: -4px 0 4px;
 	}
 	.card :global(.tagline) {
 		margin: -8px 0 0;
 		color: var(--muted);
+		font-size: 16px;
+		font-weight: 500;
+		letter-spacing: 0;
 	}
 	.card :global(p) {
 		margin: 0;

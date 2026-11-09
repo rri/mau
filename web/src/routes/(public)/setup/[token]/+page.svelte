@@ -23,7 +23,6 @@
 	</p>
 	<div class="links"><a class="link" href="/signin">Go to sign in</a></div>
 {:else if !started}
-	<h1 class="brand">mau</h1>
 	<h1>Set up this instance</h1>
 	<p>
 		You opened the one-time setup link from the server log. The account you create next will be the

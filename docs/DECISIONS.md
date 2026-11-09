@@ -622,3 +622,30 @@ Mine:
   disk, so a rebuilt shell's script hash changes); release builds hash once.
 - Real Lighthouse needs Chrome, which won't start here without
   libXcomposite and libXdamage.
+
+## Logo (2026-11-09)
+
+The user supplied the logo (two Bengal cats and an open book, "mau" on the
+page). Chosen by the user:
+
+- Sidebar: the logo alone at 96px (its own "mau" lettering is readable from
+  about 48px), replacing the green square and the word.
+- Public pages: the logo at 112px. It sits in the shared public layout, so
+  sign-in, sign-up, invite, reset, and setup all show it.
+- Every icon uses it: favicon, PWA 192/512, maskable, apple-touch.
+- PWA splash and manifest theme colour are the logo's navy, #1E242B. Pages'
+  own `theme-color` still follows light or dark.
+
+Mine:
+
+- The logo is served as a file (`/logo.svg`, also copied to `/icon.svg`) and
+  shown with `<img>`, since inlining it would duplicate its gradient and
+  filter IDs.
+- Maskable icon: the navy fills the square and the artwork is scaled to 74%,
+  inside Android's 80% safe circle. The iOS icon uses 86%, because iOS rounds
+  the corners itself and transparent corners would show black.
+- `favicon.ico` holds 16, 32, and 48px renders.
+- A 1px ring in the line colour and a soft shadow give the badge an edge on
+  dark backgrounds; the corner radius (22.5%) matches the artwork's.
+- On sign-in, the tagline ("Your library and reading log") is now the page's
+  h1. Setup lost its duplicate h1.

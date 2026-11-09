@@ -97,6 +97,14 @@ h2,
 h3 {
 	letter-spacing: -0.02em;
 }
+/* The logo badge: a hairline ring so its dark navy keeps an edge on dark
+   backgrounds (the corner radius matches the artwork's, 115 / 512). */
+img[src='/logo.svg'] {
+	border-radius: 22.5%;
+	box-shadow:
+		0 0 0 1px var(--line),
+		0 2px 8px rgb(0 0 0 / 0.12);
+}
 ::selection {
 	background: var(--accent-soft);
 }

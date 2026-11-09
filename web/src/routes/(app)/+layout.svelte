@@ -29,7 +29,7 @@
 {#if auth.me}
 	<div class="shell">
 		<nav class="tabs" aria-label="Main">
-			<span class="brand"><i aria-hidden="true"></i>mau</span>
+			<img class="brand" src="/logo.svg" alt="mau" width="96" height="96" />
 			{#each tabs as t (t.href)}
 				<a href={t.href} class="tab" aria-current={t.match(page.url.pathname) ? 'page' : undefined}>
 					{#if t.label === 'Reading'}
@@ -139,19 +139,8 @@
 			backdrop-filter: none;
 		}
 		.brand {
-			display: flex;
-			align-items: center;
-			gap: 9px;
-			font-size: 20px;
-			font-weight: 700;
-			letter-spacing: -0.02em;
-			padding: 0 12px 22px;
-		}
-		.brand i {
-			width: 22px;
-			height: 22px;
-			border-radius: 7px;
-			background: var(--accent);
+			display: block;
+			margin: 0 0 20px;
 		}
 		.tab {
 			display: flex;
