@@ -154,7 +154,7 @@
     <path d="M 340 228 L 340 234 M 340 234 Q 330 241 321 236 M 340 234 Q 350 241 359 236" fill="none" stroke="#1E140C" stroke-width="3" stroke-linecap="round" />
   </g>
 
-  <!-- ==================== OPEN BOOK ("mau") ==================== -->
+  <!-- ==================== OPEN BOOK ==================== -->
   <g id="open-book" filter="url(#shadow)">
     <!-- Hardcover Backing -->
     <path d="M 48 312 Q 152 292 256 326 Q 360 292 464 312 L 476 436 Q 366 414 256 448 Q 146 414 36 436 Z" fill="#8C3B2B" stroke="#5E2317" stroke-width="4" stroke-linejoin="round" />
@@ -172,15 +172,15 @@
     <!-- Center Spine Crease -->
     <line x1="256" y1="308" x2="256" y2="426" stroke="#B8AC97" stroke-width="3" stroke-linecap="round" />
 
-    <!-- Subtle Decorative Book Lines & Rosette Paw Emblem on Left Page -->
+    <!-- Subtle Decorative Book Lines on Left Page -->
     <path d="M 95 335 Q 155 322 215 342" fill="none" stroke="#C7BBA6" stroke-width="3" stroke-linecap="round" />
     <path d="M 92 355 Q 155 342 215 362" fill="none" stroke="#C7BBA6" stroke-width="3" stroke-linecap="round" />
     <path d="M 90 375 Q 135 366 180 378" fill="none" stroke="#C7BBA6" stroke-width="3" stroke-linecap="round" />
 
-    <!-- "mau" Typography Across the Book Banner / Right Page -->
-    <text x="358" y="372" font-family="Georgia, 'Times New Roman', serif" font-size="64" font-weight="bold" font-style="italic" fill="#2A211B" text-anchor="middle" letter-spacing="1.5">mau</text>
-    <!-- Small Bengal Rosette Dot Accent above/next to 'mau' -->
-    <circle cx="428" cy="340" r="4.5" fill="#D89448" stroke="#2A211B" stroke-width="2" />
+    <!-- Subtle Decorative Book Lines on Right Page -->
+    <path d="M 297 342 Q 357 322 417 335" fill="none" stroke="#C7BBA6" stroke-width="3" stroke-linecap="round" />
+    <path d="M 297 362 Q 357 342 420 355" fill="none" stroke="#C7BBA6" stroke-width="3" stroke-linecap="round" />
+    <path d="M 297 382 Q 342 368 387 375" fill="none" stroke="#C7BBA6" stroke-width="3" stroke-linecap="round" />
   </g>
 
   <!-- ==================== STRIPED BENGAL PAWS DRAPED OVER BOOK ==================== -->

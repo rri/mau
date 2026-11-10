@@ -657,3 +657,7 @@ Mine:
   tab buttons: 100% of the sidebar's inner width, 176px. Public pages keep
   112px: matching their full-width buttons (about 340px) would push the
   sign-in form off a phone screen.
+- (Later) The user replaced the logo with a version without the "mau"
+  lettering (lines on both pages instead). All icons were regenerated the
+  same way. The name now shows nowhere in the wide-screen sidebar; screen
+  readers still get "mau" from the image's alt text.
