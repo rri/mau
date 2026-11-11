@@ -21,7 +21,6 @@
 </script>
 
 <svelte:head>
-	<title>mau · your personal library and reading log</title>
 	<meta name="theme-color" content="#12161a" />
 </svelte:head>
 
