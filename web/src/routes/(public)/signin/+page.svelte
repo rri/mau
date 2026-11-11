@@ -57,7 +57,7 @@
 	}
 </script>
 
-<h1 class="tagline">Your library and reading log</h1>
+<h1 class="tagline">your personal library and reading log</h1>
 
 {#if auth.status?.setup_required}
 	<p class="notice">

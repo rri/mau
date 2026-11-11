@@ -26,27 +26,30 @@
 		border: 1px solid var(--line);
 		border-radius: 18px;
 	}
+	/* The logo and each page's heading are centered; forms stay left-aligned. */
 	.card :global(h1) {
 		margin: 0;
 		font-size: 24px;
 		font-weight: 700;
+		text-align: center;
 		text-wrap: balance;
 	}
 	.logo {
 		display: block;
 		width: max-content;
-		margin: -4px 0 4px;
+		margin: -4px auto 4px;
 		border-radius: 22.5%;
 	}
 	.logo img {
 		display: block;
 	}
 	.card :global(.tagline) {
-		margin: -8px 0 0;
+		margin: -8px 0 4px;
 		color: var(--muted);
-		font-size: 16px;
+		font-size: 17px;
 		font-weight: 500;
-		letter-spacing: 0;
+		font-variant-caps: small-caps;
+		letter-spacing: 0.06em;
 	}
 	.card :global(p) {
 		margin: 0;
