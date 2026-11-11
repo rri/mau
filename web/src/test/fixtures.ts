@@ -7,7 +7,7 @@ import type { Me } from '#lib/api/generated/Me.ts';
 import type { WorkRow } from '#lib/api/generated/WorkRow.ts';
 import { auth } from '#lib/auth.svelte.ts';
 import { library } from '#lib/library.svelte.ts';
-import { emptyData, tagKey, type Data } from '#lib/sync/apply.ts';
+import { cloneData, emptyData, tagKey, type Data } from '#lib/sync/apply.ts';
 
 /** Today in the tests: Wednesday 11 November 2026, 09:00 in Berlin. */
 export const TODAY = '2026-11-11';
@@ -238,6 +238,12 @@ export function sampleLibrary(): Data {
 
 /** Puts `d` on screen as the signed-in reader's library. */
 export function useLibrary(d: Data = sampleLibrary()) {
+	// As if synced: the server copy and the view agree, with nothing unsent.
+	const lib = library as unknown as { server: Data; outbox: unknown[]; userId: string | null };
+	lib.server = cloneData(d);
+	lib.outbox = [];
+	// Opened already, so the app shell doesn't open the (absent) IndexedDB store.
+	lib.userId = auth.me?.id ?? ME.id;
 	library.view = d;
 	library.ready = true;
 	library.online = true;
@@ -253,7 +259,7 @@ export function mockApi(routes: Record<string, unknown | ((body: unknown) => unk
 		const r = routes[key];
 		if (r === undefined) throw new Error(`unexpected request ${key}`);
 		const body = init?.body ? JSON.parse(String(init.body)) : undefined;
-		const value = typeof r === 'function' ? (r as (b: unknown) => unknown)(body) : r;
+		const value = await (typeof r === 'function' ? (r as (b: unknown) => unknown)(body) : r);
 		if (value instanceof Response) return value;
 		return new Response(JSON.stringify(value), {
 			status: 200,

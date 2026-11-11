@@ -3,6 +3,8 @@
 process.env.TZ = 'UTC';
 
 import '@testing-library/jest-dom/vitest';
+// The library keeps its offline copy in IndexedDB, which jsdom lacks.
+import 'fake-indexeddb/auto';
 import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/svelte';
 import { nav, page } from './app-mocks.ts';
@@ -15,6 +17,9 @@ for (const name of ['localStorage', 'sessionStorage'] as const)
 
 // jsdom doesn't lay out pages.
 Element.prototype.scrollIntoView = () => {};
+// Browsers let a file input's files be set (to clear it); jsdom has no setter.
+const files = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'files')!;
+Object.defineProperty(HTMLInputElement.prototype, 'files', { ...files, set() {} });
 
 vi.mock('$app/navigation', () => nav);
 vi.mock('$app/state', () => ({ page }));
