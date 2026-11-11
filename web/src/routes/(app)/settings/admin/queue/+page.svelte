@@ -7,6 +7,7 @@
 	import WorkEditor from '#lib/components/WorkEditor.svelte';
 
 	let items = $state<QueueItem[]>([]);
+	let loaded = $state(false);
 	let editing = $state<string | null>(null);
 	let error = $state('');
 
@@ -15,6 +16,8 @@
 			items = await get<QueueItem[]>('/admin/queue');
 		} catch (e) {
 			error = (e as Error).message;
+		} finally {
+			loaded = true;
 		}
 	}
 	onMount(load);
@@ -111,7 +114,7 @@
 				{/if}
 			</div>
 		{:else}
-			<p class="help">No suggestions waiting.</p>
+			{#if loaded && !error}<p class="help">No suggestions waiting.</p>{/if}
 		{/each}
 	</div>
 	{#if error}<p class="error" role="alert">{error}</p>{/if}

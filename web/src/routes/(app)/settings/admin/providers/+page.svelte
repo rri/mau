@@ -3,6 +3,7 @@
 	import { get, put } from '#lib/api/client.ts';
 	import type { ProviderInfo } from '#lib/api/generated/ProviderInfo.ts';
 	import { toasts } from '#lib/toast.svelte.ts';
+	import Icon from '#lib/components/Icon.svelte';
 	import PageHead from '#lib/components/PageHead.svelte';
 
 	let list = $state<(ProviderInfo & { key: string })[]>([]);
@@ -54,13 +55,13 @@
 						type="button"
 						aria-label="Move {p.label} up"
 						disabled={i === 0}
-						onclick={() => move(i, -1)}>▲</button
+						onclick={() => move(i, -1)}><Icon name="up" size={14} /></button
 					>
 					<button
 						type="button"
 						aria-label="Move {p.label} down"
 						disabled={i === list.length - 1}
-						onclick={() => move(i, 1)}>▼</button
+						onclick={() => move(i, 1)}><Icon name="down" size={14} /></button
 					>
 				</div>
 				<div>
@@ -108,7 +109,9 @@
 		border-radius: 6px;
 		width: 28px;
 		height: 22px;
-		font-size: 11px;
+		padding: 0;
+		display: grid;
+		place-items: center;
 		color: var(--muted);
 		cursor: pointer;
 	}

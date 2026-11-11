@@ -6,7 +6,7 @@
 		size = 16,
 		filled = true
 	}: {
-		name: 'plus' | 'pause' | 'play' | 'star' | 'check' | 'shelf';
+		name: 'plus' | 'pause' | 'play' | 'star' | 'check' | 'shelf' | 'up' | 'down';
 		size?: number;
 		filled?: boolean;
 	} = $props();
@@ -30,6 +30,15 @@
 			fill="none"
 			stroke="currentColor"
 			stroke-width="2.6"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		/>
+	{:else if name === 'up' || name === 'down'}
+		<path
+			d={name === 'up' ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2.4"
 			stroke-linecap="round"
 			stroke-linejoin="round"
 		/>

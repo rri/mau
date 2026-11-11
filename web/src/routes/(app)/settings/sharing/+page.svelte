@@ -9,6 +9,7 @@
 	import PageHead from '#lib/components/PageHead.svelte';
 
 	let shares = $state<Share[]>([]);
+	let loaded = $state(false);
 	let error = $state('');
 	let creating = $state(false);
 	let kind = $state('finished');
@@ -18,6 +19,10 @@
 	const tags = $derived(
 		[...new Set(liveBooks(library.view).flatMap((b) => b.tags))].sort((a, b) => a.localeCompare(b))
 	);
+	// A tag share starts on the first tag, so what's shown is what's sent.
+	$effect(() => {
+		if (kind === 'tag' && !tags.includes(tag)) tag = tags[0] ?? '';
+	});
 	const profileUrl = `${location.origin}/u/${auth.me?.username}`;
 	const label = (s: Share) =>
 		s.kind === 'finished'
@@ -33,6 +38,8 @@
 			shares = await get<Share[]>('/shares');
 		} catch (e) {
 			error = (e as Error).message;
+		} finally {
+			loaded = true;
 		}
 	}
 	onMount(load);
@@ -60,15 +67,25 @@
 	}
 
 	async function update(s: Share, body: object, message: string) {
-		await patch(`/shares/${s.id}`, body);
-		toasts.show(message);
-		load();
+		error = '';
+		try {
+			await patch(`/shares/${s.id}`, body);
+			toasts.show(message);
+			load();
+		} catch (e) {
+			error = (e as Error).message;
+		}
 	}
 
 	async function remove(s: Share) {
-		await del(`/shares/${s.id}`);
-		toasts.show(`Stopped sharing ${label(s)}`);
-		load();
+		error = '';
+		try {
+			await del(`/shares/${s.id}`);
+			toasts.show(`Stopped sharing ${label(s)}`);
+			load();
+		} catch (e) {
+			error = (e as Error).message;
+		}
 	}
 </script>
 
@@ -122,7 +139,7 @@
 				</div>
 			</div>
 		{:else}
-			<p class="help">You're not sharing anything.</p>
+			{#if loaded && !error}<p class="help">You're not sharing anything.</p>{/if}
 		{/each}
 	</div>
 	{#if creating}
@@ -131,7 +148,9 @@
 				>What to share<select bind:value={kind}>
 					<option value="finished">Finished books</option>
 					<option value="active">Currently reading</option>
-					<option value="tag">A tag…</option>
+					<option value="tag" disabled={!tags.length}
+						>{tags.length ? 'A tag…' : 'A tag… (no tags yet)'}</option
+					>
 					<option value="catalog">Whole catalog</option>
 				</select></label
 			>
@@ -148,7 +167,7 @@
 			>
 			<div class="row-end">
 				<button class="btn" type="button" onclick={() => (creating = false)}>Cancel</button>
-				<button class="btn primary" type="submit">Publish</button>
+				<button class="btn primary" type="submit" disabled={kind === 'tag' && !tag}>Publish</button>
 			</div>
 		</form>
 	{:else}

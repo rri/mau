@@ -69,7 +69,9 @@
 <div class="years" onpointerleave={() => (tip = null)}>
 	{#each years as y (y.year)}
 		<div class="year" style="--w:{y.weeks}">
-			<div class="year-head"><b>{y.year}</b><span>{y.total} pages</span></div>
+			<div class="year-head">
+				<b>{y.year}</b><span>{y.total} {y.total === 1 ? 'page' : 'pages'}</span>
+			</div>
 			<div class="months" aria-hidden="true">
 				{#each y.months as m (m.col)}<span style="grid-column:{m.col + 1}">{m.label}</span>{/each}
 			</div>

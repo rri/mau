@@ -41,9 +41,14 @@
 		}
 	}
 	async function revoke(id: string) {
-		await del(`/invites/${id}`);
-		toasts.show('Invite revoked');
-		load();
+		error = '';
+		try {
+			await del(`/invites/${id}`);
+			toasts.show('Invite revoked');
+			load();
+		} catch (e) {
+			error = (e as Error).message;
+		}
 	}
 	const expires = (ms: number) => {
 		const d = daysBetween(dateOfMs(Date.now(), tz), dateOfMs(ms, tz));
@@ -77,7 +82,7 @@
 			</div>
 		</div>
 	{:else}
-		<p class="help">No pending invites.</p>
+		{#if data}<p class="help">No pending invites.</p>{/if}
 	{/each}
 </div>
 {#if data?.can_create}

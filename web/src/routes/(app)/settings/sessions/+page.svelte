@@ -29,14 +29,24 @@
 	}
 
 	async function revoke(s: SessionInfo) {
-		await del(`/sessions/${s.id}`);
-		toasts.show(`Signed out ${s.device}`);
-		load();
+		error = '';
+		try {
+			await del(`/sessions/${s.id}`);
+			toasts.show(`Signed out ${s.device}`);
+			load();
+		} catch (e) {
+			error = (e as Error).message;
+		}
 	}
 	async function revokeOthers() {
-		await post('/sessions/revoke-others');
-		toasts.show('Signed out all other sessions');
-		load();
+		error = '';
+		try {
+			await post('/sessions/revoke-others');
+			toasts.show('Signed out all other sessions');
+			load();
+		} catch (e) {
+			error = (e as Error).message;
+		}
 	}
 </script>
 
@@ -68,5 +78,5 @@
 			<button class="btn" type="button" onclick={revokeOthers}>Sign out all other sessions</button>
 		</div>
 	{/if}
-	{#if error}<p class="error">{error}</p>{/if}
+	{#if error}<p class="error" role="alert">{error}</p>{/if}
 </div>

@@ -5,6 +5,7 @@
 	import PageHead from '#lib/components/PageHead.svelte';
 
 	let entries = $state<AuditEntry[]>([]);
+	let loaded = $state(false);
 	let more = $state(true);
 	let error = $state('');
 	const fmt = new Intl.DateTimeFormat('en-US', {
@@ -22,6 +23,8 @@
 			more = page.length === 200;
 		} catch (e) {
 			error = (e as Error).message;
+		} finally {
+			loaded = true;
 		}
 	}
 	onMount(() => load());
@@ -29,15 +32,17 @@
 
 <PageHead title="Audit log" />
 <div class="sec">
-	<ul class="log">
-		{#each entries as e, i (i)}
-			<li>
-				<time>{fmt.format(new Date(e.at))}</time><span><b>{e.actor_name}</b> {e.action}</span>
-			</li>
-		{:else}
-			<li><span></span><span class="help">Nothing yet.</span></li>
-		{/each}
-	</ul>
+	{#if entries.length}
+		<ul class="log">
+			{#each entries as e, i (i)}
+				<li>
+					<time>{fmt.format(new Date(e.at))}</time><span><b>{e.actor_name}</b> {e.action}</span>
+				</li>
+			{/each}
+		</ul>
+	{:else if loaded && !error}
+		<p class="help">Nothing recorded yet.</p>
+	{/if}
 	{#if more && entries.length}<button
 			class="btn"
 			type="button"

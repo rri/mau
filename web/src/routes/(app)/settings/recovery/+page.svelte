@@ -75,7 +75,11 @@
 		</p>
 		<div><b class="big">{status.left}</b> <span class="help">of 10 codes left</span></div>
 		<div class="meter"><span style="width:{status.left * 10}%"></span></div>
-		{#if status.left <= 3}<p class="notice">
+		{#if status.left === 0}<p class="notice">
+				No codes left. Generate a new set now: without one, a forgotten password needs an admin's
+				help.
+			</p>
+		{:else if status.left <= 3}<p class="notice">
 				Only {status.left} left. Generate a new set soon.
 			</p>{/if}
 		<p class="help">
@@ -89,7 +93,7 @@
 		<h2>Recovery activity</h2>
 		{#if status.events.length}
 			<ul class="log">
-				{#each status.events as e (e.at)}<li>
+				{#each status.events as e, i (i)}<li>
 						<time>{fmtDate(dateOfMs(Number(e.at), tz))}</time><span>{e.message}</span>
 					</li>{/each}
 			</ul>

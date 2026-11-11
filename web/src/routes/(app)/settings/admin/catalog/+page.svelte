@@ -11,6 +11,7 @@
 	const FORMATS = ['', 'Hardcover', 'Paperback', 'Ebook', 'Audiobook'];
 	let q = $state('');
 	let results = $state<WorkRow[]>([]);
+	let searched = $state('');
 	let editing = $state<string | null>(null);
 	let editingEdition = $state<EditionRow | null>(null);
 	let error = $state('');
@@ -20,6 +21,7 @@
 		error = '';
 		try {
 			results = await get<WorkRow[]>(`/admin/catalog?q=${encodeURIComponent(q.trim())}`);
+			searched = q.trim();
 		} catch (err) {
 			error = (err as Error).message;
 		}
@@ -61,8 +63,13 @@
 				body: file,
 				headers: { 'Content-Type': file.type }
 			});
-			const data = await res.json();
-			if (!res.ok) throw new ApiError(res.status, data.error, data.message);
+			const data = await res.json().catch(() => null);
+			if (!res.ok || !data)
+				throw new ApiError(
+					res.status,
+					data?.error ?? 'error',
+					data?.message ?? `The server answered ${res.status}.`
+				);
 			results = results.map((r) => (r.id === work.id ? data : r));
 			toasts.show('Cover replaced');
 		} catch (err) {
@@ -101,7 +108,8 @@
 						<div class="name">{w.title}</div>
 						<div class="meta">
 							{w.people.map((p) => p.name).join(', ')}{w.first_year ? ` · ${w.first_year}` : ''} · {w
-								.editions.length} editions
+								.editions.length}
+							{w.editions.length === 1 ? 'edition' : 'editions'}
 						</div>
 					</div>
 				</div>
@@ -176,6 +184,9 @@
 			</div>
 		{/each}
 	</div>
+	{#if searched && !results.length && !error}
+		<p class="help">No books in the catalog match “{searched}”.</p>
+	{/if}
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
 </div>
 
