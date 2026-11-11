@@ -8,10 +8,21 @@ const FOCUSABLE =
 // Open dialogs, newest last: Escape closes only the one on top.
 const stack: HTMLElement[] = [];
 
+// The element focused before the current one: a field inside a dialog can
+// take focus before the dialog itself is set up.
+let previous: HTMLElement | null = null;
+let current: HTMLElement | null = null;
+if (typeof document !== 'undefined')
+	document.addEventListener('focusin', (e) => {
+		previous = current;
+		current = e.target as HTMLElement;
+	});
+
 export function modal(node: HTMLElement, oncancel: () => void) {
 	let cancel = oncancel;
 	stack.push(node);
-	const before = document.activeElement as HTMLElement | null;
+	const active = document.activeElement as HTMLElement | null;
+	const before = active && node.contains(active) ? previous : active;
 	const items = () => [...node.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.hidden);
 
 	queueMicrotask(() => {
