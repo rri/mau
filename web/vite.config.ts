@@ -29,6 +29,17 @@ export default defineConfig({
 					include: ['src/**/*.{test,spec}.{js,ts}'],
 					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
 				}
+			},
+			{
+				// Pages and components, rendered in jsdom with mock library data.
+				extends: './vite.config.ts',
+				resolve: { conditions: ['browser'] },
+				test: {
+					name: 'client',
+					environment: 'jsdom',
+					include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
+					setupFiles: ['./src/test/setup.ts']
+				}
 			}
 		]
 	}
