@@ -866,7 +866,9 @@ Mine, approved:
 - **CI runs** rustfmt, clippy, Rust tests, a check that the generated API
   types are committed, svelte-check, prettier, vitest, Playwright
   (Chromium), and `cargo audit --deny warnings` ignoring only
-  RUSTSEC-2026-0459 (waits on sqlx). The Firefox suite stays local.
+  RUSTSEC-2026-0459 (waits on sqlx). The Firefox suite stays local. Playwright
+  failures are reported as GitHub annotations, which are public (job logs
+  need a sign-in).
 - **www.maubooks.org** redirects to maubooks.org. **CAA** allows Let's
   Encrypt and ZeroSSL (Caddy's fallback).
 - **Signup** stays invite-only (the default).
