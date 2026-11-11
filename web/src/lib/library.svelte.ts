@@ -146,6 +146,12 @@ class Library {
 		} finally {
 			this.syncing = false;
 		}
+		// A sync asked for while this one ran (coming back online, say) still
+		// happens, even when this one failed.
+		if (this.syncAgain && this.store) {
+			this.syncAgain = false;
+			return this.sync();
+		}
 	}
 
 	private merge(res: SyncResponse) {
