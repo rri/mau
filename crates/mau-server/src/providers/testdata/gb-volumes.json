@@ -1,0 +1,56 @@
+{
+ "kind": "books#volumes",
+ "totalItems": 3,
+ "items": [
+  {
+   "kind": "books#volume",
+   "id": "lhodVol1",
+   "volumeInfo": {
+    "title": "The Left Hand of Darkness",
+    "authors": [
+     "Ursula K. Le Guin"
+    ],
+    "publisher": "Ace",
+    "publishedDate": "1987-03-15",
+    "industryIdentifiers": [
+     {
+      "type": "ISBN_10",
+      "identifier": "0441478123"
+     },
+     {
+      "type": "ISBN_13",
+      "identifier": "9780441478125"
+     }
+    ],
+    "pageCount": 304,
+    "imageLinks": {
+     "smallThumbnail": "http://books.google.com/books/content?id=lhodVol1&printsec=frontcover&img=1&zoom=5",
+     "thumbnail": "http://books.google.com/books/content?id=lhodVol1&printsec=frontcover&img=1&zoom=1"
+    }
+   }
+  },
+  {
+   "kind": "books#volume",
+   "id": "lhodVol2",
+   "volumeInfo": {
+    "title": "The Left Hand of Darkness",
+    "publishedDate": "2000",
+    "industryIdentifiers": [
+     {
+      "type": "ISBN_10",
+      "identifier": "0441478123"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "books#volume",
+   "id": "noTitle",
+   "volumeInfo": {
+    "authors": [
+     "Nobody"
+    ]
+   }
+  }
+ ]
+}

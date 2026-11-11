@@ -14,22 +14,21 @@ async fn volumes(http: &reqwest::Client, key: &str, q: &str) -> ProviderResult<V
         .map_err(|e| format!("Google Books: {e}"))?;
     if !res.status().is_success() {
         let status = res.status();
-        // Google explains itself, e.g. "API key not valid" or a used-up quota.
-        let why = res
-            .json::<Value>()
-            .await
-            .ok()
-            .and_then(|v| v["error"]["message"].as_str().map(str::to_string));
-        return Err(match why {
-            Some(m) => format!("Google Books refused: {m}"),
-            None => format!("Google Books answered {status}"),
-        });
+        return Err(refusal(status, res.json::<Value>().await.ok()));
     }
     let v: Value = res.json().await.map_err(|e| format!("Google Books: {e}"))?;
     Ok(v["items"]
         .as_array()
         .map(|items| items.iter().filter_map(candidate).collect())
         .unwrap_or_default())
+}
+
+/// Google explains itself, e.g. "API key not valid" or a used-up quota.
+fn refusal(status: reqwest::StatusCode, body: Option<Value>) -> String {
+    match body.as_ref().and_then(|v| v["error"]["message"].as_str()) {
+        Some(m) => format!("Google Books refused: {m}"),
+        None => format!("Google Books answered {status}"),
+    }
 }
 
 fn candidate(item: &Value) -> Option<Candidate> {
@@ -86,4 +85,77 @@ pub async fn by_isbn(
         .await?
         .into_iter()
         .next())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture(name: &str) -> Value {
+        let path = format!(
+            "{}/src/providers/testdata/{name}",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn refusals_carry_googles_reason() {
+        // Recorded answers (2026-11-11): a used-up quota and a bad key.
+        let quota = refusal(
+            reqwest::StatusCode::TOO_MANY_REQUESTS,
+            Some(fixture("gb-quota.json")),
+        );
+        assert!(
+            quota.starts_with("Google Books refused: Quota exceeded"),
+            "{quota}"
+        );
+        let key = refusal(
+            reqwest::StatusCode::BAD_REQUEST,
+            Some(fixture("gb-badkey.json")),
+        );
+        assert_eq!(
+            key,
+            "Google Books refused: API key not valid. Please pass a valid API key."
+        );
+        let none = refusal(reqwest::StatusCode::BAD_GATEWAY, None);
+        assert_eq!(none, "Google Books answered 502 Bad Gateway");
+    }
+
+    #[test]
+    fn a_volume_becomes_a_work_with_one_edition() {
+        // Hand-made from Google's documented volume format (see testdata/README.md).
+        let v = fixture("gb-volumes.json");
+        let items: Vec<Candidate> = v["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(candidate)
+            .collect();
+        assert_eq!(items.len(), 2, "the volume without a title is skipped");
+        let c = &items[0];
+        assert_eq!(c.provider, "google");
+        assert_eq!(c.source_id, "lhodVol1");
+        assert_eq!(c.title, "The Left Hand of Darkness");
+        assert_eq!(c.authors, ["Ursula K. Le Guin"]);
+        assert_eq!(c.first_year, Some(1987));
+        assert_eq!(c.edition_count, Some(1));
+        // Covers are fetched over HTTPS.
+        assert!(
+            c.cover_url
+                .as_deref()
+                .unwrap()
+                .starts_with("https://books.google.com/")
+        );
+        let e = &c.editions[0];
+        assert_eq!(e.isbn13.as_deref(), Some("9780441478125"));
+        assert_eq!(e.publisher.as_deref(), Some("Ace"));
+        assert_eq!(e.pages, Some(304));
+        assert_eq!(e.binding, None);
+        // Only an ISBN-10: converted to ISBN-13. No page count: none.
+        let d = &items[1];
+        assert_eq!(d.editions[0].isbn13.as_deref(), Some("9780441478125"));
+        assert_eq!(d.editions[0].pages, None);
+        assert!(d.authors.is_empty());
+    }
 }

@@ -158,3 +158,89 @@ pub async fn editions(
         .map(|e| e.iter().map(edition).collect())
         .unwrap_or_default())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Answers recorded from openlibrary.org on 2026-11-11 (testdata/README.md).
+    fn fixture(name: &str) -> Value {
+        let path = format!(
+            "{}/src/providers/testdata/{name}",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn search_results_become_works() {
+        let v = fixture("ol-search.json");
+        let works: Vec<Candidate> = v["docs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(work_from_doc)
+            .collect();
+        assert_eq!(works.len(), v["docs"].as_array().unwrap().len());
+        let w = &works[0];
+        assert_eq!(w.provider, "openlibrary");
+        assert_eq!(w.source_id, "OL59800W");
+        assert_eq!(w.title, "The Left Hand of Darkness");
+        assert_eq!(w.authors, ["Ursula K. Le Guin"]);
+        assert_eq!(w.first_year, Some(1969));
+        assert!(w.edition_count.unwrap() > 50);
+        assert_eq!(
+            w.cover_url.as_deref(),
+            Some("https://covers.openlibrary.org/b/id/10618463-L.jpg")
+        );
+    }
+
+    #[test]
+    fn an_isbn_lookup_reads_the_edition() {
+        let e = edition(&fixture("ol-isbn.json"));
+        assert_eq!(e.source_id.as_deref(), Some("OL7525849M"));
+        assert_eq!(e.publisher.as_deref(), Some("Ace"));
+        assert_eq!(e.binding.as_deref(), Some("Paperback"));
+        assert_eq!(e.pages, Some(304));
+        assert_eq!(e.isbn13.as_deref(), Some("9780441478125"));
+        assert_eq!(
+            e.cover_url.as_deref(),
+            Some("https://covers.openlibrary.org/b/id/284550-L.jpg")
+        );
+        assert!(e.year.is_some());
+    }
+
+    #[test]
+    fn a_works_editions_are_listed_with_what_each_has() {
+        let v = fixture("ol-editions.json");
+        let list: Vec<CandidateEdition> = v["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(edition)
+            .collect();
+        assert_eq!(list.len(), v["entries"].as_array().unwrap().len());
+        assert!(
+            list.iter()
+                .all(|e| e.source_id.as_deref().is_some_and(|k| k.starts_with("OL")))
+        );
+        let first = &list[0];
+        assert_eq!(first.publisher.as_deref(), Some("Mondadori"));
+        assert_eq!(first.year, Some(2025));
+        assert_eq!(first.isbn13.as_deref(), Some("9788835740988"));
+    }
+
+    #[test]
+    fn missing_or_odd_fields_are_left_empty() {
+        let e = edition(
+            &serde_json::json!({"key": "/books/OL1M", "covers": [-1], "number_of_pages": 0}),
+        );
+        assert_eq!(e.cover_url, None);
+        assert_eq!(e.pages, None);
+        assert_eq!(e.isbn13, None);
+        assert!(
+            work_from_doc(&serde_json::json!({"key": "/works/OL1W"})).is_none(),
+            "no title"
+        );
+    }
+}

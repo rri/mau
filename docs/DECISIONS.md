@@ -753,3 +753,81 @@ Mine:
 - Headings are semibold (600) with -0.01em tracking, which suits Instrument
   Sans better than Geist's bold.
 - Removed `streak` and `byMonth` from stats.ts (and their tests).
+
+## Functional specification, tests, and fixes (2026-11-11)
+
+Asked by the user: a functional specification of every element on every
+page, checked against fast local tests, gaps filled, with one-time non-local
+tests as a reference for mocks. Chosen when asked: expand docs/SPEC.md (now
+§14 behavior by page with IDs, §15 verification); add component tests
+(Vitest + Testing Library + jsdom); keep a Firefox suite in the repo (`just
+browser-test`), with Playwright staying for CI.
+
+Mine, about testing:
+
+- Test names start with the spec's behavior ID (HOME-04, ADD-11, …), so
+  `grep` connects them. Page tests use a shared mock library
+  (`web/src/test/fixtures.ts`): five books in known states and progress on
+  known dates, a fixed "today" (2026-11-11), and a mock API answering by
+  route. jsdom gaps are filled in `web/src/test/setup.ts` (fake IndexedDB, a
+  settable file input, no-op scrollIntoView); the device clock is UTC.
+- The Firefox suite starts its own servers on free ports with throwaway data,
+  creates the test user and session with Node's built-in SQLite (no sqlite3
+  command needed), and runs axe-core (WCAG 2.1 A/AA and best practice) in
+  light and dark at 1440 and 390px. Steps that call Open Library run only
+  with `MAU_BROWSER_NETWORK=1`.
+- Provider parsing is tested against answers recorded once from Open Library
+  and Google Books (`providers/testdata/`); Google's quota was used up while
+  recording, so its success answer is hand-made from the documented format.
+
+Bugs found and fixed:
+
+- Removing a book threw before its toast and the return to the catalog.
+- Coming back online while a sync was failing lost the retry and showed
+  "Offline" until the next minute's poll.
+- The audit log's Older button paged by time and could skip entries from the
+  same millisecond; it pages by entry ID (`AuditEntry` gained `id`).
+- Unknown addresses showed SvelteKit's unstyled 404; now a card like sign-in.
+- A non-JSON error page (e.g. a proxy's 502) broke the API client.
+- Sharing "A tag…" displayed the first tag but sent none; it now starts on
+  the first tag and is disabled without tags.
+- Deleting the account checked the username as it was when the page opened.
+- Wording: "+1 page today", "1 day read", "1 page" in the calendar, the admin
+  delete dialog for 0 or 1 books, "1 edition", zero recovery codes (page and
+  Settings row), and a closed instance's signup page no longer says to ask
+  for an invite.
+- Empty states (audit log, review queue, invites, sharing) wait for loading
+  instead of flashing "Nothing yet"; failed session, sharing, and invite
+  actions show their error.
+- Screen readers heard run-together labels ("Not startedadded",
+  "20261 page", "1 day read1 page").
+- Public pages: shelf titles line up, a share page no longer repeats its
+  title, "See all" only when a list is cut short.
+- Provider order arrows are drawn chevrons; the Add page's side padding
+  matches its title (20px).
+
+Mine, about behavior:
+
+- **Every dialog** gets the same behavior through one `modal` action: focus
+  moves in, Tab stays inside, Escape cancels the topmost dialog, and focus
+  returns to the opener (even when a field took focus first).
+- **Admin confirmation:** issuing a reset link, deleting a user, and making
+  someone an admin need a recent password confirmation, like the user's own
+  sensitive actions. A stolen admin session alone could otherwise take over
+  any account through a reset link. Suspending doesn't ask (it only removes
+  access, and is undone easily).
+- **Tab titles** come from one table (`lib/title.ts`): "*Page* · mau", the
+  book's title on its page, "Page not found · mau".
+- Public share pages keep their own names ("Finished", "Library"), which
+  differ from the Sharing page's ("Finished books", "Whole catalog"). Left as
+  is; worth aligning if it reads oddly.
+
+Not done (open):
+
+- Catalog grid badges can overlap a generated cover's title when the title
+  sits near the top (cosmetic).
+- Reordering in the Reading list is by pointer only; there is no keyboard way
+  to reorder (WCAG 2.1.1 asks for one). Up/down keys on the drag handle would
+  do.
+- No tests for camera decoding, the drag gesture itself, Hardcover and ISBNdb
+  parsing, provider fall-back order, or opening the app fully offline (§15).

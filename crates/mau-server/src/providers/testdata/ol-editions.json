@@ -1,0 +1,236 @@
+{
+ "links": {
+  "self": "/works/OL59858W/editions.json?limit=5",
+  "work": "/works/OL59858W",
+  "next": "/works/OL59858W/editions.json?limit=5&offset=5"
+ },
+ "size": 40,
+ "entries": [
+  {
+   "works": [
+    {
+     "key": "/works/OL59858W"
+    }
+   ],
+   "title": "La falce dei cieli",
+   "publishers": [
+    "Mondadori"
+   ],
+   "publish_date": "2025",
+   "key": "/books/OL59151305M",
+   "type": {
+    "key": "/type/edition"
+   },
+   "identifiers": {},
+   "isbn_13": [
+    "9788835740988"
+   ],
+   "publish_places": [
+    "Milan, Italy"
+   ],
+   "contributors": [
+    {
+     "role": "Translator",
+     "name": "Riccardo Valla"
+    }
+   ],
+   "languages": [
+    {
+     "key": "/languages/ita"
+    }
+   ],
+   "translation_of": "The Lathe of Heaven",
+   "translated_from": [
+    {
+     "key": "/languages/eng"
+    }
+   ],
+   "physical_format": "ebook",
+   "covers": [
+    15088625
+   ],
+   "latest_revision": 3,
+   "revision": 3,
+   "created": {
+    "type": "/type/datetime",
+    "value": "2025-05-21T07:46:47.321732"
+   },
+   "last_modified": {
+    "type": "/type/datetime",
+    "value": "2025-05-22T11:47:43.093712"
+   }
+  },
+  {
+   "works": [
+    {
+     "key": "/works/OL59858W"
+    }
+   ],
+   "title": "天钧",
+   "publishers": [
+    "北京日报出版社"
+   ],
+   "publish_date": "2024",
+   "key": "/books/OL57643904M",
+   "type": {
+    "key": "/type/edition"
+   },
+   "identifiers": {},
+   "isbn_13": [
+    "9787547747872"
+   ],
+   "languages": [
+    {
+     "key": "/languages/chi"
+    }
+   ],
+   "latest_revision": 2,
+   "revision": 2,
+   "created": {
+    "type": "/type/datetime",
+    "value": "2025-01-30T16:48:59.878915"
+   },
+   "last_modified": {
+    "type": "/type/datetime",
+    "value": "2025-01-30T16:51:03.696056"
+   }
+  },
+  {
+   "works": [
+    {
+     "key": "/works/OL59858W"
+    }
+   ],
+   "title": "The Lathe of Heaven",
+   "publishers": [
+    "北京日报出版社"
+   ],
+   "publish_date": "2024",
+   "key": "/books/OL57643903M",
+   "type": {
+    "key": "/type/edition"
+   },
+   "identifiers": {},
+   "isbn_13": [
+    "9787547747872"
+   ],
+   "latest_revision": 1,
+   "revision": 1,
+   "created": {
+    "type": "/type/datetime",
+    "value": "2025-01-30T16:48:59.725451"
+   },
+   "last_modified": {
+    "type": "/type/datetime",
+    "value": "2025-01-30T16:48:59.725451"
+   }
+  },
+  {
+   "type": {
+    "key": "/type/edition"
+   },
+   "publish_date": "1980",
+   "publish_country": "is",
+   "languages": [
+    {
+     "key": "/languages/heb"
+    }
+   ],
+   "work_titles": [
+    "Lathe of heaven"
+   ],
+   "title": "Mekḥonat ha-ḥalomot",
+   "by_statement": "ʻIvrit Dafnah Leṿi",
+   "authors": [
+    {
+     "key": "/authors/OL31353A"
+    }
+   ],
+   "oclc_numbers": [
+    "19163111"
+   ],
+   "series": [
+    "Madaʻ bidyoni (Keter)"
+   ],
+   "notes": {
+    "type": "/type/text",
+    "value": "Translation of: The lathe of heaven."
+   },
+   "publishers": [
+    "Keter"
+   ],
+   "publish_places": [
+    "Jerusalem"
+   ],
+   "pagination": "150 p.",
+   "number_of_pages": 150,
+   "source_records": [
+    "marc:harvard_bibliographic_metadata/ab.bib.00.20150123.full.mrc:19448392:556"
+   ],
+   "works": [
+    {
+     "key": "/works/OL59858W"
+    }
+   ],
+   "key": "/books/OL50242461M",
+   "latest_revision": 2,
+   "revision": 2,
+   "created": {
+    "type": "/type/datetime",
+    "value": "2023-12-08T04:56:42.926707"
+   },
+   "last_modified": {
+    "type": "/type/datetime",
+    "value": "2024-06-28T06:33:05.661778"
+   }
+  },
+  {
+   "publishers": [
+    "Editorial Presenca"
+   ],
+   "source_records": [
+    "amazon:9722331566"
+   ],
+   "title": "O Tormento DOS Ceus (Portuguese Edition)",
+   "publish_date": "Apr 10, 2004",
+   "key": "/books/OL26843898M",
+   "authors": [
+    {
+     "key": "/authors/OL31353A"
+    }
+   ],
+   "works": [
+    {
+     "key": "/works/OL59858W"
+    }
+   ],
+   "type": {
+    "key": "/type/edition"
+   },
+   "identifiers": {},
+   "isbn_10": [
+    "9722331566"
+   ],
+   "isbn_13": [
+    "9789722331562"
+   ],
+   "classifications": {},
+   "languages": [
+    {
+     "key": "/languages/por"
+    }
+   ],
+   "translation_of": "Lathe of Heaven",
+   "latest_revision": 4,
+   "revision": 4,
+   "created": {
+    "type": "/type/datetime",
+    "value": "2019-04-10T14:49:47.702162"
+   },
+   "last_modified": {
+    "type": "/type/datetime",
+    "value": "2024-06-28T06:33:05.661778"
+   }
+  }
+ ]
+}
