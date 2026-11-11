@@ -140,7 +140,7 @@ section{margin-top:32px;padding-top:20px;border-top:1px solid var(--line)}
 h2{margin:0 0 14px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:baseline}
 h2 a{font-size:14px;letter-spacing:0;text-transform:none;font-weight:500}
 .shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:22px 16px;list-style:none;margin:0;padding:0}
-.bk{display:grid;gap:6px;font-size:13.5px}
+.bk{display:grid;align-content:start;gap:6px;font-size:13.5px}
 .cover{aspect-ratio:2/3;border-radius:5px;box-shadow:0 1px 2px rgb(0 0 0/.18),0 0 0 1px rgb(0 0 0/.06);overflow:hidden;display:grid;place-items:center;text-align:center;padding:8px;font-weight:700;font-size:12px;line-height:1.2;text-transform:uppercase;color:#f3f6f4}
 .cover img{width:100%;height:100%;object-fit:cover;display:block}
 .cover.img{padding:0}
@@ -209,14 +209,19 @@ fn reading_list(list: &[Item]) -> Markup {
     }
 }
 
-fn section(s: &ShareRow, list: &[Item], limit: Option<usize>) -> Markup {
+/// One shared list. On the profile each list has a heading (and a link to
+/// the whole list when it's cut short); on a share's own page the page title
+/// already names it.
+fn section(s: &ShareRow, list: &[Item], limit: Option<usize>, heading: bool) -> Markup {
     let shown = limit.map_or(list, |n| &list[..list.len().min(n)]);
     html! {
         section {
-            h2 {
-                span { (title_of(s)) }
-                @if limit.is_some() {
-                    a href=(format!("/s/{}", s.token)) { "See all " (list.len()) }
+            @if heading {
+                h2 {
+                    span { (title_of(s)) }
+                    @if shown.len() < list.len() {
+                        a href=(format!("/s/{}", s.token)) { "See all " (list.len()) }
+                    }
                 }
             }
             @if list.is_empty() {
@@ -345,7 +350,7 @@ pub async fn profile(
     let mut sections = Vec::new();
     for s in &shares {
         let list = items(&state, &owner.id, s).await?;
-        sections.push(section(s, &list, Some(PREVIEW)));
+        sections.push(section(s, &list, Some(PREVIEW), true));
     }
     let body = html! {
         (header(&owner))
@@ -404,7 +409,7 @@ pub async fn share(
             h1 { (title_of(&s)) }
             div.user { a href=(format!("/u/{username}")) { (display_name) " (@" (username) ")" } }
         }
-        (section(&s, &list, None))
+        (section(&s, &list, None, false))
     };
     let _ = bio;
     Ok(html_response(
