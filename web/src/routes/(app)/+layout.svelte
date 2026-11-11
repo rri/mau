@@ -21,7 +21,9 @@
 	});
 
 	const tabs = [
-		{ href: '/', label: 'Reading', match: (p: string) => p === '/' },
+		// Phones only: on wide screens the logo is the way home.
+		{ href: '/', label: 'Home', match: (p: string) => p === '/', phoneOnly: true },
+		{ href: '/reading', label: 'Reading', match: (p: string) => p === '/reading' },
 		{
 			href: '/catalog',
 			label: 'Catalog',
@@ -36,10 +38,31 @@
 {:else if auth.me}
 	<div class="shell">
 		<nav class="tabs" aria-label="Main">
-			<img class="brand" src="/logo.svg" alt="mau" width="176" height="176" />
+			<a
+				class="brand"
+				href="/"
+				aria-label="mau home"
+				aria-current={page.url.pathname === '/' ? 'page' : undefined}
+				><img src="/logo.svg" alt="" width="176" height="176" /></a
+			>
 			{#each tabs as t (t.href)}
-				<a href={t.href} class="tab" aria-current={t.match(page.url.pathname) ? 'page' : undefined}>
-					{#if t.label === 'Reading'}
+				<a
+					href={t.href}
+					class="tab"
+					class:phone-only={t.phoneOnly}
+					aria-current={t.match(page.url.pathname) ? 'page' : undefined}
+				>
+					{#if t.label === 'Home'}
+						<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"
+							><path
+								d="M3.5 9 10 3.5 16.5 9v7.5a1 1 0 0 1-1 1h-3.5v-5h-4v5H4.5a1 1 0 0 1-1-1z"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.6"
+								stroke-linejoin="round"
+							/></svg
+						>
+					{:else if t.label === 'Reading'}
 						<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"
 							><path
 								d="M3 4.5C5.5 3.5 8 3.8 10 5.2c2-1.4 4.5-1.7 7-.7v11c-2.5-1-5-.7-7 .7-2-1.4-4.5-1.7-7-.7z"
@@ -103,7 +126,7 @@
 		bottom: 0;
 		z-index: 20;
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: repeat(4, 1fr);
 		background: color-mix(in srgb, var(--surface) 92%, transparent);
 		backdrop-filter: blur(12px);
 		border-top: 1px solid var(--line);
@@ -145,12 +168,23 @@
 			background: none;
 			backdrop-filter: none;
 		}
-		/* As wide as the tab buttons below it. */
+		/* As wide as the tab buttons below it; it's the link home. */
 		.brand {
+			display: block;
+			margin: 0 0 20px;
+			border-radius: 22.5%;
+		}
+		.brand img {
 			display: block;
 			width: 100%;
 			height: auto;
-			margin: 0 0 20px;
+		}
+		.brand[aria-current='page'] img {
+			outline: 2px solid var(--accent);
+			outline-offset: 3px;
+		}
+		.tab.phone-only {
+			display: none;
 		}
 		.tab {
 			display: flex;

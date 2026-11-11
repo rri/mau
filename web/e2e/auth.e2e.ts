@@ -36,7 +36,10 @@ test('first admin signs up with the setup link, then signs in with the password'
 	// Sign out by dropping the cookie, then sign in again.
 	await page.context().clearCookies();
 	await page.evaluate(() => localStorage.clear());
+	// Signed out, the front page is the landing page; app pages ask to sign in.
 	await page.goto('/');
+	await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
+	await page.goto('/reading');
 	await expect(page).toHaveURL(/\/signin$/);
 	await page.getByLabel('Username').fill('rri');
 	await page.getByLabel('Password').fill('not the password');

@@ -9,7 +9,7 @@ test.beforeAll(() => seed('rri'));
 const PLUS = 'Add 1 page to The Left Hand of Darkness';
 
 test('+ logs one page and Undo takes it back', async ({ page }) => {
-	await page.goto('/');
+	await page.goto('/reading');
 	const row = page.getByRole('listitem').filter({ hasText: 'The Left Hand of Darkness' });
 	await expect(row.getByText('page 140 of 304')).toBeVisible();
 	await page.getByRole('button', { name: PLUS }).click();
@@ -20,7 +20,7 @@ test('+ logs one page and Undo takes it back', async ({ page }) => {
 });
 
 test('taps made offline sync when the connection returns', async ({ page, context }) => {
-	await page.goto('/');
+	await page.goto('/reading');
 	const row = page.getByRole('listitem').filter({ hasText: 'The Left Hand of Darkness' });
 	await expect(row.getByText('page 140 of 304')).toBeVisible();
 	await context.setOffline(true);
@@ -41,7 +41,7 @@ test('taps made offline sync when the connection returns', async ({ page, contex
 });
 
 test('pausing moves a book to the top of the inactive books', async ({ page }) => {
-	await page.goto('/');
+	await page.goto('/reading');
 	await page.getByRole('button', { name: 'Pause Middlemarch' }).click();
 	const rows = page.getByRole('listitem');
 	// Middlemarch is now the first book with a Resume button.

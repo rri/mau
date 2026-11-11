@@ -699,3 +699,31 @@ Mine:
   with an amber Sign in button; its space for the quote is reserved so the
   page doesn't jump. Offline, it shows without a quote.
 - Sign-out still goes to the sign-in page.
+
+## Home page for signed-in readers (2026-11-10)
+
+Asked by the user: the logo links to a landing page for signed-in users with
+useful summaries and reading statistics. Chosen when asked:
+
+- Home takes over `/`; the Reading view moves to `/reading`.
+- Phones get a Home tab (the sidebar logo is the link on wide screens).
+- Sections: today and streak, continue reading, this year in numbers, pages
+  by month. (Recently finished, library totals, records and year-by-year
+  history were offered and not chosen.)
+
+Mine:
+
+- Numbers are computed in the browser (`lib/stats.ts`, unit-tested) from the
+  synced library: forward page moves only, deleted books excluded, unknown
+  finish dates not counted. "Pages per reading day" divides by days that had
+  reading.
+- The streak counts back from today, or from yesterday while today has no
+  reading yet, and says "read today to keep it".
+- Days left = pages remaining ÷ that book's pages over the last 28 days
+  per day, rounded up; no estimate without recent reading.
+- Charts (`BarChart`): one series in the accent, current day or month in full
+  accent and the rest lighter, empty days as a thin line, later months blank,
+  a tooltip on hover, and a hidden table for screen readers.
+- The greeting follows the device clock; the date follows the account's time
+  zone. The sidebar logo shows an accent ring while you're on Home.
+- Playwright tests updated for `/reading` and the signed-out landing page.

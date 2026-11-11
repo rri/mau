@@ -104,7 +104,7 @@ recovery codes, and deleting the account: the password, plus an authenticator
 ## 3a. Landing page
 
 - Visitors who aren't signed in see a landing page at `/`; every other page
-  still sends them to sign in. Signed in, `/` is the Reading view as before.
+  still sends them to sign in. Signed in, `/` is the home page (§3b).
 - One centered column in the logo's navy (the same look in light and dark
   mode): the large logo, "mau" in Pinyon Script, the tagline "your personal
   library and reading log" in small caps, a random quote, and **Sign in**
@@ -116,6 +116,26 @@ recovery codes, and deleting the account: the password, plus an authenticator
 - Footer: a link to github.com/rri/mau · "Source code licensed under
   AGPL-3.0".
 - The logo on the sign-in and other public pages links back to it.
+
+## 3b. Home (signed in)
+
+- `/` for signed-in readers; the Reading view moved to `/reading`. Signing in
+  or signing up lands here. On wide screens the sidebar logo is the link (it
+  gets an accent ring while you're home); phones get a fourth tab, **Home**,
+  before Reading.
+- Header: today's date and "Good morning/afternoon/evening, *name*"
+  ("Welcome, *name*." while the library is empty, with Add and Import).
+- **Today**: pages read today, the reading streak (consecutive days; it
+  survives until the day is over: "read today to keep it"), and the last 14
+  days as bars.
+- **Continue reading**: up to five active books with progress, the round +,
+  and "about N days left at your pace" (from the last 28 days of that book;
+  hidden without recent reading). "All N books" opens the Reading view.
+- **Year so far**: books finished, pages read, days with reading, pages per
+  reading day (calendar year; unknown finish dates don't count).
+- **Pages by month**: bars for each month of the year, the current month in
+  full accent, later months empty, books finished marked under each month.
+- All figures come from the synced library, so the page works offline.
 
 ## 4. Reading view (progress view)
 
@@ -301,7 +321,7 @@ A list of sections, each its own page, then **Sign out**.
   as the tab buttons (176px) at the top of the wide-screen sidebar, and a 112px badge on the sign-in,
   sign-up, invite, reset, and setup pages. Installed-app splash screens are
   navy (#1E242B) to match.
-- Bottom tab bar: Reading · Catalog · Settings. On wide screens it becomes a
+- Bottom tab bar: Home · Reading · Catalog · Settings. On wide screens it becomes a
   sidebar docked to the left of a 720px content panel; the content stays
   centered on screen (from 1120px wide; narrower, the pair is centered).
 - Covers: real covers everywhere. Without one, a generated image that looks
