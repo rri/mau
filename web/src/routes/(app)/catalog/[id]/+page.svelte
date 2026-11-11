@@ -15,15 +15,18 @@
 	import Cover from '#lib/components/Cover.svelte';
 	import TagInput from '#lib/components/TagInput.svelte';
 	import Icon from '#lib/components/Icon.svelte';
+	import Breadcrumbs from '#lib/components/Breadcrumbs.svelte';
+	import { origin } from '#lib/origin.svelte.ts';
 
 	const FORMATS = ['Hardcover', 'Paperback', 'Ebook', 'Audiobook'];
 
-	// "‹ Catalog" goes back in history when we came from the catalog, so its
-	// scroll position and filters are kept.
-	let cameFromCatalog = $state(false);
-	afterNavigate(({ from }) => (cameFromCatalog = from?.url.pathname === '/catalog'));
+	// The trail starts at the section the reader came from (Home, Reading, or
+	// Catalog). Going back to it uses history when we came straight from there,
+	// so its scroll position and filters are kept.
+	let cameFrom = $state<string | null>(null);
+	afterNavigate(({ from }) => (cameFrom = from?.url.pathname ?? null));
 	function back(e: MouseEvent) {
-		if (cameFromCatalog) {
+		if (cameFrom === origin.section.href) {
 			e.preventDefault();
 			history.back();
 		}
@@ -277,11 +280,16 @@
 {:else if !info}
 	<div class="pad">
 		<p>This book isn't on your list.</p>
-		<a class="link" href="/catalog">Back to the catalog</a>
+		<a class="link" href={origin.section.href}>Back to {origin.section.label}</a>
 	</div>
 {:else}
 	<div class="topbar">
-		<a class="back" href="/catalog" onclick={back}>‹ Catalog</a>
+		<Breadcrumbs
+			items={[
+				{ label: origin.section.label, href: origin.section.href, onclick: back },
+				{ label: info.title }
+			]}
+		/>
 		<div class="menu-wrap">
 			<button
 				class="more"
@@ -612,12 +620,8 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 10px 10px 4px;
-	}
-	.back {
-		color: var(--accent);
-		text-decoration: none;
-		padding: 6px 8px;
+		gap: 12px;
+		padding: 16px 12px 4px 20px;
 	}
 	.menu-wrap {
 		position: relative;
@@ -671,7 +675,7 @@
 	h1 {
 		margin: 0;
 		font-size: 24px;
-		font-weight: 700;
+		font-weight: 600;
 		line-height: 1.2;
 		text-wrap: balance;
 	}

@@ -130,10 +130,10 @@ const STYLE: &str = r#"
 :root{--bg:#f5f7f6;--surface:#fff;--ink:#0d1512;--muted:#56635d;--line:#e1e7e4;--accent:#047857;color-scheme:light}
 @media (prefers-color-scheme:dark){:root{--bg:#0a0f0d;--surface:#131a17;--ink:#e9f0ec;--muted:#95a59e;--line:#25302b;--accent:#34d399;color-scheme:dark}}
 *{box-sizing:border-box}html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font:15px/1.5 'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 main{max-width:720px;min-height:100vh;margin:0 auto;padding:36px 24px 48px;background:var(--surface);border-left:1px solid var(--line);border-right:1px solid var(--line)}
 a{color:var(--accent)}
-.head h1{margin:0;font-size:28px;font-weight:700;letter-spacing:-.025em;line-height:1.15}
+.head h1{margin:0;font-size:28px;font-weight:600;letter-spacing:-.015em;line-height:1.15}
 .user{color:var(--muted)}
 .bio{margin:10px 0 0;max-width:60ch}
 section{margin-top:32px;padding-top:20px;border-top:1px solid var(--line)}
@@ -231,7 +231,7 @@ fn section(s: &ShareRow, list: &[Item], limit: Option<usize>) -> Markup {
 }
 
 fn page(title: &str, description: &str, body: Markup, public_url: &str) -> Markup {
-    let font = crate::web::asset_path("geist-latin-wght-normal");
+    let font = crate::web::asset_path("instrument-sans-latin-wght-normal");
     html! {
         (DOCTYPE)
         html lang="en" {
@@ -245,7 +245,7 @@ fn page(title: &str, description: &str, body: Markup, public_url: &str) -> Marku
                 link rel="icon" href="/icon.svg" type="image/svg+xml";
                 @if let Some(f) = &font {
                     link rel="preload" href=(f) as="font" type="font/woff2" crossorigin;
-                    style { (PreEscaped(format!("@font-face{{font-family:'Geist';font-style:normal;font-weight:100 900;font-display:swap;src:url({f}) format('woff2')}}"))) }
+                    style { (PreEscaped(format!("@font-face{{font-family:'Instrument Sans';font-style:normal;font-weight:400 700;font-display:swap;src:url({f}) format('woff2')}}"))) }
                 }
                 style { (PreEscaped(STYLE)) }
             }

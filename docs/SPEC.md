@@ -123,18 +123,16 @@ recovery codes, and deleting the account: the password, plus an authenticator
   or signing up lands here. On wide screens the sidebar logo is the link (it
   gets an accent ring while you're home); phones get a fourth tab, **Home**,
   before Reading.
-- Header: today's date and "Good morning/afternoon/evening, *name*"
-  ("Welcome, *name*." while the library is empty, with Add and Import).
-- **Today**: pages read today, the reading streak (consecutive days; it
-  survives until the day is over: "read today to keep it"), and the last 14
-  days as bars.
-- **Continue reading**: up to five active books with progress, the round +,
-  and "about N days left at your pace" (from the last 28 days of that book;
-  hidden without recent reading). "All N books" opens the Reading view.
-- **Year so far**: books finished, pages read, days with reading, pages per
-  reading day (calendar year; unknown finish dates don't count).
-- **Pages by month**: bars for each month of the year, the current month in
-  full accent, later months empty, books finished marked under each month.
+- Header: today's date, then "Good morning/afternoon/evening, *name*!"
+  ("Welcome, *name*!" while the library is empty, with Add and Import), with
+  room between the two and below.
+- **Pick up where you left off**: up to five active books with progress, the
+  round +, and "about N days left at your pace" (from the last 28 days of
+  that book; hidden without recent reading). "All N books" opens Reading.
+- **Your reading trends** (same heading style), with two subheadings:
+  **Last 14 days** (pages per day as bars) and **2026 (so far)** (books
+  finished, pages read, days with reading; unknown finish dates don't count).
+- No streaks, no "nothing yet today", no per-day average, no monthly chart.
 - All figures come from the synced library, so the page works offline.
 
 ## 4. Reading view (progress view)
@@ -309,7 +307,7 @@ A list of sections, each its own page, then **Sign out**.
 ## 10. Visual design
 
 - "Clean and crisp": cool neutral greys, white surfaces (near-black in dark
-  mode), Geist typeface throughout (self-hosted), vivid emerald accent
+  mode), Instrument Sans throughout (self-hosted; headings semibold), vivid emerald accent
   (#047857 light, #34d399 dark). Every text pair is at least 4.5:1.
 - Follows the system light or dark mode, with an override in Settings.
 - Comfortable density: 64px rows, 42px round **+**, 20px side padding.
@@ -325,8 +323,14 @@ A list of sections, each its own page, then **Sign out**.
   sidebar docked to the left of a 720px content panel; the content stays
   centered on screen (from 1120px wide; narrower, the pair is centered).
 - Covers: real covers everywhere. Without one, a generated image that looks
-  like a book cover with the title and author, lettered in Geist.
+  like a book cover with the title and author, lettered in Instrument Sans.
 - Public pages use the same font and colors.
+- Breadcrumbs above page titles: earlier steps are accent links with a soft
+  hover, chevrons between, the current page plain and bold; on phones only
+  "‹ parent". A book and Add a book start from the section you came from
+  (Home, Reading or Catalog; Catalog when opened directly), and that section's
+  tab stays highlighted. Settings pages: Settings › page; admin pages:
+  Settings › Admin › page.
 - Reference: mocks/style2.html (Geist, Emerald, Tinted cards, Docked sidebar).
 
 ## 11. Offline and sync

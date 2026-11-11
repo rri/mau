@@ -20,6 +20,8 @@
 	import Cover from '#lib/components/Cover.svelte';
 	import Scanner from '#lib/components/Scanner.svelte';
 	import TagInput from '#lib/components/TagInput.svelte';
+	import Breadcrumbs from '#lib/components/Breadcrumbs.svelte';
+	import { origin } from '#lib/origin.svelte.ts';
 
 	const FORMATS = ['Hardcover', 'Paperback', 'Ebook', 'Audiobook'];
 	const ROLES = [
@@ -341,10 +343,18 @@
 
 <div class="topbar">
 	{#if mode === 'manual'}
-		<button class="back" type="button" onclick={() => (mode = 'search')}>‹ Search</button>
+		<Breadcrumbs
+			items={[
+				{ label: origin.section.label, href: origin.section.href },
+				{ label: 'Add a book', onclick: () => (mode = 'search') },
+				{ label: 'Enter a book' }
+			]}
+		/>
 		<h1>Enter a book</h1>
 	{:else}
-		<a class="back" href="/catalog">‹ Catalog</a>
+		<Breadcrumbs
+			items={[{ label: origin.section.label, href: origin.section.href }, { label: 'Add a book' }]}
+		/>
 		<h1>Add a book</h1>
 	{/if}
 </div>
@@ -602,24 +612,14 @@
 
 <style>
 	.topbar {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		padding: 12px 12px 6px;
+		display: grid;
+		gap: 10px;
+		padding: 18px 20px 8px;
 	}
 	.topbar h1 {
 		margin: 0;
-		font-size: 21px;
+		font-size: 24px;
 		font-weight: 600;
-	}
-	.back {
-		color: var(--accent);
-		text-decoration: none;
-		padding: 6px 8px;
-		background: none;
-		border: 0;
-		cursor: pointer;
-		font-size: 16px;
 	}
 	.searchbar {
 		display: flex;

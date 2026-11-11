@@ -8,6 +8,7 @@
 	import Toast from '#lib/components/Toast.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import Landing from '#lib/components/Landing.svelte';
+	import { origin } from '#lib/origin.svelte.ts';
 
 	let { children } = $props();
 
@@ -15,20 +16,26 @@
 	// to sign in. Signed in, the app as usual.
 	const landing = $derived(!auth.me && page.url.pathname === '/');
 
+	// Remember the main section, so books and Add a book can lead back to it.
+	$effect(() => origin.visit(page.url.pathname));
+
 	$effect(() => {
 		if (auth.me) library.open(auth.me.id);
 		else if (!landing) goto('/signin', { replaceState: true });
 	});
 
+	// A book or Add a book belongs to the section the reader came from, so
+	// that tab stays highlighted (matching the breadcrumb trail).
+	const section = $derived.by(() => {
+		const p = page.url.pathname;
+		if (p.startsWith('/catalog/') || p.startsWith('/add')) return origin.section.href;
+		return p;
+	});
 	const tabs = [
 		// Phones only: on wide screens the logo is the way home.
 		{ href: '/', label: 'Home', match: (p: string) => p === '/', phoneOnly: true },
 		{ href: '/reading', label: 'Reading', match: (p: string) => p === '/reading' },
-		{
-			href: '/catalog',
-			label: 'Catalog',
-			match: (p: string) => p.startsWith('/catalog') || p.startsWith('/add')
-		},
+		{ href: '/catalog', label: 'Catalog', match: (p: string) => p === '/catalog' },
 		{ href: '/settings', label: 'Settings', match: (p: string) => p.startsWith('/settings') }
 	];
 </script>
@@ -42,7 +49,7 @@
 				class="brand"
 				href="/"
 				aria-label="mau home"
-				aria-current={page.url.pathname === '/' ? 'page' : undefined}
+				aria-current={section === '/' ? 'page' : undefined}
 				><img src="/logo.svg" alt="" width="176" height="176" /></a
 			>
 			{#each tabs as t (t.href)}
@@ -50,7 +57,7 @@
 					href={t.href}
 					class="tab"
 					class:phone-only={t.phoneOnly}
-					aria-current={t.match(page.url.pathname) ? 'page' : undefined}
+					aria-current={t.match(section) ? 'page' : undefined}
 				>
 					{#if t.label === 'Home'}
 						<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"

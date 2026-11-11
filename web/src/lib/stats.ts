@@ -19,19 +19,6 @@ export function pagesPerDay(d: Data): Map<string, number> {
 	return out;
 }
 
-/** Consecutive reading days ending today, or ending yesterday if today has
- *  no reading yet (the streak isn't broken until the day is over). */
-export function streak(perDay: Map<string, number>, today: string) {
-	const readToday = (perDay.get(today) ?? 0) > 0;
-	let day = readToday ? today : addDays(today, -1);
-	let days = 0;
-	while ((perDay.get(day) ?? 0) > 0) {
-		days++;
-		day = addDays(day, -1);
-	}
-	return { days, readToday };
-}
-
 /** The last `n` days, oldest first. */
 export function lastDays(perDay: Map<string, number>, today: string, n = 14) {
 	return Array.from({ length: n }, (_, i) => {
@@ -61,21 +48,7 @@ export function yearTotals(d: Data, perDay: Map<string, number>, year: number) {
 			pages += p;
 			days++;
 		}
-	return {
-		finished: finishedIn(d, year).length,
-		pages,
-		days,
-		perReadingDay: days ? Math.round(pages / days) : 0
-	};
-}
-
-/** Pages and finished books for each month of `year`. */
-export function byMonth(d: Data, perDay: Map<string, number>, year: number) {
-	const months = Array.from({ length: 12 }, (_, m) => ({ month: m, pages: 0, finished: 0 }));
-	for (const [date, p] of perDay)
-		if (date.startsWith(`${year}-`)) months[Number(date.slice(5, 7)) - 1].pages += p;
-	for (const f of finishedIn(d, year)) months[Number(f.slice(5, 7)) - 1].finished++;
-	return months;
+	return { finished: finishedIn(d, year).length, pages, days };
 }
 
 /** Days left for a reading at its pace over the last four weeks, or null when

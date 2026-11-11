@@ -30,7 +30,7 @@
 	.card :global(h1) {
 		margin: 0;
 		font-size: 24px;
-		font-weight: 700;
+		font-weight: 600;
 		text-align: center;
 		text-wrap: balance;
 	}

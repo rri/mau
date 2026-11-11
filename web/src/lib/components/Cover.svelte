@@ -94,7 +94,7 @@
 				x="100"
 				y={firstY + i * 20}
 				text-anchor="middle"
-				font-family="Geist Variable, system-ui, sans-serif"
+				font-family="Instrument Sans Variable, system-ui, sans-serif"
 				font-weight="700"
 				font-size="16"
 				letter-spacing="0.5"
@@ -105,7 +105,7 @@
 			x="100"
 			y={authorY}
 			text-anchor="middle"
-			font-family="Geist Variable, system-ui, sans-serif"
+			font-family="Instrument Sans Variable, system-ui, sans-serif"
 			font-size="10"
 			font-weight="500"
 			letter-spacing="1.2"

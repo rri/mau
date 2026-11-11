@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Data } from './sync/apply.ts';
-import { byMonth, daysLeft, lastDays, pagesPerDay, streak, yearTotals } from './stats.ts';
+import { daysLeft, lastDays, pagesPerDay, yearTotals } from './stats.ts';
 
 // A tiny library: one book, two readings (one finished), a few progress events.
 function library(): Data {
@@ -64,13 +64,6 @@ describe('stats', () => {
 		expect(p.get('2026-03-01')).toBe(300);
 	});
 
-	it('keeps a streak alive until the day is over', () => {
-		const p = pagesPerDay(library());
-		expect(streak(p, '2026-11-10')).toEqual({ days: 3, readToday: true });
-		expect(streak(p, '2026-11-11')).toEqual({ days: 3, readToday: false });
-		expect(streak(p, '2026-11-12')).toEqual({ days: 0, readToday: false });
-	});
-
 	it('lists recent days oldest first', () => {
 		const days = lastDays(pagesPerDay(library()), '2026-11-10', 3);
 		expect(days).toEqual([
@@ -80,18 +73,10 @@ describe('stats', () => {
 		]);
 	});
 
-	it('totals a year and splits it by month', () => {
+	it('totals a year', () => {
 		const d = library();
 		const p = pagesPerDay(d);
-		expect(yearTotals(d, p, 2026)).toEqual({
-			finished: 1,
-			pages: 410,
-			days: 4,
-			perReadingDay: 103
-		});
-		const m = byMonth(d, p, 2026);
-		expect(m[2]).toEqual({ month: 2, pages: 300, finished: 1 });
-		expect(m[10]).toEqual({ month: 10, pages: 110, finished: 0 });
+		expect(yearTotals(d, p, 2026)).toEqual({ finished: 1, pages: 410, days: 4 });
 	});
 
 	it('estimates days left from the last four weeks', () => {

@@ -53,7 +53,7 @@ fn response(body: Vec<u8>, content_type: &str, cache: &'static str) -> Response 
 }
 
 /// The served path of a built asset whose file name starts with `prefix`
-/// (e.g. the hashed Geist font, for server-rendered pages).
+/// (e.g. the hashed Instrument Sans font, for server-rendered pages).
 pub fn asset_path(prefix: &str) -> Option<String> {
     Assets::iter()
         .find(|p| {

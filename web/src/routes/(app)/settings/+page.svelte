@@ -89,7 +89,7 @@
 </ul>
 
 {#if auth.me?.is_admin}
-	<div class="group">Admin</div>
+	<div class="group" id="admin">Admin</div>
 	<ul class="list">
 		{#each adminItems as it (it.href)}
 			<li>

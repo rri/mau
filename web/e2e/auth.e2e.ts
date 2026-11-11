@@ -27,7 +27,7 @@ test('first admin signs up with the setup link, then signs in with the password'
 	await expect(start).toBeDisabled();
 	await page.getByLabel("I've saved these codes somewhere safe").check();
 	await start.click();
-	await expect(page.getByText('Welcome, R. Reader.')).toBeVisible();
+	await expect(page.getByText('Welcome, R. Reader!')).toBeVisible();
 
 	// The setup link no longer works.
 	await page.goto(`/setup/${setupToken()}`);
@@ -47,7 +47,7 @@ test('first admin signs up with the setup link, then signs in with the password'
 	await expect(page.getByText("That username and password don't match.")).toBeVisible();
 	await page.getByLabel('Password').fill(PASSWORD);
 	await page.getByRole('button', { name: 'Sign in' }).click();
-	await expect(page.getByText('Welcome, R. Reader.')).toBeVisible();
+	await expect(page.getByText('Welcome, R. Reader!')).toBeVisible();
 
 	// Later test files reuse this session.
 	await page.context().storageState({ path: AUTH_FILE });

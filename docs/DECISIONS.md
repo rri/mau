@@ -727,3 +727,29 @@ Mine:
 - The greeting follows the device clock; the date follows the account's time
   zone. The sidebar logo shows an accent ring while you're on Home.
 - Playwright tests updated for `/reading` and the signed-out landing page.
+
+## Home page revisions, breadcrumbs, Instrument Sans (2026-11-11)
+
+Asked by the user: "!" after the greeting; more room between date, greeting
+and the rest; no streak; no "Nothing yet today"; "Your reading trends" and
+"Pick up where you left off" as equal headings; "2026 (so far)" as a
+subheading under trends; no per-day average; no monthly chart; breadcrumbs
+that lead back to where you came from and look like breadcrumbs; fresher
+fonts. Chosen when asked: Instrument Sans (over Inter, Figtree, DM Sans, from
+a comparison board on the design canvas); "Pick up where you left off" first;
+a chevron trail.
+
+Mine:
+
+- Trends has two subheadings, "Last 14 days" (the chart) and "2026 (so far)",
+  so the chart is labeled.
+- Where you came from is the last main section shown (Home, Reading or
+  Catalog), kept for the tab in sessionStorage; direct visits start from
+  Catalog. Book pages and Add a book use it for the trail and the highlighted
+  tab, and the trail's first link goes back in history when that's where you
+  came from (keeping scroll and filters).
+- Admin pages: Settings › Admin › page, where Admin jumps to the admin group
+  on Settings (#admin).
+- Headings are semibold (600) with -0.01em tracking, which suits Instrument
+  Sans better than Geist's bold.
+- Removed `streak` and `byMonth` from stats.ts (and their tests).

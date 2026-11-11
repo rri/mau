@@ -259,7 +259,7 @@
 	h1 {
 		margin: 0;
 		font-size: 24px;
-		font-weight: 700;
+		font-weight: 600;
 	}
 	.status {
 		font-size: 13px;

@@ -1,7 +1,7 @@
-/* Clean and crisp: Geist throughout, cool neutral greys, a vivid emerald
+/* Clean and crisp: Instrument Sans throughout, cool neutral greys, a vivid emerald
    accent. Light by default; dark follows the system unless data-theme pins it.
    Every text pair is at least 4.5:1 in both modes. */
-@import '@fontsource-variable/geist/wght.css';
+@import '@fontsource-variable/instrument-sans/index.css';
 
 :root {
 	--bg: #f5f7f6;
@@ -16,7 +16,7 @@
 	--danger: #c8283f;
 	--warn: #8a5a00;
 	--shadow: 0 1px 2px rgb(16 24 20 / 0.06), 0 1px 3px rgb(16 24 20 / 0.08);
-	--font: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font: 'Instrument Sans Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
 	color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -95,7 +95,7 @@ textarea {
 h1,
 h2,
 h3 {
-	letter-spacing: -0.02em;
+	letter-spacing: -0.01em;
 }
 /* The logo badge: a hairline ring so its dark navy keeps an edge on dark
    backgrounds. It's drawn inside the image (and there's no blurred shadow)
@@ -248,20 +248,14 @@ img[src='/logo.svg'] {
 /* ---- Settings pages ------------------------------------------------- */
 
 .page-head {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	padding: 20px 14px 10px;
+	display: grid;
+	gap: 10px;
+	padding: 18px 20px 8px;
 }
 .page-head h1 {
 	margin: 0;
-	font-size: 22px;
-	font-weight: 700;
-}
-.page-head .back {
-	color: var(--accent);
-	text-decoration: none;
-	padding: 6px 8px;
+	font-size: 24px;
+	font-weight: 600;
 }
 .sec {
 	padding: 12px 20px 18px;
