@@ -73,6 +73,10 @@ pub async fn update_user(
     Path(id): Path<String>,
     Json(req): Json<UserUpdate>,
 ) -> ApiResult<Json<Ok_>> {
+    // Granting admin hands over everyone's account recovery.
+    if req.is_admin == Some(true) {
+        a.0.require_recent_confirmation()?;
+    }
     let mut tx = state.db.begin().await?;
     let (username, is_admin, suspended): (String, bool, bool) =
         sqlx::query_as("SELECT username, is_admin, suspended FROM users WHERE id = ?")
@@ -136,6 +140,7 @@ pub async fn delete_user(
             "Delete your own account from Settings → Account.",
         ));
     }
+    a.0.require_recent_confirmation()?;
     let mut tx = state.db.begin().await?;
     let (username, is_admin): (String, bool) =
         sqlx::query_as("SELECT username, is_admin FROM users WHERE id = ?")
@@ -169,6 +174,8 @@ pub async fn reset_link(
     a: Admin,
     Path(id): Path<String>,
 ) -> ApiResult<Json<Link>> {
+    // The link takes over the account, so a stolen admin session isn't enough.
+    a.0.require_recent_confirmation()?;
     let mut tx = state.db.begin().await?;
     let username: String = sqlx::query_scalar("SELECT username FROM users WHERE id = ?")
         .bind(&id)

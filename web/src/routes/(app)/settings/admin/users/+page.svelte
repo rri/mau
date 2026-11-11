@@ -4,6 +4,8 @@
 	import type { Link } from '#lib/api/generated/Link.ts';
 	import type { UserRow } from '#lib/api/generated/UserRow.ts';
 	import { auth } from '#lib/auth.svelte.ts';
+	import { withReauth } from '#lib/confirm.svelte.ts';
+	import { modal } from '#lib/modal.ts';
 	import { toasts } from '#lib/toast.svelte.ts';
 	import PageHead from '#lib/components/PageHead.svelte';
 
@@ -27,10 +29,10 @@
 	async function update(u: UserRow, body: object) {
 		error = '';
 		try {
-			await patch(`/admin/users/${u.id}`, body);
+			await withReauth(() => patch(`/admin/users/${u.id}`, body));
 			load();
 		} catch (e) {
-			error = (e as Error).message;
+			if ((e as { code?: string }).code !== 'cancelled') error = (e as Error).message;
 		}
 	}
 	async function run() {
@@ -39,14 +41,14 @@
 		confirm = null;
 		try {
 			if (kind === 'delete') {
-				await del(`/admin/users/${user.id}`);
+				await withReauth(() => del(`/admin/users/${user.id}`));
 				toasts.show(`Deleted @${user.username}`);
 				load();
 			} else {
-				link = (await post<Link>(`/admin/users/${user.id}/reset-link`)).url;
+				link = (await withReauth(() => post<Link>(`/admin/users/${user.id}/reset-link`))).url;
 			}
 		} catch (e) {
-			error = (e as Error).message;
+			if ((e as { code?: string }).code !== 'cancelled') error = (e as Error).message;
 		}
 	}
 	async function copy() {
@@ -118,11 +120,21 @@
 
 {#if confirm}
 	<div class="dialog-back" role="presentation">
-		<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="c-h">
+		<div
+			class="dialog"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="c-h"
+			use:modal={() => (confirm = null)}
+		>
 			{#if confirm.kind === 'delete'}
 				<h3 id="c-h">Delete @{confirm.user.username}?</h3>
 				<p>
-					Deletes their account and all {confirm.user.books} books with their history. This can't be undone.
+					Deletes their account and {confirm.user.books === 0
+						? 'their library'
+						: confirm.user.books === 1
+							? 'their 1 book with its history'
+							: `all ${confirm.user.books} books with their history`}. This can't be undone.
 					Suspending keeps their data.
 				</p>
 			{:else}
