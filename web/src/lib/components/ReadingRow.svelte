@@ -140,7 +140,8 @@
 		<div class="bar" class:empty={!r}><span style="width:{pct}%"></span></div>
 		<div class="meta">
 			{#if !r}
-				<span>Not started</span><span>added {ago(addedOn, today)}</span>
+				<span>Not started</span>
+				<span>added {ago(addedOn, today)}</span>
 			{:else if editing}
 				<span
 					class="edit"

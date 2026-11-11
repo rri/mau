@@ -9,9 +9,16 @@ export const nav = {
 };
 
 /** The current page; tests set `page.url` (and `page.params`) before rendering. */
-export const page: { url: URL; params: Record<string, string> } = {
+export const page: {
+	url: URL;
+	params: Record<string, string>;
+	status: number;
+	error: { message: string } | null;
+} = {
 	url: new URL('http://localhost/'),
-	params: {}
+	params: {},
+	status: 200,
+	error: null
 };
 
 export function at(path: string, params: Record<string, string> = {}) {

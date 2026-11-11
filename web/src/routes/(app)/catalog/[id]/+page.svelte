@@ -267,9 +267,11 @@
 	let confirmRemove = $state(false);
 	function remove() {
 		if (!info) return;
+		// Read before deleting: afterwards the book (and `info`) is gone.
+		const { title } = info;
 		library.commit([{ type: 'book.delete', id: info.book.id }]);
 		confirmRemove = false;
-		toasts.show(`Removed ${info.title} from your list`);
+		toasts.show(`Removed ${title} from your list`);
 		goto('/catalog', { replaceState: true });
 	}
 	const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -543,11 +545,9 @@
 		<h2>Reading activity</h2>
 		{#if info.readings.length}
 			<div class="stats">
-				<span><b>{daysRead}</b> {daysRead === 1 ? 'day' : 'days'} read</span><span
-					><b>{totalPages}</b> {totalPages === 1 ? 'page' : 'pages'}</span
-				><span
-					><b>{info.readings.length}</b> {info.readings.length === 1 ? 'reading' : 'readings'}</span
-				>
+				<span><b>{daysRead}</b> {daysRead === 1 ? 'day' : 'days'} read</span>
+				<span><b>{totalPages}</b> {totalPages === 1 ? 'page' : 'pages'}</span>
+				<span><b>{info.readings.length}</b> {info.readings.length === 1 ? 'reading' : 'readings'}</span>
 			</div>
 			<ActivityCalendar
 				{perDay}

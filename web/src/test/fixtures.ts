@@ -34,7 +34,10 @@ export function signIn(me: Partial<Me> = {}, signup_mode: 'open' | 'invite' | 'c
 	auth.ready = true;
 }
 
-export function signOut(signup_mode: 'open' | 'invite' | 'closed' = 'invite', setup_required = false) {
+export function signOut(
+	signup_mode: 'open' | 'invite' | 'closed' = 'invite',
+	setup_required = false
+) {
 	auth.me = null;
 	auth.status = { me: null, signup_mode, setup_required };
 	auth.ready = true;
@@ -66,7 +69,9 @@ type BookSpec = {
 let seq = 0;
 const id = (p: string) => `${p}${++seq}`;
 
-export function work(spec: Pick<BookSpec, 'id' | 'title' | 'author' | 'pages' | 'year' | 'cover'>): WorkRow {
+export function work(
+	spec: Pick<BookSpec, 'id' | 'title' | 'author' | 'pages' | 'year' | 'cover'>
+): WorkRow {
 	return {
 		id: 'w-' + spec.id,
 		title: spec.title,
@@ -109,7 +114,9 @@ export function addBook(d: Data, b: BookSpec) {
 		clock: {}
 	});
 	for (const f of b.finished ?? []) {
-		const rid = id('rf');
+		// IDs sort like real ones (UUIDv7, by creation time): older readings first,
+		// and all before readings the app creates during a test.
+		const rid = id('000rf');
 		d.readings.set(rid, {
 			id: rid,
 			book_id: b.id,
@@ -123,7 +130,7 @@ export function addBook(d: Data, b: BookSpec) {
 		});
 	}
 	if (b.reading) {
-		const rid = 'r-' + b.id;
+		const rid = '00r-' + b.id;
 		d.readings.set(rid, {
 			id: rid,
 			book_id: b.id,
