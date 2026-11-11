@@ -8,6 +8,7 @@
 	import { fmtDate, fmtMonthDay } from '#lib/dates.ts';
 	import { bookInfo, eventsOf, liveBooks, pagesOn } from '#lib/derive.ts';
 	import { library } from '#lib/library.svelte.ts';
+	import { modal } from '#lib/modal.ts';
 	import { uuidv7 } from '#lib/sync/ids.ts';
 	import { toasts } from '#lib/toast.svelte.ts';
 	import { uploadCover } from '#lib/covers.ts';
@@ -246,6 +247,7 @@
 					m.set(e.local_date, (m.get(e.local_date) ?? 0) + (e.to_page - e.from_page));
 		return m;
 	});
+	const todayPages = $derived(r ? pagesOn(library.view, r.id, day) : 0);
 	const totalPages = $derived([...perDay.values()].reduce((a, b) => a + b, 0));
 	const daysRead = $derived([...perDay.values()].filter((p) => p > 0).length);
 
@@ -394,8 +396,8 @@
 						<span>Finished {fmtDate(r.finished_on)}</span>
 					{:else if r}
 						<button class="pos" type="button" onclick={openPages}>page {r.pos} of {r.total}</button>
-						{#if pagesOn(library.view, r.id, day) > 0}<span class="today"
-								>+{pagesOn(library.view, r.id, day)} pages today</span
+						{#if todayPages > 0}<span class="today"
+								>+{plural(todayPages, 'page', 'pages')} today</span
 							>{/if}
 					{:else}
 						<span>Not started</span>
@@ -541,7 +543,9 @@
 		<h2>Reading activity</h2>
 		{#if info.readings.length}
 			<div class="stats">
-				<span><b>{daysRead}</b> days read</span><span><b>{totalPages}</b> pages</span><span
+				<span><b>{daysRead}</b> {daysRead === 1 ? 'day' : 'days'} read</span><span
+					><b>{totalPages}</b> {totalPages === 1 ? 'page' : 'pages'}</span
+				><span
 					><b>{info.readings.length}</b> {info.readings.length === 1 ? 'reading' : 'readings'}</span
 				>
 			</div>
@@ -592,7 +596,13 @@
 
 	{#if confirmRemove}
 		<div class="dialog-back" role="presentation">
-			<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="rm-h">
+			<div
+				class="dialog"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="rm-h"
+				use:modal={() => (confirmRemove = false)}
+			>
 				<h3 id="rm-h">Remove {info.title}?</h3>
 				<p>
 					This permanently deletes {plural(info.readings.length, 'reading', 'readings')} with their activity,

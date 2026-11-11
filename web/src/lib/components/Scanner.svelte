@@ -3,6 +3,7 @@
 	// bundled with mau and loaded only when the scanner opens.
 	import { onDestroy, onMount } from 'svelte';
 	import { normalizeIsbn } from '../isbn.ts';
+	import { modal } from '../modal.ts';
 
 	let { onfound, onclose }: { onfound: (isbn: string) => void; onclose: () => void } = $props();
 
@@ -76,7 +77,13 @@
 	onDestroy(stop);
 </script>
 
-<div class="scanner" role="dialog" aria-modal="true" aria-label="Scan a barcode">
+<div
+	class="scanner"
+	role="dialog"
+	aria-modal="true"
+	aria-label="Scan a barcode"
+	use:modal={() => (stop(), onclose())}
+>
 	<div class="top">
 		<span>Scan the barcode on the back cover</span>
 		<button type="button" aria-label="Close scanner" onclick={() => (stop(), onclose())}>✕</button>

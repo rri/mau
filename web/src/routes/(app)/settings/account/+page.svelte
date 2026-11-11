@@ -5,6 +5,7 @@
 	import { withReauth } from '#lib/confirm.svelte.ts';
 	import { auth } from '#lib/auth.svelte.ts';
 	import { library } from '#lib/library.svelte.ts';
+	import { modal } from '#lib/modal.ts';
 	import { setAppearance, storedAppearance, type Appearance } from '#lib/theme.ts';
 	import { toasts } from '#lib/toast.svelte.ts';
 	import PageHead from '#lib/components/PageHead.svelte';
@@ -56,12 +57,12 @@
 
 	async function deleteAccount() {
 		deleteError = '';
-		if (confirmName.trim().toLowerCase() !== me.username) {
+		if (confirmName.trim().toLowerCase() !== auth.me?.username) {
 			deleteError = "The username didn't match. Nothing was deleted.";
 			return;
 		}
 		try {
-			await withReauth(() => del('/account', { username: confirmName }));
+			await withReauth(() => del('/account', { username: confirmName.trim().toLowerCase() }));
 			await library.wipe();
 			auth.clear();
 			goto('/signin', { replaceState: true });
@@ -142,14 +143,20 @@
 
 {#if deleting}
 	<div class="dialog-back" role="presentation">
-		<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="del-h">
+		<div
+			class="dialog"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="del-h"
+			use:modal={() => (deleting = false)}
+		>
 			<h3 id="del-h">Delete your account?</h3>
 			<p>
 				Everything in it is deleted right away and can't be recovered. You'll confirm with your
 				password.
 			</p>
 			<label class="field"
-				>Type your username, {me.username}, to confirm<input
+				>Type your username, {auth.me?.username}, to confirm<input
 					bind:value={confirmName}
 					autocapitalize="none"
 				/></label

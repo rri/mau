@@ -14,6 +14,7 @@
 	import { uploadCover } from '#lib/covers.ts';
 	import { authorsOf, liveBooks } from '#lib/derive.ts';
 	import { looksLikeIsbn, normalizeIsbn } from '#lib/isbn.ts';
+	import { modal } from '#lib/modal.ts';
 	import { library } from '#lib/library.svelte.ts';
 	import { uuidv7 } from '#lib/sync/ids.ts';
 	import { toasts } from '#lib/toast.svelte.ts';
@@ -533,7 +534,13 @@
 		role="presentation"
 		onclick={(e) => e.target === e.currentTarget && (sheet = null)}
 	>
-		<div class="sheet" role="dialog" aria-modal="true" aria-label="Add {title}">
+		<div
+			class="sheet"
+			role="dialog"
+			aria-modal="true"
+			aria-label="Add {title}"
+			use:modal={() => (sheet = null)}
+		>
 			<div class="grab"></div>
 			<div class="sheet-head">
 				<span class="cov big"
@@ -624,7 +631,7 @@
 	.searchbar {
 		display: flex;
 		gap: 8px;
-		padding: 6px 14px 12px;
+		padding: 6px 20px 12px;
 		border-bottom: 1px solid var(--line);
 	}
 	.search {
@@ -637,7 +644,7 @@
 		font-size: 16px;
 	}
 	.note {
-		padding: 10px 16px 0;
+		padding: 10px 20px 0;
 		margin: 0;
 		font-size: 14px;
 		color: var(--muted);
@@ -653,7 +660,7 @@
 		grid-template-columns: 40px minmax(0, 1fr) auto;
 		gap: 12px;
 		align-items: center;
-		padding: 9px 14px;
+		padding: 9px 20px;
 		border: 0;
 		border-bottom: 1px solid var(--line);
 		background: none;
@@ -698,13 +705,13 @@
 		color: var(--muted);
 	}
 	.manual {
-		padding: 14px 16px;
+		padding: 14px 20px;
 		color: var(--muted);
 	}
 	.form {
 		display: grid;
 		gap: 12px;
-		padding: 12px 16px 24px;
+		padding: 12px 20px 24px;
 	}
 	.person {
 		display: grid;

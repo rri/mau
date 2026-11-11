@@ -4,6 +4,7 @@
 	import { post } from '#lib/api/client.ts';
 	import { auth } from '#lib/auth.svelte.ts';
 	import { confirmation } from '#lib/confirm.svelte.ts';
+	import { modal } from '#lib/modal.ts';
 
 	let password = $state('');
 	let code = $state('');
@@ -35,7 +36,13 @@
 
 {#if confirmation.open}
 	<div class="dialog-back" role="presentation">
-		<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="cf-h">
+		<div
+			class="dialog"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="cf-h"
+			use:modal={() => confirmation.cancel()}
+		>
 			<form onsubmit={submit}>
 				<h3 id="cf-h">Confirm it's you</h3>
 				<p>Enter your password to continue. You won't be asked again for 10 minutes.</p>

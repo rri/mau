@@ -2,6 +2,7 @@
 	// Asks for the total pages before a never-started book's first activation
 	// from the Reading grid. The list asks inline in the row instead.
 	import type { BookInfo } from '../derive.ts';
+	import { modal } from '../modal.ts';
 
 	let {
 		info,
@@ -27,10 +28,14 @@
 	}
 </script>
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && oncancel()} />
-
 <div class="dialog-back" role="presentation">
-	<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="start-h">
+	<div
+		class="dialog"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="start-h"
+		use:modal={oncancel}
+	>
 		<form onsubmit={submit}>
 			<h3 id="start-h">{info.title}</h3>
 			<label class="field" for="start-total"

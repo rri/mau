@@ -6,6 +6,7 @@
 	import type { Share } from '#lib/api/generated/Share.ts';
 	import { auth } from '#lib/auth.svelte.ts';
 	import { library } from '#lib/library.svelte.ts';
+	import { modal } from '#lib/modal.ts';
 	import { signOut } from '#lib/signout.ts';
 
 	let codesLeft = $state<number | null>(null);
@@ -48,7 +49,7 @@
 		{
 			href: '/settings/recovery',
 			label: 'Recovery codes',
-			value: codesLeft === null ? '' : `${codesLeft} of 10 left`
+			value: codesLeft === null ? '' : codesLeft === 0 ? 'None left' : `${codesLeft} of 10 left`
 		},
 		{
 			href: '/settings/sharing',
@@ -107,7 +108,13 @@
 
 {#if confirmSignOut}
 	<div class="dialog-back" role="presentation">
-		<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="so-h">
+		<div
+			class="dialog"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="so-h"
+			use:modal={() => (confirmSignOut = false)}
+		>
 			<h3 id="so-h">Sign out with unsynced changes?</h3>
 			<p>
 				{library.pending}

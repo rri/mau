@@ -4,6 +4,7 @@
 	import type { TotpSetup } from '#lib/api/generated/TotpSetup.ts';
 	import { auth } from '#lib/auth.svelte.ts';
 	import { withReauth } from '#lib/confirm.svelte.ts';
+	import { modal } from '#lib/modal.ts';
 	import { toasts } from '#lib/toast.svelte.ts';
 	import PageHead from '#lib/components/PageHead.svelte';
 
@@ -132,7 +133,13 @@
 
 {#if turningOff}
 	<div class="dialog-back" role="presentation">
-		<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="off-h">
+		<div
+			class="dialog"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="off-h"
+			use:modal={() => (turningOff = false)}
+		>
 			<h3 id="off-h">Turn off two-factor?</h3>
 			<p>Signing in will need only your password. You'll confirm with your password and a code.</p>
 			<div class="row-end">
