@@ -90,6 +90,15 @@
 				: 'Move here';
 	}
 
+	/** Keyboard reordering: one place within the book's own group (play and
+	 *  pause move books between the groups). */
+	function step(info: BookInfo, by: -1 | 1) {
+		const i = all.indexOf(info);
+		const next = all[i + by];
+		if (!next || next.state !== info.state) return;
+		moveBook(info, i + by, () => {});
+	}
+
 	function drop(info: BookInfo) {
 		const d = drag;
 		drag = null;
@@ -189,6 +198,7 @@
 						startReading(info, total, rank);
 					}}
 					ongrab={(e) => grab(info, e)}
+					onmove={(by) => step(info, by)}
 				/>
 			{/each}
 		</ul>

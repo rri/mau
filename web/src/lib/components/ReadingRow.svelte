@@ -20,7 +20,8 @@
 		onsetup,
 		oncancel,
 		onstart,
-		ongrab
+		ongrab,
+		onmove
 	}: {
 		info: BookInfo;
 		today: string;
@@ -35,6 +36,8 @@
 		oncancel: () => void;
 		onstart: (total: number) => void;
 		ongrab: (e: PointerEvent) => void;
+		/** Arrow keys on the handle: one place up (-1) or down (1). */
+		onmove: (by: -1 | 1) => void;
 	} = $props();
 
 	const r = $derived(info.reading);
@@ -110,9 +113,14 @@
 		<button
 			class="handle"
 			type="button"
-			aria-label="Drag to reorder {info.title}"
-			title="Drag to reorder"
+			aria-label="Drag to reorder {info.title}, or use the up and down arrow keys"
+			title="Drag to reorder (or use ↑ ↓)"
 			onpointerdown={ongrab}
+			onkeydown={(e) => {
+				if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+				e.preventDefault();
+				onmove(e.key === 'ArrowUp' ? -1 : 1);
+			}}
 		>
 			<svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true"
 				><g fill="currentColor"

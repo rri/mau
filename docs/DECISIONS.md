@@ -816,6 +816,10 @@ Mine, about behavior:
   sensitive actions. A stolen admin session alone could otherwise take over
   any account through a reset link. Suspending doesn't ask (it only removes
   access, and is undone easily).
+- **Keyboard reordering** (WCAG 2.1.1): ↑ and ↓ on a Reading row's drag
+  handle move the book one place within its group, with the usual toast;
+  crossing between active and inactive stays with play and pause, so a key
+  never changes a book's state.
 - **Tab titles** come from one table (`lib/title.ts`): "*Page* · mau", the
   book's title on its page, "Page not found · mau".
 - Public share pages keep their own names ("Finished", "Library"), which
@@ -826,8 +830,5 @@ Not done (open):
 
 - Catalog grid badges can overlap a generated cover's title when the title
   sits near the top (cosmetic).
-- Reordering in the Reading list is by pointer only; there is no keyboard way
-  to reorder (WCAG 2.1.1 asks for one). Up/down keys on the drag handle would
-  do.
 - No tests for camera decoding, the drag gesture itself, Hardcover and ISBNdb
   parsing, provider fall-back order, or opening the app fully offline (§15).

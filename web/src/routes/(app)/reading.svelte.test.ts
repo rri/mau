@@ -197,6 +197,29 @@ describe('Reading list', () => {
 		expect(screen.queryByRole('button', { name: 'Grid layout' })).toBeNull();
 	});
 
+	it('READ-13 arrow keys on the handle move a book one place within its group', async () => {
+		useLibrary();
+		render(Reading);
+		const order = () => rows().map((r) => within(r).getByRole('link').textContent);
+		const handle = (t: string) =>
+			screen.getByRole('button', { name: new RegExp(`Drag to reorder ${t}`) });
+		handle('Middlemarch').focus();
+		await userEvent.keyboard('{ArrowUp}');
+		expect(order().slice(0, 2)).toEqual(['Middlemarch', 'The Left Hand of Darkness']);
+		expect(toasts.current?.message).toBe('Moved Middlemarch');
+		expect(handle('Middlemarch')).toHaveFocus();
+		// Not across into the inactive books (pause does that).
+		handle('The Left Hand of Darkness').focus();
+		await userEvent.keyboard('{ArrowDown}');
+		expect(info('lhod').state).toBe('active');
+		expect(order()[1]).toBe('The Left Hand of Darkness');
+		// Within the inactive books.
+		handle('The Brothers Karamazov').focus();
+		await userEvent.keyboard('{ArrowUp}');
+		expect(order().slice(2)).toEqual(['The Brothers Karamazov', 'Station Eleven']);
+		expect(info('bk').state).toBe('inactive');
+	});
+
 	it('READ-12 while loading, it says so', () => {
 		render(Reading);
 		expect(screen.getByText('Loading your library…')).toBeInTheDocument();

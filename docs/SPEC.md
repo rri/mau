@@ -151,6 +151,9 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
   - Dropping an inactive book between active books activates it there.
     Dragging an active book down keeps it active and moves it to the end of the
     active books. Dropping at the edge between the groups changes no one's state.
+  - Keyboard: the up and down arrow keys on a drag handle move that book one
+    place within its group (play and pause move books between the groups).
+    Each move shows the usual undo toast, and focus stays on the handle.
 - **Progress is always in pages,** with a total entered by the user. The
   wording is "page 140 of 304".
 - **+** appears only on active rows and adds 1 page. Each change shows an undo
@@ -486,6 +489,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | READ-10 | Status | Next to the title: "Offline · N unsynced" or "Syncing…". | C |
 | READ-11 | Empty | "Welcome, *name*." with Add and Import; no search or layout toggle. | C |
 | READ-12 | Loading | "Loading your library…". | C |
+| READ-13 | Keyboard reorder | ↑ and ↓ on a drag handle move the book one place within its group; never across groups. | C |
 | READ-ACT-01…09 | Actions | +, set pages (clamped 0…total), finishing and its undo, pause, resume, start, re-read: the exact changes and toasts. | U |
 | READ-DRAG-01…05 | Drag rules | §4 ordering rules for every drop position; a never-started book dropped among active books asks for its pages first. A drop label shows "Move here", "Activate here", "Start here", or "Stays active: goes to end of active". | U (rules); the pointer gesture: — |
 
@@ -636,7 +640,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | Layer | Where | Runs with | Count (2026-11-11) |
 |---|---|---|---|
 | U: unit | `web/src/lib/*.spec.ts`, `*.svelte.test.ts` for runes modules; Rust `#[test]` | `npx vitest run`, `cargo test` | part of the counts below |
-| C: page and component | `web/src/**/*.svelte.test.ts` (jsdom, Testing Library, mock library in `web/src/test/fixtures.ts`, mock API by route) | `npx vitest run --project client` | 206 web tests in all |
+| C: page and component | `web/src/**/*.svelte.test.ts` (jsdom, Testing Library, mock library in `web/src/test/fixtures.ts`, mock API by route) | `npx vitest run --project client` | 207 web tests in all |
 | A: API | `crates/mau-server/src/**` tests against a temporary SQLite database (`app_tests.rs`, `access_tests.rs`, and per module) | `cargo test` | 198 Rust tests |
 | B: Firefox | `web/browser-tests/` (headless Firefox via puppeteer-core, throwaway seeded servers on free ports; axe-core for WCAG 2.1 AA) | `just browser-test` | 29 steps (+1 with `MAU_BROWSER_NETWORK=1`) |
 | E: Playwright | `web/e2e/` (Chromium, for CI) | `just e2e` | 5 |
