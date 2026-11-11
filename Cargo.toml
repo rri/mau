@@ -39,6 +39,14 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ts-rs = "11"
 uuid = { version = "1", features = ["v4", "v7", "serde"] }
 
+# Password and recovery-code hashing (argon2) is ~10x slower unoptimized; a
+# sign-up hashes 11 times, which outlasts end-to-end test timeouts in CI.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

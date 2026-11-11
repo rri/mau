@@ -896,3 +896,8 @@ Mine, details:
   `deploy` (system, `/bin/sh` for the forced command, no password) only
   receives deploys.
 - **The commit author email** (rri@olorin.dev) is public once pushed.
+- **argon2 and blake2 are optimized in debug builds** (`opt-level = 3` for
+  just those crates). The first CI run's sign-up test timed out: a sign-up
+  hashes the password and 10 recovery codes, about 0.22 s each unoptimized,
+  too slow for a 5-second wait on a 2-core runner. Release builds were never
+  affected. Rust tests also dropped from 8.8 s to 3 s locally.
