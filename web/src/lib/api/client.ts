@@ -29,7 +29,14 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
 		throw new ApiError(0, 'offline', 'Needs a connection.');
 	}
 	const text = await res.text();
-	const data = text ? JSON.parse(text) : null;
+	// A proxy in front of mau can answer with an HTML error page.
+	let data = null;
+	try {
+		data = text ? JSON.parse(text) : null;
+	} catch {
+		if (res.ok)
+			throw new ApiError(res.status, 'bad_response', 'The server sent an unreadable answer.');
+	}
 	if (!res.ok) {
 		throw new ApiError(
 			res.status,
