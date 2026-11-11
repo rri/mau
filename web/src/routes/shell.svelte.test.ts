@@ -108,7 +108,7 @@ describe('Tab titles and the error page', () => {
 		mockApi({ 'GET /auth/status': { me: auth.me, signup_mode: 'invite', setup_required: false } });
 		useLibrary();
 		at('/catalog/mm', { id: 'mm' });
-		render(RootLayout, { children: content });
+		render(RootLayout, { children: content } as never);
 		await new Promise((r) => setTimeout(r));
 		expect(document.title).toBe('Middlemarch · mau');
 	});

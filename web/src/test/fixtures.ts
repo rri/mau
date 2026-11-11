@@ -252,14 +252,17 @@ export function useLibrary(d: Data = sampleLibrary()) {
 }
 
 /** A fetch stub answering by method and path; unmatched calls fail loudly. */
-export function mockApi(routes: Record<string, unknown | ((body: unknown) => unknown)>) {
+/** A canned answer, or a function of the request body (whatever the page sent). */
+type Route = ((body: any) => unknown) | Response | object | null;
+
+export function mockApi(routes: Record<string, Route>) {
 	const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
 		const url = new URL(String(input), 'http://localhost');
 		const key = `${(init?.method ?? 'GET').toUpperCase()} ${url.pathname.replace(/^\/api/, '')}`;
 		const r = routes[key];
 		if (r === undefined) throw new Error(`unexpected request ${key}`);
 		const body = init?.body ? JSON.parse(String(init.body)) : undefined;
-		const value = await (typeof r === 'function' ? (r as (b: unknown) => unknown)(body) : r);
+		const value = await (typeof r === 'function' ? r(body) : r);
 		if (value instanceof Response) return value;
 		return new Response(JSON.stringify(value), {
 			status: 200,

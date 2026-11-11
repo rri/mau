@@ -547,7 +547,9 @@
 			<div class="stats">
 				<span><b>{daysRead}</b> {daysRead === 1 ? 'day' : 'days'} read</span>
 				<span><b>{totalPages}</b> {totalPages === 1 ? 'page' : 'pages'}</span>
-				<span><b>{info.readings.length}</b> {info.readings.length === 1 ? 'reading' : 'readings'}</span>
+				<span
+					><b>{info.readings.length}</b> {info.readings.length === 1 ? 'reading' : 'readings'}</span
+				>
 			</div>
 			<ActivityCalendar
 				{perDay}

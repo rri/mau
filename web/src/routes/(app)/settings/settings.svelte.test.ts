@@ -13,6 +13,7 @@ import Sharing from './sharing/+page.svelte';
 import GoogleBooks from './google-books/+page.svelte';
 import Invites from './invites/+page.svelte';
 import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
+import type { Share } from '#lib/api/generated/Share.ts';
 import { auth } from '#lib/auth.svelte.ts';
 import { library } from '#lib/library.svelte.ts';
 import { toasts } from '#lib/toast.svelte.ts';
@@ -279,7 +280,7 @@ describe('Sessions, recovery codes', () => {
 			}
 		});
 		render(Sessions);
-		const card = async (d: string) => (await screen.findByText(d)).closest('.card')!;
+		const card = async (d: string) => (await screen.findByText(d)).closest<HTMLElement>('.card')!;
 		expect(await card('Firefox on Linux')).toHaveTextContent('This device');
 		expect(await card('Firefox on Linux')).toHaveTextContent('Active now');
 		expect(await card('Safari on iPhone')).toHaveTextContent('Active in the last hour');
@@ -346,7 +347,9 @@ describe('Sessions, recovery codes', () => {
 
 describe('Sharing, Google Books, invites', () => {
 	it('SET-40 shares list with their link and rating setting; tag shares start on the first tag', async () => {
-		let shares = [{ id: 's1', kind: 'finished', tag: null, include_ratings: true, token: 'tok1' }];
+		let shares: Share[] = [
+			{ id: 's1', kind: 'finished', tag: null, include_ratings: true, token: 'tok1' }
+		];
 		const fetch = mockApi({
 			'GET /shares': () => shares,
 			'POST /shares': (b) => {
@@ -362,7 +365,7 @@ describe('Sharing, Google Books, invites', () => {
 			}
 		});
 		render(Sharing);
-		const card = (await screen.findByText('Finished books')).closest('.card')!;
+		const card = (await screen.findByText('Finished books')).closest<HTMLElement>('.card')!;
 		expect(card).toHaveTextContent('Public');
 		expect(card).toHaveTextContent('Includes ratings · /s/tok1');
 		await userEvent.click(screen.getByRole('button', { name: 'Share something' }));

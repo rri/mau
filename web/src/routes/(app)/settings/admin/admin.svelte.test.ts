@@ -86,7 +86,7 @@ describe('Users', () => {
 	it('ADM-10 lists people with their role, state, and books; the last admin can’t be demoted', async () => {
 		mockApi({ 'GET /admin/users': users });
 		render(Users);
-		const card = (n: string) => screen.getByText(n).closest('.card')!;
+		const card = (n: string) => screen.getByText(n).closest<HTMLElement>('.card')!;
 		await screen.findByText('Bo');
 		expect(card('R. Reader')).toHaveTextContent('Admin');
 		expect(card('R. Reader')).toHaveTextContent('5 books');
@@ -111,7 +111,7 @@ describe('Users', () => {
 		});
 		render(Users);
 		render(ConfirmDialog);
-		const bo = (await screen.findByText('Bo')).closest('.card')!;
+		const bo = (await screen.findByText('Bo')).closest<HTMLElement>('.card')!;
 		await userEvent.click(within(bo as HTMLElement).getByRole('button', { name: 'Delete' }));
 		const dialog = screen.getByRole('dialog', { name: 'Delete @bo?' });
 		expect(dialog).toHaveTextContent('Deletes their account and their 1 book with its history.');
@@ -228,7 +228,7 @@ describe('Review queue, shared catalog', () => {
 			'POST /admin/queue/w-z/merge': () => ((items = []), { ok: true })
 		});
 		render(Queue);
-		const card = (await screen.findByText('Zine')).closest('.card')!;
+		const card = (await screen.findByText('Zine')).closest<HTMLElement>('.card')!;
 		expect(card).toHaveTextContent('from @bo');
 		expect(card).toHaveTextContent('Me · 2024');
 		expect(card).toHaveTextContent('Possibly the same as Zine (2nd) (2025).');

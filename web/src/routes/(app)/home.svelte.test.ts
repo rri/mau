@@ -6,7 +6,14 @@ import Home from './+page.svelte';
 import { library } from '#lib/library.svelte.ts';
 import { toasts } from '#lib/toast.svelte.ts';
 import { emptyData } from '#lib/sync/apply.ts';
-import { addBook, freezeTime, sampleLibrary, signIn, TODAY, useLibrary } from '../../test/fixtures.ts';
+import {
+	addBook,
+	freezeTime,
+	sampleLibrary,
+	signIn,
+	TODAY,
+	useLibrary
+} from '../../test/fixtures.ts';
 
 beforeEach(() => signIn());
 
@@ -40,7 +47,10 @@ describe('Home', () => {
 		useLibrary(emptyData());
 		render(Home);
 		expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Welcome, R. Reader!');
-		expect(screen.getByRole('link', { name: 'Add your first book' })).toHaveAttribute('href', '/add');
+		expect(screen.getByRole('link', { name: 'Add your first book' })).toHaveAttribute(
+			'href',
+			'/add'
+		);
 		expect(screen.getByRole('link', { name: /Import from Goodreads/ })).toHaveAttribute(
 			'href',
 			'/settings/import'
@@ -62,7 +72,10 @@ describe('Home', () => {
 		expect(items[0]).toHaveTextContent('page 140 of 304 · about 33 days left at your pace');
 		// Middlemarch: 49 pages in 28 days → 581 left at 1.75 a day = 332 days.
 		expect(items[1]).toHaveTextContent('page 299 of 880 · about 332 days left at your pace');
-		expect(within(sec).getByRole('link', { name: 'All 4 books' })).toHaveAttribute('href', '/reading');
+		expect(within(sec).getByRole('link', { name: 'All 4 books' })).toHaveAttribute(
+			'href',
+			'/reading'
+		);
 	});
 
 	it('HOME-05 no pace is shown without reading in the last four weeks', () => {
@@ -124,18 +137,25 @@ describe('Home', () => {
 		freezeTime();
 		useLibrary();
 		render(Home);
-		expect(screen.getByRole('link', { name: 'Middlemarch' })).toHaveAttribute('href', '/catalog/mm');
+		expect(screen.getByRole('link', { name: 'Middlemarch' })).toHaveAttribute(
+			'href',
+			'/catalog/mm'
+		);
 	});
 
 	it('HOME-10 the last 14 days: one bar per day, today labelled, numbers in a table', () => {
 		freezeTime();
 		useLibrary();
 		const { container } = render(Home);
-		expect(screen.getByRole('heading', { level: 2, name: 'Your reading trends' })).toBeInTheDocument();
+		expect(
+			screen.getByRole('heading', { level: 2, name: 'Your reading trends' })
+		).toBeInTheDocument();
 		expect(screen.getByRole('heading', { level: 3, name: 'Last 14 days' })).toBeInTheDocument();
 		expect(container.querySelectorAll('.plot .bar')).toHaveLength(14);
 		const table = screen.getByRole('table', { name: 'Pages read each of the last 14 days' });
-		const rows = within(table).getAllByRole('row').map((r) => r.textContent);
+		const rows = within(table)
+			.getAllByRole('row')
+			.map((r) => r.textContent);
 		expect(rows).toHaveLength(14);
 		expect(rows[0]).toBe('Oct 29: no reading');
 		expect(rows.slice(-3)).toEqual(['Nov 9: 20 pages', 'Nov 10: 63 pages', 'Nov 11: 6 pages']);
