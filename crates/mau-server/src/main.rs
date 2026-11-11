@@ -4,6 +4,8 @@
 // would add indirection without making them clearer.
 #![allow(clippy::type_complexity)]
 
+#[cfg(test)]
+mod access_tests;
 mod admin;
 mod app;
 #[cfg(test)]

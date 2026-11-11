@@ -274,15 +274,18 @@ describe('Review queue, shared catalog', () => {
 
 describe('Audit log, stats', () => {
 	it('ADM-40 entries newest first with time and actor; Older loads the next page', async () => {
-		const page = (n: number, from: number) =>
+		const page = (n: number, from: number, firstId: number) =>
 			Array.from({ length: n }, (_, i) => ({
+				id: firstId - i,
 				at: from - i * 60_000,
 				actor_name: 'rri',
 				action: `did ${i}`
 			}));
 		const fetch = mockApi({
 			'GET /admin/audit': () =>
-				fetch.mock.calls.length === 1 ? page(200, Date.parse('2026-11-10T12:00:00Z')) : page(3, 0)
+				fetch.mock.calls.length === 1
+					? page(200, Date.parse('2026-11-10T12:00:00Z'), 500)
+					: page(3, 0, 300)
 		});
 		render(Audit);
 		expect(await screen.findByText('did 0')).toBeInTheDocument();
@@ -290,7 +293,7 @@ describe('Audit log, stats', () => {
 		expect(log()).toHaveLength(200);
 		await userEvent.click(screen.getByRole('button', { name: 'Older' }));
 		await vi.waitFor(() => expect(log()).toHaveLength(203));
-		expect(String(fetch.mock.calls[1][0])).toMatch(/before=\d+/);
+		expect(String(fetch.mock.calls[1][0])).toMatch(/before=301$/);
 		expect(screen.queryByRole('button', { name: 'Older' })).toBeNull();
 	});
 

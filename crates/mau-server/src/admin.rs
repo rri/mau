@@ -821,6 +821,9 @@ pub async fn set_work_cover(
 #[derive(Serialize, TS, sqlx::FromRow)]
 #[ts(export)]
 pub struct AuditEntry {
+    /// Pass the last one shown as `before` to get older entries.
+    #[ts(type = "number")]
+    pub id: i64,
     #[ts(type = "number")]
     pub at: i64,
     pub actor_name: String,
@@ -829,6 +832,8 @@ pub struct AuditEntry {
 
 #[derive(Deserialize)]
 pub struct AuditQuery {
+    /// An entry ID: entries older than it (several can share a millisecond,
+    /// so times can't be used to page).
     before: Option<i64>,
 }
 
@@ -837,10 +842,12 @@ pub async fn audit_log(
     _a: Admin,
     Query(q): Query<AuditQuery>,
 ) -> ApiResult<Json<Vec<AuditEntry>>> {
-    let rows = sqlx::query_as("SELECT at, actor_name, action FROM audit_log WHERE at < ? ORDER BY at DESC, id DESC LIMIT 200")
-        .bind(q.before.unwrap_or(i64::MAX))
-        .fetch_all(&state.db)
-        .await?;
+    let rows = sqlx::query_as(
+        "SELECT id, at, actor_name, action FROM audit_log WHERE id < ? ORDER BY id DESC LIMIT 200",
+    )
+    .bind(q.before.unwrap_or(i64::MAX))
+    .fetch_all(&state.db)
+    .await?;
     Ok(Json(rows))
 }
 

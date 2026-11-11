@@ -46,7 +46,7 @@
 	{#if more && entries.length}<button
 			class="btn"
 			type="button"
-			onclick={() => load(entries.at(-1)!.at)}>Older</button
+			onclick={() => load(entries.at(-1)!.id)}>Older</button
 		>{/if}
 	{#if error}<p class="error">{error}</p>{/if}
 </div>
