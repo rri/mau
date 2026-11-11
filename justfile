@@ -50,6 +50,11 @@ e2e: web-build
     cargo build -p mau-server
     cd web && npx playwright test
 
+# Browser tests in headless Firefox against throwaway servers (`just browser-test app` for one suite)
+browser-test suite="": web-build
+    cargo build -p mau-server
+    cd web && node browser-tests/run.mjs {{suite}}
+
 # Development: add the mock sample books to an account (e.g. `just seed rri`)
 seed user:
     MAU_DATA_DIR=data cargo run -p mau-server -- seed --user {{user}}
