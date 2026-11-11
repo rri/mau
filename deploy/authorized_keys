@@ -1,0 +1,1 @@
+restrict,command="sudo -n /usr/local/sbin/mau-deploy $SSH_ORIGINAL_COMMAND" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPFhmJI79ECMQASdJUDhYkn+mnybYU9TFu4vb7JBwADr mau-deploy

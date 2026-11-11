@@ -25,6 +25,9 @@ for the build machine's architecture.
 mau speaks plain HTTP on localhost. Put a reverse proxy with HTTPS in front of
 it; passwords and session cookies must only travel over HTTPS.
 
+How https://maubooks.org is set up, and deployed from CI on every push to
+`main`, is in [deploy/README.md](deploy/README.md).
+
 1. Create a user and data directory, and copy the config:
 
        useradd --system --home /var/lib/mau mau

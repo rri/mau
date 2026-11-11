@@ -1,0 +1,6 @@
+# /etc/mau/mau.toml on maubooks.org.
+listen = "127.0.0.1:8370"
+public_url = "https://maubooks.org"
+data_dir = "/mnt/data/mau"
+trusted_proxies = ["127.0.0.1", "::1"]
+backup_keep = 7

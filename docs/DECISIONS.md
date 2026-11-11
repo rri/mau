@@ -330,7 +330,8 @@ Newest entries at the bottom of each section.
 - **The release binary links the system C library dynamically** (glibc), and
   is built for the machine it's built on. Fully static (musl) and arm64 builds
   aren't set up yet; they'd need the musl and aarch64 Rust targets plus a cross
-  C toolchain for the TLS library.
+  C toolchain for the TLS library. (Superseded: CI builds a static musl
+  binary; see "Hosting maubooks.org".)
 - **Generated API types are excluded from prettier**, so `cargo test` and
   `npm run format` don't fight over their formatting.
 - **End-to-end tests** cover the first-admin signup and passkey sign-in, +1 and
@@ -832,3 +833,64 @@ Not done (open):
   sits near the top (cosmetic).
 - No tests for camera decoding, the drag gesture itself, Hardcover and ISBNdb
   parsing, provider fall-back order, or opening the app fully offline (§15).
+
+## Hosting maubooks.org (2026-11-11)
+
+Yours:
+
+- **Host:** the existing Hetzner instance (x86-64, Debian 13, systemd), behind
+  its Caddy, at **maubooks.org** (bare domain). DNS is Hetzner's (Porkbun
+  delegates).
+- **Build:** a fully static binary (musl).
+- **Deploy:** pushed from GitHub Actions on **every push to `main`** that
+  passes CI.
+- **Data:** `/mnt/data/mau` on the attached volume (survives deleting the
+  server). **No Hetzner backups**; mau's daily snapshots stay in
+  `/mnt/data/mau/backups`, on the same volume.
+- **Repository:** public, github.com/rri/mau.
+
+Mine, approved:
+
+- **CI reaches the server over Tailscale:** SSH (port 22) is closed to the
+  internet, so the deploy job joins the tailnet as a short-lived `tag:ci`
+  node, and the policy lets `tag:ci` reach only the server's port 22.
+- **The deploy key runs one script** (`restrict` plus a forced command) that
+  runs `/usr/local/sbin/mau-deploy` as root through a one-line sudoers rule.
+  It takes the binary on stdin with its checksum and commit, stops mau, copies
+  the database with the old binary, installs (keeping `mau.prev`), and checks
+  `/api/health` for 30 seconds; if that fails, the old binary and the
+  database copy go back. The newest 5 pre-deploy copies are kept. A few
+  seconds of downtime per deploy.
+- **Secrets live in a `production` environment** limited to `main`, so pull
+  requests never see them.
+- **CI runs** rustfmt, clippy, Rust tests, a check that the generated API
+  types are committed, svelte-check, prettier, vitest, Playwright
+  (Chromium), and `cargo audit --deny warnings` ignoring only
+  RUSTSEC-2026-0459 (waits on sqlx). The Firefox suite stays local.
+- **www.maubooks.org** redirects to maubooks.org. **CAA** allows Let's
+  Encrypt and ZeroSSL (Caddy's fallback).
+- **Signup** stays invite-only (the default).
+- **mimalloc** replaces musl's allocator in the static build only, since
+  musl's is slow under many threads.
+- **The AAAA records** (maubooks.org and oxo-lang.org) point at the server's
+  own address `…aa5b::1`; `…aa5b::` answered only because IPv6 forwarding
+  is on.
+
+Mine, details:
+
+- **Rust is pinned to 1.96.0 in CI** (the `rust-version`), so a new release's
+  lints don't fail a deploy unannounced; Node is 26 (the current LTS), as
+  the README asks.
+- **Third-party actions are pinned to commits**, with the release named in a
+  comment, since the deploy job holds the deploy secrets.
+- **A deploy is skipped when `main` has moved on**, so a slow older run never
+  replaces a newer one; the newer run deploys itself.
+- **Config:** `/etc/mau/mau.toml` (public_url `https://maubooks.org`, data dir
+  `/mnt/data/mau`, trusted proxies localhost). The unit waits for the volume
+  (`RequiresMountsFor`).
+- **The server's files are in `deploy/`** in this repo, with the one-time
+  setup commands in `deploy/README.md`.
+- **Users:** `mau` (system, no shell, home `/mnt/data/mau`) runs the service;
+  `deploy` (system, `/bin/sh` for the forced command, no password) only
+  receives deploys.
+- **The commit author email** (rri@olorin.dev) is public once pushed.

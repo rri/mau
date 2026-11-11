@@ -375,11 +375,15 @@ A list of sections, each its own page, then **Sign out**.
   settings live in the database and are changed in the admin UI.
 - **HTTPS:** behind the user's reverse proxy. mau listens on plain HTTP and
   trusts forwarded headers only from configured proxy addresses.
-- **Deployment:** a single binary (Linux amd64 and arm64). No Docker image.
+- **Deployment:** a single binary. No Docker image. Releases are a static
+  x86-64 binary (musl, with mimalloc). The public instance is
+  https://maubooks.org: every push to `main` that passes CI deploys there
+  (`deploy/README.md`).
 - **Backups:** daily consistent SQLite snapshot into the data directory,
   keeping the last 7 (configurable), plus a `mau backup <path>` command.
 - **Repository:** one repo with a Cargo workspace (`crates/`) and `web/`; one
-  build command produces the binary. Local git for now; hosting decided later.
+  build command produces the binary. Public at https://github.com/rri/mau;
+  GitHub Actions runs every test layer except the Firefox suite.
 - **Tests:** see §15.
 - **License:** AGPL-3.0.
 
@@ -401,8 +405,7 @@ These came up while writing this document and haven't been decided explicitly:
 6. **Provider responses** are cached on the server for 30 days.
 7. **Placement:** time zone and appearance settings go in Account (neither
    was in the Settings mock).
-8. **Postponed:** sharing with specific people, lending, and a hosted
-   repository with CI.
+8. **Postponed:** sharing with specific people and lending.
 
 ## 14. Behavior by page
 
@@ -643,7 +646,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | C: page and component | `web/src/**/*.svelte.test.ts` (jsdom, Testing Library, mock library in `web/src/test/fixtures.ts`, mock API by route) | `npx vitest run --project client` | 207 web tests in all |
 | A: API | `crates/mau-server/src/**` tests against a temporary SQLite database (`app_tests.rs`, `access_tests.rs`, and per module) | `cargo test` | 198 Rust tests |
 | B: Firefox | `web/browser-tests/` (headless Firefox via puppeteer-core, throwaway seeded servers on free ports; axe-core for WCAG 2.1 AA) | `just browser-test` | 29 steps (+1 with `MAU_BROWSER_NETWORK=1`) |
-| E: Playwright | `web/e2e/` (Chromium, for CI) | `just e2e` | 5 |
+| E: Playwright | `web/e2e/` (Chromium) | `just e2e`, and in CI | 5 |
 
 `just test` runs the unit, page, and API tests with type checks. Every
 behavior above has at least one automated test, except:

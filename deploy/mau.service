@@ -1,0 +1,20 @@
+# /etc/systemd/system/mau.service on maubooks.org.
+[Unit]
+Description=mau library and reading tracker
+After=network.target
+RequiresMountsFor=/mnt/data/mau
+
+[Service]
+User=mau
+Group=mau
+ExecStart=/usr/local/bin/mau serve
+Restart=on-failure
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/mnt/data/mau
+
+[Install]
+WantedBy=multi-user.target

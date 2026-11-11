@@ -1,0 +1,8 @@
+# Added to /etc/caddy/Caddyfile on maubooks.org.
+maubooks.org {
+	reverse_proxy 127.0.0.1:8370
+}
+
+www.maubooks.org {
+	redir https://maubooks.org{uri} permanent
+}

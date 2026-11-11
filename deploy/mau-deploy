@@ -1,0 +1,83 @@
+#!/bin/sh
+# Installs the mau binary sent on stdin and restarts the service:
+#
+#   mau-deploy SHA256 COMMIT < mau
+#
+# The deploy user's SSH key can run only this, through sudo (see README.md).
+# It stops mau and copies the database first, so if the new binary doesn't
+# come up healthy, the old binary and the database (which the new binary's
+# migrations may have changed) both go back.
+set -eu
+umask 077
+
+BIN=/usr/local/bin/mau
+DATA=/mnt/data/mau
+HEALTH=http://127.0.0.1:8370/api/health
+KEEP=5 # pre-deploy database copies kept in $DATA/backups
+
+log() {
+	echo "mau-deploy: $*"
+	logger -t mau-deploy -- "$*" || true
+}
+fail() {
+	log "$*"
+	exit 1
+}
+healthy() {
+	for _ in $(seq 30); do
+		curl -fsS -o /dev/null --max-time 2 "$HEALTH" && return 0
+		sleep 1
+	done
+	return 1
+}
+start() {
+	systemctl reset-failed mau 2>/dev/null || true
+	systemctl start mau
+}
+
+sha=${1:-}
+commit=${2:-}
+echo "$sha" | grep -Eqx '[0-9a-f]{64}' || fail "usage: mau-deploy SHA256 COMMIT < mau"
+echo "$commit" | grep -Eqx '[0-9a-f]{40}' || fail "usage: mau-deploy SHA256 COMMIT < mau"
+
+new=$(mktemp "$BIN.new.XXXXXX")
+trap 'rm -f "$new"' EXIT
+head -c 200000000 >"$new"
+echo "$sha  $new" | sha256sum --check --status || fail "the binary's checksum doesn't match; nothing changed"
+chmod 755 "$new"
+"$new" --version >/dev/null || fail "the new binary doesn't run here; nothing changed"
+
+log "installing $commit"
+systemctl stop mau
+copy=
+if [ -x "$BIN" ] && [ -f "$DATA/mau.db" ]; then
+	copy=$DATA/backups/pre-deploy-$(date -u +%Y%m%d-%H%M%S)-$(echo "$commit" | cut -c1-12).db
+	if ! runuser -u mau -- "$BIN" backup "$copy" >/dev/null; then
+		start
+		fail "couldn't copy the database; nothing changed"
+	fi
+fi
+[ -x "$BIN" ] && cp -p "$BIN" "$BIN.prev"
+mv "$new" "$BIN"
+start
+
+if healthy; then
+	ls -1t "$DATA"/backups/pre-deploy-*.db 2>/dev/null | tail -n +$((KEEP + 1)) | xargs -r rm -f
+	log "deployed $commit"
+	exit 0
+fi
+
+log "$commit didn't come up healthy; going back"
+journalctl -u mau -n 30 --no-pager || true
+systemctl stop mau
+if [ ! -x "$BIN.prev" ]; then
+	fail "there's no previous version to go back to; mau is stopped"
+fi
+cp -p "$BIN.prev" "$BIN"
+if [ -n "$copy" ]; then
+	rm -f "$DATA/mau.db" "$DATA/mau.db-wal" "$DATA/mau.db-shm"
+	install -m 600 -o mau -g mau "$copy" "$DATA/mau.db"
+fi
+start
+healthy || fail "the previous version didn't come up either; see journalctl -u mau"
+fail "went back to the previous version; see the log above"

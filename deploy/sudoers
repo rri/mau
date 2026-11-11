@@ -1,0 +1,4 @@
+# /etc/sudoers.d/mau-deploy (mode 440): the deploy user may run only this.
+# No pty, so the binary on stdin passes through untouched.
+Defaults:deploy !use_pty
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/mau-deploy
