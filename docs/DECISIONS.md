@@ -661,3 +661,41 @@ Mine:
   lettering (lines on both pages instead). All icons were regenerated the
   same way. The name now shows nowhere in the wide-screen sidebar; screen
   readers still get "mau" from the image's alt text.
+
+## Landing page (2026-11-10)
+
+Asked by the user: Option D from the landing-page canvas, shown only when
+signed out; signed-in users keep the current pages; footer with the GitHub
+link and the AGPL note separated by a middle dot; only the centered column
+(nothing on the sides); tagline "your personal library and reading log" in
+small caps; a random science-fiction quote from a collection of at least a
+thousand.
+
+Chosen by the user when asked:
+
+- Quotes from public-domain texts rather than Wikiquote (whose license
+  excludes quotations still in copyright) or an admin-supplied file.
+- The script face is **Pinyon Script**, self-hosted (@fontsource).
+- The second button is "Create account", shown only when signup is open.
+- The quote's title links to the book on Project Gutenberg.
+
+Mine:
+
+- Public domain worldwide, not only in the US: only works whose every author
+  and translator died by 1955. That leaves out Piper, Leinster, Norton and
+  early Dick, whose stories Gutenberg carries as US public domain.
+- A script proposed candidates; I read every one and kept 1,028 (of about
+  3,000 read). Excluded: lines that depend on their story, dated or demeaning
+  language about race, women or disability, Bible verses quoted inside
+  novels, and five works (The Yellow Danger, The Fall of a Nation, Cæsar's
+  Column, The Great White Queen, The Coming Conquest of England).
+- Years are first-publication years I could vouch for (770 of 1,028); the
+  rest show no year, since the automatic guesses picked up years inside the
+  stories.
+- The list is compiled into the server (`crates/mau-server/data/quotes.json`)
+  and served one at a time by `GET /api/quote` (public, no-store), so the
+  page downloads one quote, not 240 KB.
+- The landing page is one fixed dark look in the logo's navy in both themes,
+  with an amber Sign in button; its space for the quote is reserved so the
+  page doesn't jump. Offline, it shows without a quote.
+- Sign-out still goes to the sign-in page.

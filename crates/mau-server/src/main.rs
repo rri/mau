@@ -22,6 +22,7 @@ mod importer;
 mod library;
 mod providers;
 mod public;
+mod quotes;
 mod ratelimit;
 mod seed;
 mod settings;

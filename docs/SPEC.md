@@ -101,6 +101,22 @@ recovery codes, and deleting the account: the password, plus an authenticator
   paused), or *finished*. There's no "did not finish"; abandoned books just stay
   inactive.
 
+## 3a. Landing page
+
+- Visitors who aren't signed in see a landing page at `/`; every other page
+  still sends them to sign in. Signed in, `/` is the Reading view as before.
+- One centered column in the logo's navy (the same look in light and dark
+  mode): the large logo, "mau" in Pinyon Script, the tagline "your personal
+  library and reading log" in small caps, a random quote, and **Sign in**
+  (plus **Create account** when signup is open). Nothing on the sides.
+- The quote is one of 1,028 hand-picked lines of public-domain science
+  fiction (authors and translators who died by 1955), a new one on each load,
+  shown with author, title (linked to its free Project Gutenberg page) and
+  year where known. Source and selection: `crates/mau-server/data/README.md`.
+- Footer: a link to github.com/rri/mau · "Source code licensed under
+  AGPL-3.0".
+- The logo on the sign-in and other public pages links back to it.
+
 ## 4. Reading view (progress view)
 
 - One continuous list of all unfinished books: active books first, then

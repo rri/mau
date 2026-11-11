@@ -4,7 +4,7 @@
 
 <main class="public">
 	<div class="card">
-		<img class="logo" src="/logo.svg" alt="mau" width="112" height="112" />
+		<a class="logo" href="/"><img src="/logo.svg" alt="mau" width="112" height="112" /></a>
 		{@render children()}
 	</div>
 </main>
@@ -34,7 +34,12 @@
 	}
 	.logo {
 		display: block;
+		width: max-content;
 		margin: -4px 0 4px;
+		border-radius: 22.5%;
+	}
+	.logo img {
+		display: block;
 	}
 	.card :global(.tagline) {
 		margin: -8px 0 0;

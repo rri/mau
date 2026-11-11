@@ -83,6 +83,7 @@ const IMPORT_LIMIT: usize = 30 * 1024 * 1024;
 pub fn router(state: AppState) -> Router {
     let api = Router::new()
         .route("/health", get(health))
+        .route("/quote", get(crate::quotes::random))
         // Sign-up, sign-in, recovery
         .route("/auth/status", get(auth::status))
         .route("/auth/username-available", post(auth::username_available))

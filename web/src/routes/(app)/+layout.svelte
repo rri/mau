@@ -7,12 +7,17 @@
 	import { library } from '#lib/library.svelte.ts';
 	import Toast from '#lib/components/Toast.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
+	import Landing from '#lib/components/Landing.svelte';
 
 	let { children } = $props();
 
+	// Signed out: the front page shows the landing page; anything else asks
+	// to sign in. Signed in, the app as usual.
+	const landing = $derived(!auth.me && page.url.pathname === '/');
+
 	$effect(() => {
-		if (!auth.me) goto('/signin', { replaceState: true });
-		else library.open(auth.me.id);
+		if (auth.me) library.open(auth.me.id);
+		else if (!landing) goto('/signin', { replaceState: true });
 	});
 
 	const tabs = [
@@ -26,7 +31,9 @@
 	];
 </script>
 
-{#if auth.me}
+{#if landing}
+	<Landing />
+{:else if auth.me}
 	<div class="shell">
 		<nav class="tabs" aria-label="Main">
 			<img class="brand" src="/logo.svg" alt="mau" width="176" height="176" />
