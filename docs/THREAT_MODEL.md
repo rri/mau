@@ -154,12 +154,12 @@ Risk is the rating *after* the listed controls. Status: ✅ in place,
 | T1 | Cross-site request forgery | SameSite=Lax cookie, plus an exact `Origin` check on every non-GET API request ✅ | Low |
 | T2 | Changing another user's records through sync | Every operation checks that the book, reading, copy, or private work belongs to the session's user; each runs in a savepoint ✅ | Low |
 | T3 | Malformed sync data (huge IDs, path-like cover names) | IDs of new records ≤ 64 characters `[A-Za-z0-9_-]`; cover overrides must be stored 32-hex hashes; field lengths, dates, pages, ranks, and ratings validated ✅ | Low |
-| T4 | Poisoning the shared catalog | Users can add works only from cached provider results; manual entries stay private until an admin promotes them; admin edits are audited ✅. **❗ Since export version 2, importing a mau export adds a book that names a provider record to the shared catalog with the title, people, and editions written in the file, so a crafted file can put made-up works into everyone's catalog (finding V2-1)** | **Medium** |
+| T4 | Poisoning the shared catalog | Users can add works only from cached provider results; manual entries stay private until an admin promotes them; admin edits are audited ✅. **A mau export only names a provider record (well-formed IDs only); the work is looked up at the provider and added as the provider describes it, otherwise the row is matched like any other file and at worst becomes a private entry (finding V2-1, fixed)** ✅ | Low |
 | T5 | Stored XSS through titles, notes, bios | Svelte and maud escape all text; no `{@html}` or `innerHTML`; strict CSP (scripts from self, plus the shell's inline script by hash) as a second layer ✅ | Low |
 | T6 | Clickjacking | `X-Frame-Options: DENY` and `frame-ancestors 'none'` ✅ | Low |
 | T7 | Tampering with files on disk by other local users | Data directory forced to mode 700 on every start ✅; **on maubooks.org the other services (Forgejo as `git`, its runner as `runner`, Caddy as `caddy`) are separate users, and the runner's jobs run in containers** ✅ | Low |
 | **T8** | **Malicious code reaching `main` (a stolen GitHub session or token, or a mistake)** | **CI must pass first; the `production` secrets reach only jobs on `main`; pull requests from forks run without secrets, and their caches can't be read by `main` ✅. A push runs as `mau` within minutes, with no review step ⚠️ (the chosen trade-off for deploying on every push). GitHub two-factor and branch protection against force-pushes are the operator's 🔭** | Medium |
-| **T9** | **Compromised build dependency or GitHub action** | **Lock files committed and used (`npm ci`, `--locked`); third-party actions pinned to commits; Rust pinned to 1.96.0; `cargo audit` on every run ✅. `npm audit` isn't automated, and advisories published between pushes go unnoticed until the next push 🔭** | Medium |
+| **T9** | **Compromised build dependency or GitHub action** | **Lock files committed and used (`npm ci`, `--locked`); third-party actions pinned to commits; Rust pinned to 1.96.0; `cargo audit` and `npm audit --omit=dev` on every run, and a weekly run of `main` catches advisories published between pushes ✅** | Medium |
 
 ### Repudiation
 
@@ -181,7 +181,7 @@ Risk is the rating *after* the listed controls. Status: ✅ in place,
 | I6 | Tracking through third-party requests | Covers are downloaded by the server and served from mau; the browser never contacts providers; **the landing page's fonts are bundled**; `Referrer-Policy: same-origin` ✅ | Low |
 | I7 | Public pages exposing too much | Only published items; notes never; ratings only if chosen ✅ | Low |
 | I8 | SQLite stale-memory bug (RUSTSEC-2026-0459, CVE-2026-119375) in the bundled SQLite | Needs a crafted `.db` + `-wal` pair placed where mau opens it; blocked by the private data directory ⚠️. Upgrade when sqlx allows `libsqlite3-sys` ≥ 0.39 🔭. **Ignored by name in CI's `cargo audit`, so any other advisory still fails the build** | Low |
-| **I9** | **Server log lines in public CI logs** | **❗ When a deploy fails its health check, `mau-deploy` prints the last 30 lines of mau's log over SSH, and the public Actions log keeps them. On an instance without an admin those lines include the setup link; otherwise they can include errors and usernames (finding V2-3)** | **Medium** |
+| **I9** | **Server log lines in public CI logs** | **What `mau-deploy` prints over SSH ends up in the public Actions log, so it prints only its own steps; mau's log (which on an instance without an admin holds the setup link) stays in the journal (finding V2-3, fixed)** ✅ | Low |
 | **I10** | **Deployment details in the public repository** | **`deploy/` and the workflow name the tailnet address, host key, paths, and users. Reaching any of them needs the tailnet and the deploy key ⚠️** | Low |
 
 ### Denial of service
@@ -203,9 +203,9 @@ Risk is the rating *after* the listed controls. Status: ✅ in place,
 | E1 | Non-admin reaching admin endpoints | `Admin` extractor on every admin handler; invites limited to the creator's own unless admin ✅ | Low |
 | E2 | Removing the last admin | Refused for demote, suspend, and delete ✅ | Low |
 | E3 | Sensitive changes from a stolen session | Password, username, two-factor, recovery codes, and account deletion need a password (and code) confirmation within 10 minutes ✅; **so do an admin's reset links for others, deleting users, and granting admin** ✅. The Google Books key does not (decision 2026-11-08) ⚠️ | Low |
-| E4 | Server-side request forgery through cover URLs | https only; host allowlist of provider image hosts; redirects only to https domain names (no IP literals or localhost), at most five; responses read with a 10 MB cap ✅. **A mau export's provider IDs are put into Open Library and Google URLs unchecked; the hosts are fixed and the allowlist still applies, so at most a query on those hosts can be altered (finding V2-4)** | Low |
-| E5 | Supply-chain compromise of dependencies | See T9: **`cargo audit` now runs in CI** ✅; npm has 4 low dev-only advisories (deepmerge, through `@sveltejs/kit`'s build tooling; none at runtime) ⚠️ | Medium |
-| **E6** | **The deploy path giving more than `mau`'s rights** | **The binary runs as `mau` under systemd hardening, and the database copy runs the old binary as `mau` ✅. ❗ But `mau-deploy` runs the uploaded binary's `--version` check as root, so the deploy key or a malicious push gets root on the server, and with it oxo-lang.org and Forgejo (finding V2-2)** | **Medium** |
+| E4 | Server-side request forgery through cover URLs | https only; host allowlist of provider image hosts; redirects only to https domain names (no IP literals or localhost), at most five; responses read with a 10 MB cap ✅. **A mau export's provider IDs must look like Open Library or Google IDs before they're used in a URL (finding V2-4, fixed)** ✅ | Low |
+| E5 | Supply-chain compromise of dependencies | See T9: **`cargo audit` and `npm audit --omit=dev` run in CI on every push and weekly** ✅; npm has 4 low dev-only advisories (deepmerge, through `@sveltejs/kit`'s build tooling; none at runtime) ⚠️ | Medium |
+| **E6** | **The deploy path giving more than `mau`'s rights** | **Nothing uploaded runs as root: the binary runs as `mau` under systemd hardening, and `mau-deploy` runs both its `--version` check and the database copy as `mau` (finding V2-2, fixed) ✅. The script itself runs as root, and takes only a checksum, a commit hash, and the binary** | Low |
 | **E7** | **Another service on the shared host reaching mau** | **Separate users, mau's data directory 700, systemd's `ProtectSystem=strict`/`ProtectHome`, Forgejo registration closed, runner jobs in containers ✅. A local privilege escalation in any of them reaches everything ⚠️. Forgejo listens on all addresses (shielded only by the Hetzner firewall) and sshd allows passwords for non-root users 🔭** | Low |
 
 ## 7. Assumptions and operator responsibilities
@@ -231,30 +231,17 @@ Risk is the rating *after* the listed controls. Status: ✅ in place,
 
 ## 8. Recommendations not yet done
 
-Findings from the 2026-11-11 review, most important first:
+The 2026-11-11 review's findings V2-1 to V2-5 are fixed (Appendix A).
 
-1. **V2-1 (T4):** build shared works from the provider's own answer, not the
-   export: look the work up by its ID (Open Library: the search by key that
-   import already makes for the cover; Google: the volume, with the user's
-   key) and fall back to normal matching when that fails. Accept only
-   well-formed provider names and IDs.
-2. **V2-2 (E6):** run the `--version` check as `mau` (`runuser -u mau`), so
-   nothing uploaded ever runs as root.
-3. **V2-3 (I9):** don't print mau's log over SSH on a failed deploy; say
-   where to look (`journalctl -u mau`) instead.
-4. **V2-4 (E4):** validate provider IDs (`OL…W`, Google's
-   `[A-Za-z0-9_-]{12}`) before using them in URLs; covered by item 1.
-5. Run CI weekly on a schedule as well, so `cargo audit` catches advisories
-   between pushes; add `npm audit --omit=dev` (T9, E5).
-6. Upgrade SQLite once sqlx accepts `libsqlite3-sys` ≥ 0.39 (I8).
-7. For the operator: an off-server backup copy (D6); GitHub two-factor and
+1. Upgrade SQLite once sqlx accepts `libsqlite3-sys` ≥ 0.39 (I8).
+2. For the operator: an off-server backup copy (D6); GitHub two-factor and
    branch protection against force-pushes and deletion (T8); confirm the
    tailnet policy (S9); bind Forgejo to localhost and turn off SSH password
    logins (E7).
-8. Optional proxy-level rate limiting in Caddy (D3).
-9. Consider encrypting TOTP secrets and API keys with a key kept outside the
+3. Optional proxy-level rate limiting in Caddy (D3).
+4. Consider encrypting TOTP secrets and API keys with a key kept outside the
    database, if backups are stored where others can read them (I3).
-10. Queue a server sign-out when signing out offline (I5).
+5. Queue a server sign-out when signing out offline (I5).
 
 ## Appendix A: review of 2026-11-11
 
@@ -271,13 +258,13 @@ low, dev-only).
 
 | # | Finding | Severity | Outcome |
 |---|---|---|---|
-| V2-1 | A crafted mau export can add made-up works to the shared catalog (T4) | Medium | Open: fix proposed (§8.1) |
-| V2-2 | The deploy script runs the uploaded binary as root to check it (E6) | Medium | Open: fix proposed (§8.2) |
-| V2-3 | A failed deploy copies server log lines, possibly a setup link, into public CI logs (I9) | Medium | Open: fix proposed (§8.3) |
-| V2-4 | Provider IDs from an export used in URLs unchecked (E4) | Low | Open: covered by V2-1's fix |
-| V2-5 | Advisories between pushes go unnoticed; `npm audit` not automated (T9) | Low | Open (§8.5) |
+| V2-1 | A crafted mau export can add made-up works to the shared catalog (T4) | Medium | Fixed: works come from the provider's answer; unconfirmed rows are matched normally |
+| V2-2 | The deploy script runs the uploaded binary as root to check it (E6) | Medium | Fixed: checked as `mau` |
+| V2-3 | A failed deploy copies server log lines, possibly a setup link, into public CI logs (I9) | Medium | Fixed: the log stays on the server |
+| V2-4 | Provider IDs from an export used in URLs unchecked (E4) | Low | Fixed: validated first |
+| V2-5 | Advisories between pushes go unnoticed; `npm audit` not automated (T9) | Low | Fixed: weekly CI run; `npm audit --omit=dev` in CI |
 | V2-6 | Backups only on the same volume as the database (D6) | Medium | Accepted by the operator |
-| V2-7 | Forgejo on all addresses; sshd password logins on (E7) | Low | Operator (§8.7) |
+| V2-7 | Forgejo on all addresses; sshd password logins on (E7) | Low | Operator (§8.2) |
 | V2-8 | The AAAA records pointed at the subnet's router address, which answered only because IPv6 forwarding was on | Low (availability) | Fixed by the operator before launch |
 
 ## Appendix B: audit of 2026-11-09

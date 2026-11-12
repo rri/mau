@@ -456,54 +456,64 @@ async fn existing(state: &AppState, user_id: &str) -> sqlx::Result<Existing> {
     })
 }
 
-/// The catalog work a mau export's book came from, as a candidate built from
-/// the export itself. Open Library (if enabled) or Google supplies the cover.
+/// A provider name and work ID from a mau export that look like ones mau
+/// stores: Open Library works (`OL…W`, or `OL…M` for an edition without a
+/// work) and Google volume IDs.
+fn exported_source_ok(provider: &str, id: &str) -> bool {
+    let rest = |prefix: &str, suffixes: &[char]| {
+        id.strip_prefix(prefix)
+            .and_then(|r| r.strip_suffix(suffixes))
+            .is_some_and(|n| {
+                !n.is_empty() && n.len() <= 12 && n.bytes().all(|b| b.is_ascii_digit())
+            })
+    };
+    match provider {
+        "openlibrary" => rest("OL", &['W', 'M']),
+        "google" => {
+            (8..=20).contains(&id.len())
+                && id
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        }
+        _ => false,
+    }
+}
+
+/// The work a mau export's book came from, as the provider describes it now.
+/// The export only names it: titles, people, and editions in the shared
+/// catalog come from the provider, never from the file. `None` when it can't
+/// be confirmed (unknown ID, provider off or refusing, no Google key).
 async fn exported_work(
     state: &AppState,
     searcher: &Searcher,
-    b: &export::Book,
     provider: &str,
     id: &str,
-) -> Candidate {
-    let cover_url = match (provider, &searcher.openlibrary) {
-        ("openlibrary", Some(_)) => providers::openlibrary::work(&state.http, id)
-            .await
-            .unwrap_or_else(|e| {
-                tracing::warn!("import: looking up {id}: {e}");
-                None
-            })
-            .and_then(|c| c.cover_url),
-        // Used when Open Library has no cover for the ISBN (as when added).
-        ("google", _) => providers::google::cover_url(&state.http, id).await,
-        _ => None,
-    };
-    Candidate {
-        provider: provider.into(),
-        source_id: id.into(),
-        title: b.title.clone(),
-        authors: b
-            .people
-            .iter()
-            .filter(|p| p.role == "author")
-            .map(|p| p.name.clone())
-            .collect(),
-        first_year: b.first_year,
-        cover_url,
-        edition_count: None,
-        editions: b
-            .editions
-            .iter()
-            .map(|e| providers::CandidateEdition {
-                source_id: None,
-                publisher: e.publisher.clone(),
-                binding: e.binding.clone(),
-                year: e.year,
-                isbn13: e.isbn13.clone(),
-                pages: e.pages,
-                cover_url: None,
-            })
-            .collect(),
+) -> Option<Candidate> {
+    if !exported_source_ok(provider, id) {
+        return None;
     }
+    let cache_key = format!("work:{provider}:{id}");
+    if let Some(c) = providers::cache_get::<Candidate>(&state.db, &cache_key).await {
+        return Some(c);
+    }
+    let found = match provider {
+        "openlibrary" => {
+            searcher.openlibrary.as_ref()?;
+            providers::openlibrary::work(&state.http, id).await
+        }
+        _ => {
+            let key = searcher.google.as_ref()?.key.as_deref()?;
+            providers::google::volume(&state.http, key, id).await
+        }
+    };
+    let found = found
+        .unwrap_or_else(|e| {
+            tracing::warn!("import: looking up {provider} {id}: {e}");
+            None
+        })
+        .filter(|c| c.source_id == id)?;
+    providers::cache_put(&state.db, &cache_key, &found).await;
+    Some(found)
 }
 
 /// `first_title` is what the first search uses: the row's title, or for
@@ -525,12 +535,14 @@ async fn match_row(
     if dupe {
         return Matched::of(MatchKind::Dupe);
     }
-    // From another mau: the same catalog work, without searching.
+    // From another mau: the same catalog work, if its provider confirms it.
+    // Otherwise the row is matched like any other.
     if let Some(b) = mau
         && let (Some(provider), Some(id)) = (&b.provider, &b.provider_id)
+        && let Some(c) = exported_work(state, searcher, provider, id).await
     {
         return Matched {
-            candidates: vec![exported_work(state, searcher, b, provider, id).await],
+            candidates: vec![c],
             ..Matched::of(MatchKind::Matched)
         };
     }
@@ -1641,16 +1653,43 @@ mod tests {
         );
     }
 
-    /// IMP-07: moving a library to another instance keeps catalog links.
+    /// IMP-07: moving a library to another instance keeps catalog links, but
+    /// only as the provider describes them.
     #[tokio::test]
     async fn mau_export_keeps_catalog_links() {
         let app = TestApp::new().await;
-        offline(&app).await;
-        // Saving fetches the work's editions; answer from the cache.
+        // Open Library only, answering from the cache (no network in tests).
+        let ol = vec![crate::providers::ProviderConfig {
+            name: crate::providers::ProviderName::Openlibrary,
+            enabled: true,
+            key: None,
+        }];
+        crate::settings::set(&app.state.db, "providers", &ol)
+            .await
+            .unwrap();
+        let lathe = Candidate {
+            provider: "openlibrary".into(),
+            source_id: "OL59858W".into(),
+            title: "The Lathe of Heaven".into(),
+            authors: vec!["Ursula K. Le Guin".into()],
+            first_year: Some(1971),
+            cover_url: None,
+            edition_count: Some(40),
+            editions: vec![],
+        };
+        crate::providers::cache_put(&app.state.db, "work:openlibrary:OL59858W", &lathe).await;
         crate::providers::cache_put(
             &app.state.db,
             "editions:openlibrary:OL59858W",
-            &Vec::<crate::providers::CandidateEdition>::new(),
+            &vec![crate::providers::CandidateEdition {
+                source_id: Some("OL7349416M".into()),
+                publisher: Some("Avon".into()),
+                binding: Some("Paperback".into()),
+                year: Some(1973),
+                isbn13: Some("9780380003471".into()),
+                pages: Some(184),
+                cover_url: None,
+            }],
         )
         .await;
         let (_, cookie) = app.user("rri", false).await;
@@ -1676,38 +1715,66 @@ mod tests {
                 .extend(extra.as_object().unwrap().clone());
             b
         };
-        let export = json!({
-            "format": "mau-export",
-            "version": 2,
-            "exported_at": "2026-11-11",
-            "account": { "username": "rri", "display_name": "R", "bio": "", "time_zone": "UTC" },
-            "books": [
-                book("The Lathe of Heaven", "Ursula K. Le Guin", json!({
-                    "provider": "openlibrary",
-                    "provider_id": "OL59858W",
-                    "private": false,
-                    "rating": 5,
-                    "editions": [{ "publisher": "Avon", "binding": "Paperback", "year": 1973, "isbn13": "9780380003471", "pages": 184 }],
-                    "copies": [{ "format": "Paperback", "location": "Hall", "edition_isbn13": "9780380003471" }],
-                    "readings": [{ "started_on": "2026-10-01", "finished_on": "2026-10-09", "total": 184, "pos": 184,
-                        "events": [{ "date": "2026-10-01", "from": 0, "to": 90 }, { "date": "2026-10-09", "from": 90, "to": 184 }] }]
-                })),
-                book("Zine No. 4", "A Friend", json!({ "private": true })),
-                // An older export, without the source fields.
-                book("Cosmos", "Carl Sagan", json!({})),
-            ]
-        })
-        .to_string();
-
+        let file = |books: Vec<Value>| {
+            json!({
+                "format": "mau-export",
+                "version": 2,
+                "exported_at": "2026-11-11",
+                "account": { "username": "rri", "display_name": "R", "bio": "", "time_zone": "UTC" },
+                "books": books
+            })
+            .to_string()
+        };
+        // The file's title and edition don't reach the shared catalog; the
+        // provider's do.
+        let export = file(vec![book(
+            "Not What Open Library Says",
+            "Someone Else",
+            json!({
+                "provider": "openlibrary",
+                "provider_id": "OL59858W",
+                "private": false,
+                "rating": 5,
+                "editions": [
+                    { "publisher": "Avon", "binding": "Paperback", "year": 1973, "isbn13": "9780380003471", "pages": 184 },
+                    { "publisher": "Made Up", "binding": null, "year": 2099, "isbn13": "9780000000002", "pages": 1 }
+                ],
+                "copies": [{ "format": "Paperback", "location": "Hall", "edition_isbn13": "9780380003471" }],
+                "readings": [{ "started_on": "2026-10-01", "finished_on": "2026-10-09", "total": 184, "pos": 184,
+                    "events": [{ "date": "2026-10-01", "from": 0, "to": 90 }, { "date": "2026-10-09", "from": 90, "to": 184 }] }]
+            }),
+        )]);
         let res = run_import(&app, &cookie, "mau", &export).await;
+        assert_eq!(res["rows"][0]["kind"], "matched");
+        assert_eq!(res["done"]["imported"], 1);
+
+        // The rest with no providers (no network in tests): a private entry,
+        // an older export's book, and two that can't be confirmed (no Google
+        // key, a malformed ID) all become private manual entries.
+        offline(&app).await;
+        let rest = file(vec![
+            book("Zine No. 4", "A Friend", json!({ "private": true })),
+            book("Cosmos", "Carl Sagan", json!({})),
+            book(
+                "Google Book",
+                "G. Author",
+                json!({ "provider": "google", "provider_id": "E3DfuwEACAAJ" }),
+            ),
+            book(
+                "Odd ID",
+                "O. Author",
+                json!({ "provider": "openlibrary", "provider_id": "../../admin" }),
+            ),
+        ]);
+        let res = run_import(&app, &cookie, "mau", &rest).await;
         let kinds: Vec<_> = res["rows"]
             .as_array()
             .unwrap()
             .iter()
             .map(|r| r["kind"].as_str().unwrap().to_string())
             .collect();
-        assert_eq!(kinds, ["matched", "unmatched", "unmatched"]);
-        assert_eq!(res["done"]["imported"], 3);
+        assert_eq!(kinds, ["unmatched"; 4]);
+        assert_eq!(res["done"]["imported"], 4);
 
         let (_, sync) = app
             .post("/api/sync", json!({ "since": 0, "ops": [] }), Some(&cookie))
@@ -1719,21 +1786,34 @@ mod tests {
                 .unwrap()
                 .iter()
                 .find(|w| w["title"] == title)
-                .unwrap()
+                .unwrap_or_else(|| panic!("no work {title}"))
                 .clone()
         };
         let lathe = work("The Lathe of Heaven");
         assert_eq!(lathe["private"], false, "{lathe}");
-        assert_eq!(lathe["editions"][0]["isbn13"], "9780380003471");
-        assert_eq!(work("Zine No. 4")["private"], true);
-        assert_eq!(work("Cosmos")["private"], true);
-        let source: (String, String) = sqlx::query_as(
-            "SELECT source, source_id FROM works WHERE title = 'The Lathe of Heaven'",
+        assert_eq!(lathe["people"][0]["name"], "Ursula K. Le Guin");
+        let isbns: Vec<_> = lathe["editions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["isbn13"].clone())
+            .collect();
+        assert_eq!(isbns, [json!("9780380003471")], "{lathe}");
+        let made_up: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM editions WHERE isbn13 = '9780000000002' AND owner_id IS NULL",
         )
         .fetch_one(&app.state.db)
         .await
         .unwrap();
-        assert_eq!(source, ("openlibrary".into(), "OL59858W".into()));
+        assert_eq!(made_up, 0);
+        for title in ["Zine No. 4", "Cosmos", "Google Book", "Odd ID"] {
+            assert_eq!(work(title)["private"], true, "{title}");
+        }
+        let shared: i64 = sqlx::query_scalar("SELECT count(*) FROM works WHERE owner_id IS NULL")
+            .fetch_one(&app.state.db)
+            .await
+            .unwrap();
+        assert_eq!(shared, 1);
         assert_eq!(ch["events"].as_array().unwrap().len(), 2);
         assert_eq!(ch["copies"][0]["location"], "Hall");
         assert!(
@@ -1766,6 +1846,27 @@ mod tests {
             )
             .await;
         assert_eq!(status, 400, "{body}");
+    }
+
+    #[test]
+    fn exported_sources() {
+        assert!(exported_source_ok("openlibrary", "OL59858W"));
+        assert!(exported_source_ok("openlibrary", "OL7349416M"));
+        assert!(exported_source_ok("google", "E3DfuwEACAAJ"));
+        assert!(exported_source_ok("google", "_tSDXV2ay_wC"));
+        for (p, id) in [
+            ("openlibrary", "OLW"),
+            ("openlibrary", "OL59858X"),
+            ("openlibrary", "OL1W/../x"),
+            ("openlibrary", "../../admin"),
+            ("google", "short"),
+            ("google", "E3Dfuw?key=x"),
+            ("google", "E3DfuwEACAAJ#x"),
+            ("hardcover", "123"),
+            ("", "OL1W"),
+        ] {
+            assert!(!exported_source_ok(p, id), "{p} {id}");
+        }
     }
 
     #[tokio::test]

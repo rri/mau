@@ -963,3 +963,32 @@ Mine, details:
   (the tagline is SVG text in the system sans, small caps). The image has its
   own background, so it reads the same in GitHub's light and dark themes.
 - The README links the threat model next to the spec and decisions.
+
+## Security fixes from threat model version 2 (2026-11-11)
+
+Approved (findings V2-1 to V2-5 in `docs/THREAT_MODEL.md`):
+
+- **A mau export only names a catalog work.** Importing looks it up at the
+  provider (Open Library by `key:/works/…`; Google's volume with the
+  importer's own key) and adds it as the provider describes it: title,
+  people, year, cover, and the provider's editions. The file's own title,
+  people, and editions never reach the shared catalog; they're still used
+  for a private manual entry. A lookup that fails (unknown ID, provider off
+  or refusing, no Google key) falls back to normal matching. This replaces
+  building the work from the export (and the keyless Google cover address,
+  now removed).
+- **Only well-formed IDs are looked up:** Open Library `OL<digits>W` (or `M`),
+  Google 8–20 characters of `[A-Za-z0-9_-]`; other providers aren't looked
+  up. Confirmed works are cached for 30 days like other provider answers.
+- **`mau-deploy` runs the uploaded binary's `--version` check as `mau`**, so
+  nothing uploaded ever runs as root.
+- **A failed deploy no longer prints mau's log** into the SSH output (which
+  becomes the public Actions log); it points to `journalctl -u mau`.
+- **CI runs every Monday at 06:17 UTC** as well (checks only; deploys stay
+  with pushes and manual runs), and runs `npm audit --omit=dev`.
+
+Consequence: a library moved to an instance where the importer has no Google
+key gets its Google books by normal matching. Checked on the real export's
+17 Google books: 16 matched Open Library works, 1 needed checking. To keep
+Google links, add a Google Books key (Settings → Google Books) before
+importing.

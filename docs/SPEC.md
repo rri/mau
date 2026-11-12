@@ -274,9 +274,10 @@ A list of sections, each its own page, then **Sign out**.
   finished with an unknown date; shelves become tags verbatim. Export: full
   JSON (re-importable, also into another mau instance) or simple CSV.
 - **Importing a mau export:** a book that came from a catalog provider is
-  added from that same provider record (no search; Open Library supplies its
-  cover), a private manual entry stays one, and books from older exports
-  without that information are matched like any other file.
+  added from that same record, as the provider describes it now (Open
+  Library; Google with the importer's own key); a private manual entry stays
+  one; anything the provider doesn't confirm, and books from older exports,
+  are matched like any other file.
 - **Import matching:** searches Google Books with the user's own key,
   otherwise Open Library (never the server's Google key). By ISBN when the
   file has one; then title + first author; without a clear match (same title

@@ -1,5 +1,6 @@
-# Tests every push and pull request. A push to main that passes is built as a
-# static binary and deployed to maubooks.org (see deploy/README.md).
+# Tests every push and pull request, and main every Monday (so new advisories
+# show up between pushes). A push to main that passes is built as a static
+# binary and deployed to maubooks.org (see deploy/README.md).
 #
 # Third-party actions are pinned to commits; the comment names the release.
 
@@ -10,6 +11,8 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"
 
 permissions:
   contents: read
@@ -84,8 +87,13 @@ jobs:
           tool: cargo-audit
       # RUSTSEC-2026-0459 (SQLite) is fixed in libsqlite3-sys 0.39, which sqlx
       # doesn't allow yet. Any other advisory fails the build.
-      - name: Advisories
+      - name: Rust advisories
         run: cargo audit --deny warnings --ignore RUSTSEC-2026-0459
+      # What ships: the web app's runtime dependencies (build tools aren't in
+      # the binary).
+      - name: npm advisories
+        run: npm audit --omit=dev
+        working-directory: web
 
   build:
     runs-on: ubuntu-24.04
@@ -126,7 +134,8 @@ jobs:
 
   deploy:
     needs: [test, audit, build]
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    # Pushes and manual runs only: the weekly run checks, it doesn't deploy.
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
     environment:
       name: production

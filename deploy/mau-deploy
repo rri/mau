@@ -45,7 +45,8 @@ trap 'rm -f "$new"' EXIT
 head -c 200000000 >"$new"
 echo "$sha  $new" | sha256sum --check --status || fail "the binary's checksum doesn't match; nothing changed"
 chmod 755 "$new"
-"$new" --version >/dev/null || fail "the new binary doesn't run here; nothing changed"
+# As mau, like the service: nothing uploaded ever runs as root.
+runuser -u mau -- "$new" --version >/dev/null || fail "the new binary doesn't run here; nothing changed"
 
 log "installing $commit"
 systemctl stop mau
@@ -67,8 +68,9 @@ if healthy; then
 	exit 0
 fi
 
-log "$commit didn't come up healthy; going back"
-journalctl -u mau -n 30 --no-pager || true
+# mau's own log stays on the server: this output ends up in public CI logs,
+# and on a new instance mau's log holds the admin setup link.
+log "$commit didn't come up healthy; going back (see journalctl -u mau)"
 systemctl stop mau
 if [ ! -x "$BIN.prev" ]; then
 	fail "there's no previous version to go back to; mau is stopped"
@@ -80,4 +82,4 @@ if [ -n "$copy" ]; then
 fi
 start
 healthy || fail "the previous version didn't come up either; see journalctl -u mau"
-fail "went back to the previous version; see the log above"
+fail "went back to the previous version; see journalctl -u mau"

@@ -24,7 +24,10 @@ workflow is `.github/workflows/ci.yml`.
    copies the database to `backups/pre-deploy-*.db` (the newest 5 are kept),
    installs the binary (the old one stays as `/usr/local/bin/mau.prev`), and
    starts mau. If `/api/health` doesn't answer within 30 seconds, it puts the
-   old binary and the database copy back and starts that.
+   old binary and the database copy back and starts that. Nothing uploaded
+   runs as root (its `--version` check runs as `mau`), and the script prints
+   only its own steps: they end up in the public Actions log, so mau's log
+   stays in the journal.
 
 mau is down for a few seconds during each deploy; the app keeps working
 offline and syncs when it's back.
