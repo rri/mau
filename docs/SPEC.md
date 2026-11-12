@@ -598,6 +598,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | ADD-22 | Save | Private work, people with roles (+ Add another person, ×), first year, optional cover and edition details; to the top of the inactive books; toast "Added *title* (private to you)…". | C, B |
 | ADD-23 | Similar titles | Once per entry, online: "Is it one of these?" with matching shared works (picking one opens its sheet) and **No, add my book**. | C, B |
 | ADD-24 | Cancel | Back to the search. | C |
+| ADD-25 | Key tip | Without the reader's own Google Books key, a tip under the search: "Get better matches with your own Google Books key." — searches use the server's shared sources until then — with **Add a key in Settings** (`/settings/google-books`). Gone once a key is added. | C |
 | ADD-30 | Scanner | Full-screen camera view with a frame; reads EAN-13 ISBNs (978/979) and searches; vibrates on success; ✕, Escape, or "Type the ISBN instead" close it; without a camera or permission it says so. | C (messages and closing); decoding: — |
 
 ### 14.9 Settings (`/settings` and personal pages)
@@ -638,6 +639,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | IMP-04 | Other CSV | Columns mapped to fields, guessed from the headers (each field once), with a sample value; Continue starts matching ("Matching books with the catalog… n of N"). | C, A |
 | IMP-05 | Offline, export | "Importing needs a connection."; Spreadsheet (CSV) and Full export (JSON) always. | C, A |
 | IMP-07 | mau export | Books keep their catalog link (provider and ID) and privacy across instances; a newer export version is refused. | A |
+| IMP-08 | Key tip | The same tip above the import form ("Imports match your books on Open Library until you add…"). | C |
 | IMP-06 | Failure | "Saving stopped: *reason*" with Done. | C |
 
 ### 14.11 Admin (`/settings/admin/…`)

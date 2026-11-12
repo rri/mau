@@ -22,6 +22,7 @@
 	import Scanner from '#lib/components/Scanner.svelte';
 	import TagInput from '#lib/components/TagInput.svelte';
 	import Breadcrumbs from '#lib/components/Breadcrumbs.svelte';
+	import KeyTip from '#lib/components/KeyTip.svelte';
 	import { origin } from '#lib/origin.svelte.ts';
 
 	const FORMATS = ['Hardcover', 'Paperback', 'Ebook', 'Audiobook'];
@@ -376,6 +377,7 @@
 		>
 	</form>
 
+	<KeyTip what="search" inset />
 	{#if !library.online}
 		<p class="note">
 			Searching the catalog needs a connection. You can still enter a book by hand.

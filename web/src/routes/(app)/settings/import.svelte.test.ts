@@ -55,6 +55,18 @@ beforeEach(() => {
 });
 
 describe('Import', () => {
+	it('IMP-08 without a Google Books key, a tip says imports match better with one', async () => {
+		mockApi({ 'GET /import/current': { job: null } });
+		const { unmount } = render(Import);
+		const tip = await screen.findByRole('complementary', { name: 'Tip' });
+		expect(tip).toHaveTextContent('Imports match your books on Open Library until you add');
+		unmount();
+		signIn({ google_books: true });
+		render(Import);
+		await screen.findByLabelText('Import from');
+		expect(screen.queryByRole('complementary', { name: 'Tip' })).toBeNull();
+	});
+
 	it('IMP-01 Read file needs a file', async () => {
 		mockApi({ 'GET /import/current': { job: null } });
 		render(Import);

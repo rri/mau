@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
+	import KeyTip from '#lib/components/KeyTip.svelte';
 	import { del, get, post } from '#lib/api/client.ts';
 	import type { CommitResult } from '#lib/api/generated/CommitResult.ts';
 	import type { CsvPreview } from '#lib/api/generated/CsvPreview.ts';
@@ -267,6 +268,7 @@
 	{#if !library.online}
 		<p class="notice">Importing needs a connection.</p>
 	{:else if step === 'choose'}
+		<KeyTip what="import" />
 		<label class="field"
 			>Import from<select bind:value={source}
 				>{#each SOURCES as s (s.v)}<option value={s.v}>{s.l}</option>{/each}</select

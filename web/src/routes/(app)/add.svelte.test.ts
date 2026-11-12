@@ -64,6 +64,20 @@ beforeEach(() => {
 });
 
 describe('Add a book: search', () => {
+	it('ADD-25 without a Google Books key, a tip says adding one gets better matches', () => {
+		const { unmount } = render(Add);
+		const tip = screen.getByRole('complementary', { name: 'Tip' });
+		expect(tip).toHaveTextContent('Get better matches with your own Google Books key.');
+		expect(within(tip).getByRole('link', { name: 'Add a key in Settings' })).toHaveAttribute(
+			'href',
+			'/settings/google-books'
+		);
+		unmount();
+		signIn({ google_books: true });
+		render(Add);
+		expect(screen.queryByRole('complementary', { name: 'Tip' })).toBeNull();
+	});
+
 	it('ADD-01 starts with help text, the trail, and a way to enter a book by hand', () => {
 		origin.visit('/reading');
 		render(Add);

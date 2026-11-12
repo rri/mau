@@ -1202,3 +1202,14 @@ progress yet" under a finished book. Now:
   unknown"), like the Catalog.
 - **The Catalog's state line shows percent** ("Active · 42%"); it said
   "page 42 of 100".
+
+## A tip to add a Google Books key (2026-11-12)
+
+- **Add a book and Import show a tip** to readers without their own Google
+  Books key (the only per-reader provider key): "Get better matches with
+  your own Google Books key." It says what they use until then (searches:
+  the server's shared sources; imports: Open Library), that a key usually
+  finds more books, editions, and covers, and links to Settings → Google
+  Books ("it takes a few minutes"). A tinted box with an accent edge, under
+  the search bar and above the import form; not dismissible, and gone once
+  a key is added.
