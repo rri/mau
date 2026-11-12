@@ -1121,7 +1121,7 @@ Details decided along the way:
 - **The progress editor is shared** by Reading rows and the book page, with
   Save and Cancel (phones have no Escape key). In a Reading row the row's
   buttons hide while it's open, so it gets the full width.
-- **Setup is shared** by Reading rows, the grid's dialog, and the book page.
+- **Setup is shared** by Reading rows and the book page (and was by the grid's dialog, since removed).
 - **Export version 3** adds each reading's `unit` and `pages` and each
   event's `unit`; older exports import as pages. The CSV shows "42%" in
   Current page and the copy's page count, if known, in Total pages. Public
@@ -1166,3 +1166,18 @@ Details:
 - **The toast is centered on the content**: beside the sidebar (900–1119px)
   that's 100px right of the screen's center, and from 1120px, where the
   content is centered, the screen's center. It used the first everywhere.
+
+## The Reading grid without buttons; "+1" (2026-11-12)
+
+Chosen by the user:
+
+- **Reading grid tiles have no buttons**: tapping a book opens its page,
+  which has them. The list view keeps them on every row. The start dialog
+  that grid tiles opened is gone (the list and the book page ask inline).
+- **"+1" replaces the upward triangle**, everywhere it appears (Home,
+  Reading list rows, the book page). Its tooltip reads "+1 page" or
+  "+1 percent"; screen readers hear "Add 1 page to *title*" or "Add 1% to
+  *title*".
+
+Details: the dialog focus test (UI-11) now uses the password confirmation
+dialog, the last dialog of its kind. The `step` icon is removed.

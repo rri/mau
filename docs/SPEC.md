@@ -144,7 +144,7 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
 - One continuous list of all unfinished books: active books first, then
   inactive. No section headers. Finished books are hidden.
 - **Ordering:** the whole list is one manual order (a drag handle on every
-  row). Nothing reorders on its own: the step button, page edits, and edits on inactive
+  row). Nothing reorders on its own: +1, page edits, and edits on inactive
   books never move a row.
   - Play moves a book to the end of the active books. Pause moves it to the top
     of the inactive books. A newly added book goes to the top of the inactive
@@ -162,8 +162,8 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
   pages once a page count is entered); the position converts and the switch
   logs no reading. Percent readings count toward days read and pace, never
   toward pages read.
-- **The step button** (a filled round button with an upward triangle)
-  appears only on active rows and adds 1 page (1% in percent). Each change shows an undo
+- **+1** (a filled round button labelled "+1"; tooltip "+1 page" or "+1
+  percent") appears only on active rows and adds 1 page (1% in percent). Each change shows an undo
   toast for 10 seconds.
 - Tapping the progress opens inline fields: current page and total pages
   (or percent and the copy's page count), with Save and Cancel; the row's
@@ -179,10 +179,10 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
   leaves the list.
 - Rows show cover thumbnail, title, author, thin progress bar, "page X of Y",
   and "+N pages today" or "last read …". Active rows have a teal edge, a pause
-  button, and the solid round step button. Inactive rows are dimmed and have a play button.
-- **Reading buttons**, the same wherever a book has them (Home, Reading rows
-  and tiles, the book page): round, all one size, right-aligned so they line
-  up from row to row. Active: step (upward triangle), finish (check mark),
+  button, and the solid round +1. Inactive rows are dimmed and have a play button.
+- **Reading buttons**, the same wherever a book has them (Home, Reading list
+  rows, the book page; not the Reading grid): round, all one size, right-aligned so they line
+  up from row to row. Active: +1, finish (check mark),
   pause. Inactive: finish, start (play; resume if started). Finished books
   have **Re-read** on their book page. The cover or title opens the book.
   Finish sets today's date at once, with an undo toast, and leaves the
@@ -191,15 +191,14 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
   else percent). A finished book can't be set back to Inactive.
 - **Search** (always visible under the header): title or author, among the
   unfinished books only, with "N of M books" and **Clear search** while typed.
-  It starts empty on each visit. Drag handles hide while searching; +, pause,
-  play and page edits still work on the results.
+  It starts empty on each visit. Drag handles hide while searching; the reading
+  buttons and page edits still work on the results.
 - **List or grid**, switchable in the header and remembered on this device
   separately from the Catalog's. Grid tiles keep the same order and show the
-  clean cover, a progress bar, a row with "p. X/Y" (or "Not started") and
-  the reading buttons (smaller) on their own line, then the title (two
-  lines at most). Nothing sits on the cover. Tapping the cover or title opens the book
-  page. Page edits and reordering are list only. Play on a never-started tile
-  asks for the total pages in a small dialog (with the catalog hint).
+  clean cover, a progress bar, "p. X/Y" (or "42%", or "Not started"), then
+  the title (two lines at most). Nothing sits on the cover, and tiles have
+  no buttons: tapping the cover or title opens the book page, which has
+  them. Page edits, the reading buttons, and reordering are list only.
 
 ## 5. Catalog view
 
@@ -351,7 +350,7 @@ A list of sections, each its own page, then **Sign out**.
   mode), Instrument Sans throughout (self-hosted; headings semibold), vivid emerald accent
   (#047857 light, #34d399 dark). Every text pair is at least 4.5:1.
 - Follows the system light or dark mode, with an override in Settings.
-- Comfortable density: 64px rows, 40px round reading buttons (30px in tiles), 20px side padding.
+- Comfortable density: 64px rows, 40px round reading buttons, 20px side padding.
 - Active books sit on a softly tinted card with an accent bar on the left;
   inactive books have desaturated covers and grey titles. In the grid,
   active covers have an accent outline.
@@ -469,7 +468,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | SHELL-11 | Unknown address | A card like sign-in: logo, "Page not found", an explanation, and **Go to Home** (signed in) or **Go to the front page**. Tab title "Page not found · mau". | C, B |
 | SHELL-12 | Other routing errors | The same card titled "Something went wrong" with the error's message. | C |
 | SHELL-20 | Toast | One at a time, bottom of the screen, `role="status"`, 10 seconds with a shrinking timer bar; an optional action (Undo, View) runs once and closes it. A new toast replaces the old one. | C (UI-01), B |
-| SHELL-21 | Dialogs | Every dialog and sheet: focus moves in (to its first field or button), Tab and Shift+Tab stay inside, Escape cancels (only the topmost dialog), and focus returns to what opened it. | C (UI-11, BOOK-33, ADD-13, READ-08), B |
+| SHELL-21 | Dialogs | Every dialog and sheet: focus moves in (to its first field or button), Tab and Shift+Tab stay inside, Escape cancels (only the topmost dialog), and focus returns to what opened it. | C (UI-11, BOOK-33, ADD-13), B |
 | SHELL-22 | Breadcrumbs | Above each page title except the main sections: earlier steps are links (or buttons for in-page steps), chevrons between, the last step plain with `aria-current="page"`. Under 600px only "‹ parent". | C, B |
 
 ### 14.2 Home (`/`, signed in)
@@ -483,7 +482,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | HOME-05 | Pace | Days left = pages left ÷ (pages read in this reading in the last 28 days ÷ 28), rounded up, at least 1. Hidden when nothing was read in those 28 days. | U, C |
 | HOME-06 | Limit | At most five books. | C |
 | HOME-07 | Nothing active | "Nothing in progress right now. Choose a book." (link to Reading). | C |
-| HOME-08 | Reading buttons | As READ-16: the step adds one page (1% for percent) to that book, with an undo toast "+1 page on *title*". | C |
+| HOME-08 | Reading buttons | As READ-16: +1 adds one page (1% for percent) to that book, with an undo toast "+1 page on *title*". | C |
 | HOME-09 | Links | Cover (hidden from screen readers, not a tab stop) and title open the book. | C |
 | HOME-10 | Last 14 days | Subheading, 14 bars oldest first; labels every other day plus "today" under the last bar; hover shows "Nov 9: 20 pages" (or "no reading"); a hidden table lists every day for screen readers. | C |
 | HOME-11 | *Year* (so far) | Three tiles, side by side at every width: books finished this year (unknown dates don't count), pages read this year, days with reading this year. Pages count forward moves only. | U, C |
@@ -522,12 +521,12 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 |---|---|---|---|
 | READ-01 | List | Unfinished books: active (tinted, accent edge) by the reader's order, then inactive (dimmed covers, grey titles). | C, U, E |
 | READ-02 | Row | Drag handle, cover and title (link), authors, a thin progress bar, then "page X of Y" (a button) with "+N page(s) today", "last read *ago*", or "no progress yet"; never-started: "Not started" and "added *ago*". | C |
-| READ-03 | Controls | Active: step (one page, or 1%), finish, pause (to the top of the inactive books). Inactive: finish, play (resume at the end of the active books). Each shows an undo toast. | C, U, B, E |
+| READ-03 | Controls | Active: +1 (one page, or 1%), finish, pause (to the top of the inactive books). Inactive: finish, play (resume at the end of the active books). Each shows an undo toast. | C, U, B, E |
 | READ-04 | Page editor | The page button opens "page [ ] of [ ]" with Save, focused and selected; Enter or leaving the fields saves, Escape cancels. Saving moves forward or back ("Moved back to page N"), changes the total, and finishes the book at the total. | C, U, B |
 | READ-05 | First start | Play on a never-started book opens inline "How many pages does your copy have?" (empty, focused), "Catalog lists N pages" fills it, an invalid number says "Enter the number of pages in your copy.", **Start reading** starts at page 0. | C, B |
 | READ-06 | Search | "Search title or author"; while typed, "N of M books" and **Clear search**; drag handles hide (their column stays). Starts empty each visit. | C, B |
 | READ-07 | No match | "No books you're reading match "*q*"." | C |
-| READ-08 | Grid | Tiles: cover (link), progress bar, "p. X/Y", "42%", or "Not started", the reading buttons (smaller, own line), the title. Play on a never-started tile opens a dialog with the same pages question. | C, B |
+| READ-08 | Grid | Tiles: cover (link), progress bar, "p. X/Y", "42%", or "Not started", the title (link). No buttons; the book page has them. | C, B |
 | READ-09 | Layout | The List/Grid toggle is remembered on this device, separately from the Catalog's. | C, B |
 | READ-10 | Status | Next to the title: "Offline · N unsynced" or "Syncing…". | C |
 | READ-11 | Empty | "Welcome, *name*." with Add and Import; no search or layout toggle. | C |
@@ -535,7 +534,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | READ-13 | Keyboard reorder | ↑ and ↓ on a drag handle move the book one place within its group; never across groups. | C |
 | READ-14 | Long lists | 60 books are drawn, then 60 more near the end (or **Show N more**); search covers every book and starts again from the top; dragging works among the books drawn. Back from a book keeps the books drawn and the scroll position. | C |
 | READ-15 | Percent | Setup offers **Don't know? Track by percent**; the row shows "N%" and "+N% today"; the editor has percent and the copy's page count, **Count pages instead** (once a count is entered) and, for pages, **Track by percent instead**. | C, U, A |
-| READ-16 | Reading buttons | The same round, same-size buttons wherever a book has them (§4), right-aligned: active step, finish, pause; inactive finish, start (or resume). Finish: today, undo toast, no reading logged. | C, U |
+| READ-16 | Reading buttons | The same round, same-size buttons wherever a book has them (§4; not the grid), right-aligned: active +1, finish, pause; inactive finish, start (or resume). Finish: today, undo toast, no reading logged. | C, U |
 | READ-ACT-01…13 | Actions | Up arrow, set pages (clamped 0…total), finishing and its undo, pause, resume, start, re-read, Finish (READ-ACT-10, 11), percent (12), switching units (13): the exact changes and toasts. | U |
 | READ-DRAG-01…05 | Drag rules | §4 ordering rules for every drop position; a never-started book dropped among active books asks for its pages first. A drop label shows "Move here", "Activate here", "Start here", or "Stays active: goes to end of active". | U (rules); the pointer gesture: — |
 
@@ -567,7 +566,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | BOOK-12 | Page editor | Current and total page with Save and Cancel. | C |
 | BOOK-13 | Start | Asks for the pages like READ-05. | C |
 | BOOK-14 | Finished | "Finished *date*"; Re-read starts a new reading at page 0 with the same total. | C, U |
-| BOOK-16 | Percent | "42%", the step adds 1%, history lines "30% → 40%"; percent adds days read but no pages; the calendar shades percent-only days by percent. | C |
+| BOOK-16 | Percent | "42%", +1 adds 1%, history lines "30% → 40%"; percent adds days read but no pages; the calendar shades percent-only days by percent. | C |
 | BOOK-20 | Rating | Five stars (a radio group); choosing the current rating again clears it. | C, B |
 | BOOK-21 | Notes | "Private notes about this book"; saved 0.7 seconds after typing stops, then "Saved" by the heading. | C, B |
 | BOOK-22 | Tags | Chips with ×; "+ add tag" suggests existing tags (§14.12) or creates one. | C, B |
