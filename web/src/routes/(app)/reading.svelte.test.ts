@@ -149,7 +149,7 @@ describe('Reading list', () => {
 		).toBeInTheDocument();
 	});
 
-	it('READ-08 the grid shows tiles; starting a never-read book opens a dialog', async () => {
+	it('READ-08 the grid shows tiles with progress and no buttons; the book opens on a tap', async () => {
 		useLibrary();
 		render(Reading);
 		await userEvent.click(screen.getByRole('button', { name: 'Grid layout' }));
@@ -158,15 +158,11 @@ describe('Reading list', () => {
 		expect(tiles).toHaveLength(4);
 		expect(tiles[0]).toHaveTextContent('p. 140/304');
 		expect(tiles[2]).toHaveTextContent('Not started');
-		await userEvent.click(screen.getByRole('button', { name: 'Start Station Eleven' }));
-		const dialog = screen.getByRole('dialog', { name: 'Station Eleven' });
-		await userEvent.keyboard('{Escape}');
-		expect(dialog).not.toBeInTheDocument();
-		await userEvent.click(screen.getByRole('button', { name: 'Start Station Eleven' }));
-		await userEvent.type(screen.getByLabelText('How many pages does your copy have?'), '320');
-		await userEvent.click(screen.getByRole('button', { name: 'Start reading' }));
-		expect(info('se').reading).toMatchObject({ total: 320 });
-		expect(screen.queryByRole('dialog')).toBeNull();
+		for (const t of tiles) expect(within(t).queryByRole('button')).toBeNull();
+		expect(within(tiles[2]).getByRole('link', { name: 'Station Eleven' })).toHaveAttribute(
+			'href',
+			'/catalog/se'
+		);
 	});
 
 	it('READ-09 the layout choice is remembered on this device', () => {
@@ -255,7 +251,14 @@ describe('Reading list', () => {
 		await userEvent.click(screen.getByRole('button', { name: 'Start Station Eleven' }));
 		await userEvent.click(screen.getByRole('button', { name: "Don't know? Track by percent" }));
 		expect(info('se').reading).toMatchObject({ unit: 'percent', pos: 0 });
-		await userEvent.click(screen.getByRole('button', { name: 'Add 1% to Station Eleven' }));
+		const step = screen.getByRole('button', { name: 'Add 1% to Station Eleven' });
+		expect(step).toHaveTextContent('+1');
+		expect(step).toHaveAttribute('title', '+1 percent');
+		expect(screen.getByRole('button', { name: 'Add 1 page to Middlemarch' })).toHaveAttribute(
+			'title',
+			'+1 page'
+		);
+		await userEvent.click(step);
 		expect(row('Station Eleven')).toHaveTextContent('1%');
 		expect(row('Station Eleven')).toHaveTextContent('+1% today');
 

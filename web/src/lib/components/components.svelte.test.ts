@@ -4,7 +4,6 @@ import { fireEvent, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import Toast from './Toast.svelte';
 import ConfirmDialog from './ConfirmDialog.svelte';
-import StartDialog from './StartDialog.svelte';
 import TagInput from './TagInput.svelte';
 import Cover from './Cover.svelte';
 import BarChart from './BarChart.svelte';
@@ -70,26 +69,23 @@ describe('Dialogs', () => {
 		expect(confirmation.open).toBe(false);
 	});
 
-	it('UI-11 Tab stays inside a dialog; Escape closes only the top one; focus returns', async () => {
-		const d = sampleLibrary();
-		const info = bookInfo(d, d.books.get('se')!);
+	it('UI-11 Tab stays inside a dialog; Escape closes it; focus returns', async () => {
 		const opener = document.createElement('button');
 		document.body.append(opener);
 		opener.focus();
-		const cancel = vi.fn();
-		const { unmount } = render(StartDialog, { info, onstart: vi.fn(), oncancel: cancel });
-		const total = screen.getByLabelText('How many pages does your copy have?');
-		await vi.waitFor(() => expect(total).toHaveFocus());
+		render(ConfirmDialog);
+		const asked = confirmation.ask().catch(() => 'cancelled');
+		const pw = await screen.findByLabelText('Password');
+		await vi.waitFor(() => expect(pw).toHaveFocus());
 		const buttons = screen.getAllByRole('button');
 		buttons.at(-1)!.focus();
 		await userEvent.tab();
-		expect(total).toHaveFocus();
+		expect(pw).toHaveFocus();
 		await userEvent.tab({ shift: true });
 		expect(buttons.at(-1)).toHaveFocus();
 		await userEvent.keyboard('{Escape}');
-		expect(cancel).toHaveBeenCalledOnce();
-		unmount();
-		expect(opener).toHaveFocus();
+		expect(await asked).toBe('cancelled');
+		await vi.waitFor(() => expect(opener).toHaveFocus());
 		opener.remove();
 	});
 });

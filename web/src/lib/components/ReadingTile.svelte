@@ -1,11 +1,11 @@
 <script lang="ts">
 	// One book in the Reading view's grid: a clean cover, then the progress,
-	// the progress, the reading buttons, then the title.
+	// the progress, then the title. No buttons: tapping the book opens its
+	// page, which has them (the list view has them on every row).
 	import { progressShort, type BookInfo } from '../derive.ts';
 	import Cover from './Cover.svelte';
-	import ReadingButtons from './ReadingButtons.svelte';
 
-	let { info, onsetup }: { info: BookInfo; onsetup: () => void } = $props();
+	let { info }: { info: BookInfo } = $props();
 
 	const r = $derived(info.reading);
 	const pct = $derived(r ? Math.round((100 * r.pos) / r.total) : 0);
@@ -16,10 +16,7 @@
 		><Cover title={info.title} author={info.authors[0] ?? ''} cover={info.cover} size="m" /></a
 	>
 	<span class="mini" class:empty={!r}><span style="width:{pct}%"></span></span>
-	<div class="controls">
-		<span class="pages">{r ? progressShort(r) : 'Not started'}</span>
-		<ReadingButtons {info} {onsetup} size="sm" />
-	</div>
+	<span class="pages">{r ? progressShort(r) : 'Not started'}</span>
 	<a class="t" href="/catalog/{info.book.id}">{info.title}</a>
 </li>
 
@@ -65,13 +62,7 @@
 		background: var(--muted);
 		opacity: 0.6;
 	}
-	/* The progress, then the buttons on their own line (right-aligned). */
-	.controls {
-		display: grid;
-		gap: 4px;
-	}
 	.pages {
-		flex: 1;
 		min-width: 0;
 		font-size: 12px;
 		color: var(--muted);

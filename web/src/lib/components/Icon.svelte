@@ -6,7 +6,7 @@
 		size = 16,
 		filled = true
 	}: {
-		name: 'plus' | 'pause' | 'play' | 'star' | 'check' | 'shelf' | 'up' | 'down' | 'step';
+		name: 'plus' | 'pause' | 'play' | 'star' | 'check' | 'shelf' | 'up' | 'down';
 		size?: number;
 		filled?: boolean;
 	} = $props();
@@ -20,15 +20,6 @@
 			stroke="currentColor"
 			stroke-width="2.4"
 			stroke-linecap="round"
-		/>
-	{:else if name === 'step'}
-		<!-- One step on (a page, or 1%): a triangle pointing up. -->
-		<path
-			d="M12 6.5 18.5 17h-13z"
-			fill="currentColor"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linejoin="round"
 		/>
 	{:else if name === 'pause'}
 		<rect x="6.5" y="5.5" width="4" height="13" rx="1.3" fill="currentColor" />

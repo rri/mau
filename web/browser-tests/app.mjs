@@ -63,6 +63,7 @@ export async function run() {
 			await page.waitForSelector('ul.grid li.tile');
 			await page.reload();
 			await page.waitForSelector('ul.grid li.tile');
+			if (await page.$('ul.grid li.tile button')) throw new Error('grid tiles have buttons');
 			await click('button[aria-label="List layout"]');
 		});
 

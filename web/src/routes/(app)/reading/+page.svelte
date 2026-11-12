@@ -9,7 +9,6 @@
 	import ReadingRow from '#lib/components/ReadingRow.svelte';
 	import ReadingTile from '#lib/components/ReadingTile.svelte';
 	import LayoutToggle from '#lib/components/LayoutToggle.svelte';
-	import StartDialog from '#lib/components/StartDialog.svelte';
 	import ShowMore from '#lib/components/ShowMore.svelte';
 
 	// The layout is remembered on this device (apart from the Catalog's); the
@@ -38,7 +37,6 @@
 
 	let editing = $state<string | null>(null);
 	let setup = $state<{ id: string; rank?: string } | null>(null);
-	const setupInfo = $derived(setup ? all.find((b) => b.book.id === setup?.id) : undefined);
 
 	// ---- Drag to reorder -------------------------------------------------
 	let listEl = $state<HTMLUListElement>();
@@ -165,22 +163,11 @@
 {:else if layout === 'grid'}
 	<ul class="grid">
 		{#each drawn as info (info.book.id)}
-			<ReadingTile {info} onsetup={() => (setup = { id: info.book.id })} />
+			<ReadingTile {info} />
 		{/each}
 	</ul>
 	{#if list.length > drawn.length}
 		<ShowMore remaining={list.length - drawn.length} onmore={() => pager.more()} />
-	{/if}
-	{#if setupInfo}
-		<StartDialog
-			info={setupInfo}
-			oncancel={() => (setup = null)}
-			onstart={(start) => {
-				const info = setupInfo;
-				setup = null;
-				startReading(info, start);
-			}}
-		/>
 	{/if}
 {:else}
 	<div class="list-wrap">

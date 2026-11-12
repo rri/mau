@@ -1,8 +1,8 @@
 <script lang="ts">
 	// A book's reading buttons, the same wherever they appear (Home, Reading
-	// rows and tiles, the book page): all one size, right-aligned so they
-	// line up from row to row.
-	//   Active:   step up (a page, or 1%), finish, pause
+	// list rows, the book page): all one size, right-aligned so they line up
+	// from row to row.
+	//   Active:   +1 (a page, or 1%), finish, pause
 	//   Inactive: finish, start (or resume)
 	// Finished books have Re-read on their book page instead.
 	import type { BookInfo } from '../derive.ts';
@@ -11,29 +11,27 @@
 
 	let {
 		info,
-		onsetup,
-		size = 'md'
+		onsetup
 	}: {
 		info: BookInfo;
 		/** Starting a never-read book asks how to count it first. */
 		onsetup: () => void;
-		size?: 'sm' | 'md';
 	} = $props();
 
 	const r = $derived(info.reading);
-	const step = $derived(r?.unit === 'percent' ? '1%' : '1 page');
-	const icon = $derived(size === 'sm' ? 14 : 18);
+	const percent = $derived(r?.unit === 'percent');
+	const icon = 18;
 </script>
 
 {#if info.state !== 'finished'}
-	<div class="buttons {size}">
+	<div class="buttons">
 		{#if info.state === 'active'}
 			<button
 				class="step"
 				type="button"
 				onclick={() => plusOne(info)}
-				aria-label="Add {step} to {info.title}"
-				title="+{step}"><Icon name="step" size={icon} /></button
+				aria-label="Add {percent ? '1%' : '1 page'} to {info.title}"
+				title={percent ? '+1 percent' : '+1 page'}>+1</button
 			>
 		{/if}
 		<button
@@ -67,9 +65,6 @@
 		align-items: center;
 		gap: 6px;
 	}
-	.buttons.sm {
-		gap: 4px;
-	}
 	button {
 		display: grid;
 		place-items: center;
@@ -82,10 +77,6 @@
 		color: var(--muted);
 		cursor: pointer;
 	}
-	.sm button {
-		width: 30px;
-		height: 30px;
-	}
 	button:hover {
 		color: var(--accent);
 		border-color: var(--accent);
@@ -93,8 +84,12 @@
 	button:active {
 		transform: scale(0.94);
 	}
-	/* The step is the button used most: filled. */
+	/* +1 is the button used most: filled, its label in text. */
 	.step {
+		font: inherit;
+		font-size: 15px;
+		font-weight: 650;
+		font-variant-numeric: tabular-nums;
 		border-color: var(--accent);
 		background: var(--accent);
 		color: var(--on-accent);
