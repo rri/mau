@@ -2,12 +2,19 @@
 
 import { openDB, type IDBPDatabase } from 'idb';
 import type { Changes } from '../api/generated/Changes.ts';
+import type { DownloadCursor } from '../api/generated/DownloadCursor.ts';
 import type { Op } from '../api/generated/Op.ts';
 import { emptyData, tagKey, type Data } from './apply.ts';
 
 const STORES = ['books', 'tags', 'copies', 'readings', 'events', 'works'] as const;
 
-export type Persisted = { server: Data; outbox: Op[]; since: number };
+/** `download`: where a new device's download stands, while it runs. */
+export type Persisted = {
+	server: Data;
+	outbox: Op[];
+	since: number;
+	download: DownloadCursor | null;
+};
 
 export class Store {
 	private constructor(private db: IDBPDatabase) {}
@@ -38,8 +45,10 @@ export class Store {
 		}
 		const outbox = (await tx.objectStore('outbox').getAll()) as Op[];
 		const since = ((await tx.objectStore('meta').get('since')) as number | undefined) ?? 0;
+		const download = ((await tx.objectStore('meta').get('download')) ??
+			null) as DownloadCursor | null;
 		await tx.done;
-		return { server, outbox, since };
+		return { server, outbox, since, download };
 	}
 
 	async addOps(ops: Op[]) {
@@ -59,7 +68,10 @@ export class Store {
 		await tx.done;
 	}
 
-	async saveChanges(c: Changes) {
+	/** Saves synced rows. A download page also saves where the download
+	 *  stands (`download`), and the last one (`download: null`) the change
+	 *  number to sync from (`c.seq`), together with its rows. */
+	async saveChanges(c: Changes, download?: DownloadCursor | null) {
 		const tx = this.db.transaction([...STORES, 'meta'], 'readwrite');
 		for (const b of c.books) tx.objectStore('books').put(b, b.id);
 		for (const t of c.tags) tx.objectStore('tags').put(t, tagKey(t.book_id, t.tag));
@@ -67,7 +79,11 @@ export class Store {
 		for (const r of c.readings) tx.objectStore('readings').put(r, r.id);
 		for (const e of c.events) tx.objectStore('events').put(e, e.id);
 		for (const w of c.works) tx.objectStore('works').put(w, w.id);
-		tx.objectStore('meta').put(c.seq, 'since');
+		if (download) tx.objectStore('meta').put(download, 'download');
+		else {
+			tx.objectStore('meta').put(c.seq, 'since');
+			if (download === null) tx.objectStore('meta').delete('download');
+		}
 		await tx.done;
 	}
 

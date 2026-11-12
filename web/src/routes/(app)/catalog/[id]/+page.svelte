@@ -4,9 +4,9 @@
 	import { page } from '$app/state';
 	import { ApiError, post } from '#lib/api/client.ts';
 	import type { EditionRow } from '#lib/api/generated/EditionRow.ts';
-	import { pause, plusOne, resume, setPages, startReading, today } from '#lib/actions.ts';
+	import { pause, plusOne, resume, startLike, startReading, today } from '#lib/actions.ts';
 	import { fmtDate, fmtMonthDay } from '#lib/dates.ts';
-	import { bookInfo, eventsOf, liveBooks, pagesOn } from '#lib/derive.ts';
+	import { bookInfo, eventsOf, liveBooks, pagesOn, progressText } from '#lib/derive.ts';
 	import { library } from '#lib/library.svelte.ts';
 	import { modal } from '#lib/modal.ts';
 	import { uuidv7 } from '#lib/sync/ids.ts';
@@ -17,6 +17,9 @@
 	import TagInput from '#lib/components/TagInput.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import Breadcrumbs from '#lib/components/Breadcrumbs.svelte';
+	import BookMenu from '#lib/components/BookMenu.svelte';
+	import ProgressEditor from '#lib/components/ProgressEditor.svelte';
+	import StartForm from '#lib/components/StartForm.svelte';
 	import { origin } from '#lib/origin.svelte.ts';
 
 	const FORMATS = ['Hardcover', 'Paperback', 'Ebook', 'Audiobook'];
@@ -128,40 +131,13 @@
 
 	// ---- Status ------------------------------------------------------------
 	let pagesEditing = $state(false);
-	let editPos = $state(0);
-	let editTotal = $state(0);
 	let setupOpen = $state(false);
-	let setupTotal = $state('');
-	let setupError = $state('');
 
-	function openPages() {
-		if (!r) return;
-		editPos = r.pos;
-		editTotal = r.total;
-		pagesEditing = true;
-	}
-	function savePages() {
-		if (!info || !r) return;
-		pagesEditing = false;
-		const total = editTotal >= 1 ? Math.floor(editTotal) : r.total;
-		setPages(info, Math.floor(editPos), total);
-	}
 	function play() {
 		if (!info) return;
-		if (info.state === 'finished') startReading(info, r?.total ?? info.catalogPages ?? 1);
+		if (info.state === 'finished') startReading(info, startLike(info));
 		else if (r) resume(info);
 		else setupOpen = true;
-	}
-	function setup(e: SubmitEvent) {
-		e.preventDefault();
-		if (!info) return;
-		const n = Number(setupTotal);
-		if (!Number.isInteger(n) || n < 1) {
-			setupError = 'Enter the number of pages in your copy.';
-			return;
-		}
-		setupOpen = false;
-		startReading(info, n);
 	}
 
 	// ---- Rating & notes ---------------------------------------------------------
@@ -239,29 +215,38 @@
 	}
 
 	// ---- Activity -----------------------------------------------------------
-	const perDay = $derived.by(() => {
-		const m = new Map<string, number>();
+	// Pages and percent read per day (forward moves only); a reading tracked
+	// by percent adds no pages.
+	const activity = $derived.by(() => {
+		const pages = new Map<string, number>();
+		const percent = new Map<string, number>();
 		for (const rd of info?.readings ?? [])
-			for (const e of eventsOf(library.view, rd.id))
-				if (e.to_page > e.from_page)
-					m.set(e.local_date, (m.get(e.local_date) ?? 0) + (e.to_page - e.from_page));
-		return m;
+			for (const e of eventsOf(library.view, rd.id)) {
+				if (e.to_page <= e.from_page) continue;
+				const m = e.unit === 'percent' ? percent : pages;
+				m.set(e.local_date, (m.get(e.local_date) ?? 0) + (e.to_page - e.from_page));
+			}
+		return { pages, percent };
 	});
-	const todayPages = $derived(r ? pagesOn(library.view, r.id, day) : 0);
+	const perDay = $derived(activity.pages);
+	const todayPages = $derived(r ? pagesOn(library.view, r, day) : 0);
 	const totalPages = $derived([...perDay.values()].reduce((a, b) => a + b, 0));
-	const daysRead = $derived([...perDay.values()].filter((p) => p > 0).length);
+	const daysRead = $derived(new Set([...perDay.keys(), ...activity.percent.keys()]).size);
 
-	type Line = { date: string; from: number; to: number; rewind: boolean };
+	type Line = { date: string; from: number; to: number; rewind: boolean; percent: boolean };
 	function summaries(readingId: string): Line[] {
 		const lines: Line[] = [];
 		for (const e of eventsOf(library.view, readingId)) {
 			const rewind = e.to_page < e.from_page;
+			const percent = e.unit === 'percent';
 			const prev = lines.at(-1);
-			if (!rewind && prev && !prev.rewind && prev.date === e.local_date) prev.to = e.to_page;
-			else lines.push({ date: e.local_date, from: e.from_page, to: e.to_page, rewind });
+			if (!rewind && prev && !prev.rewind && prev.percent === percent && prev.date === e.local_date)
+				prev.to = e.to_page;
+			else lines.push({ date: e.local_date, from: e.from_page, to: e.to_page, rewind, percent });
 		}
 		return lines.reverse();
 	}
+	const at = (l: Line, n: number) => (l.percent ? `${n}%` : `page ${n}`);
 
 	// ---- Remove ------------------------------------------------------------------
 	let confirmRemove = $state(false);
@@ -382,24 +367,21 @@
 							: 'Inactive'}</span
 				>
 				{#if r}<div class="bar {info.state}">
-						<span style="width:{Math.round((100 * r.pos) / r.total)}%"></span>
+						<span
+							style="width:{info.state === 'finished' ? 100 : Math.round((100 * r.pos) / r.total)}%"
+						></span>
 					</div>{/if}
 				<div class="meta">
 					{#if pagesEditing && r}
-						<span class="edit">
-							page <input type="number" min="0" bind:value={editPos} aria-label="Current page" />
-							of <input type="number" min="1" bind:value={editTotal} aria-label="Total pages" />
-							<button class="btn sm primary" type="button" onclick={savePages}>Save</button>
-							<button class="btn sm" type="button" onclick={() => (pagesEditing = false)}
-								>Cancel</button
-							>
-						</span>
+						<ProgressEditor {info} ondone={() => (pagesEditing = false)} />
 					{:else if info.state === 'finished' && r?.finished_on}
 						<span>Finished {fmtDate(r.finished_on)}</span>
 					{:else if r}
-						<button class="pos" type="button" onclick={openPages}>page {r.pos} of {r.total}</button>
+						<button class="pos" type="button" onclick={() => (pagesEditing = true)}
+							>{progressText(r)}</button
+						>
 						{#if todayPages > 0}<span class="today"
-								>+{plural(todayPages, 'page', 'pages')} today</span
+								>+{r.unit === 'percent' ? `${todayPages}%` : plural(todayPages, 'page', 'pages')} today</span
 							>{/if}
 					{:else}
 						<span>Not started</span>
@@ -408,6 +390,7 @@
 			</div>
 			{#if !pagesEditing && !setupOpen}
 				<div class="actions">
+					<BookMenu {info} onsetup={() => (setupOpen = true)} openLink={false} />
 					{#if info.state === 'active'}
 						<button
 							class="pause"
@@ -416,8 +399,12 @@
 							title="Pause"
 							onclick={() => pause(info)}><Icon name="pause" size={14} /></button
 						>
-						<button class="plus" type="button" aria-label="Add 1 page" onclick={() => plusOne(info)}
-							><Icon name="plus" size={20} /></button
+						<button
+							class="plus"
+							type="button"
+							aria-label={r?.unit === 'percent' ? 'Add 1%' : 'Add 1 page'}
+							title={r?.unit === 'percent' ? '+1%' : '+1 page'}
+							onclick={() => plusOne(info)}><Icon name="step" size={20} /></button
 						>
 					{:else}
 						<button class="play" type="button" onclick={play}
@@ -429,26 +416,16 @@
 			{/if}
 		</div>
 		{#if setupOpen}
-			<form class="form" onsubmit={setup}>
-				<label class="field"
-					>How many pages does your copy have?<input
-						type="number"
-						min="1"
-						bind:value={setupTotal}
-					/></label
-				>
-				{#if info.catalogPages}<button
-						class="link"
-						type="button"
-						onclick={() => (setupTotal = String(info.catalogPages))}
-						>Catalog lists {info.catalogPages} pages</button
-					>{/if}
-				{#if setupError}<p class="error">{setupError}</p>{/if}
-				<div class="row-end">
-					<button class="btn" type="button" onclick={() => (setupOpen = false)}>Cancel</button>
-					<button class="btn primary" type="submit">Start reading</button>
-				</div>
-			</form>
+			<div class="form">
+				<StartForm
+					{info}
+					oncancel={() => (setupOpen = false)}
+					onstart={(start) => {
+						setupOpen = false;
+						if (info) startReading(info, start);
+					}}
+				/>
+			</div>
 		{/if}
 	</section>
 
@@ -553,6 +530,7 @@
 			</div>
 			<ActivityCalendar
 				{perDay}
+				percentPerDay={activity.percent}
 				today={day}
 				includeYear={r && !r.finished_on ? Number(day.slice(0, 4)) : null}
 			/>
@@ -578,10 +556,11 @@
 							{#each lines as l, j (j)}
 								<li>
 									<span class="muted">{fmtMonthDay(l.date)}</span>
-									{#if l.rewind}<span class="rewind">moved back page {l.from} → {l.to}</span><span
-										></span>
-									{:else}<span>page {l.from} → {l.to}</span><span class="delta"
-											>+{l.to - l.from}</span
+									{#if l.rewind}<span class="rewind"
+											>moved back {at(l, l.from)} → {l.percent ? `${l.to}%` : l.to}</span
+										><span></span>
+									{:else}<span>{at(l, l.from)} → {l.percent ? `${l.to}%` : l.to}</span><span
+											class="delta">+{l.to - l.from}{l.percent ? '%' : ''}</span
 										>{/if}
 								</li>
 							{:else}
@@ -796,20 +775,6 @@
 		text-decoration: underline dashed color-mix(in srgb, currentColor 35%, transparent);
 		text-decoration-thickness: 1px;
 		text-underline-offset: 4px;
-	}
-	.edit {
-		display: inline-flex;
-		flex-wrap: wrap;
-		gap: 6px;
-		align-items: center;
-		color: var(--ink);
-	}
-	.edit input {
-		width: 72px;
-		padding: 2px 6px;
-		border: 1px solid var(--accent);
-		border-radius: 6px;
-		background: var(--surface);
 	}
 	.today {
 		color: var(--accent);

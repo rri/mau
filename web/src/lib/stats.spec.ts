@@ -38,13 +38,21 @@ function library(): Data {
 		pos: 0,
 		total: 9
 	} as never);
-	const ev = (id: string, reading: string, date: string, from: number, to: number) =>
+	const ev = (
+		id: string,
+		reading: string,
+		date: string,
+		from: number,
+		to: number,
+		unit: 'pages' | 'percent' = 'pages'
+	) =>
 		d.events.set(id, {
 			id,
 			reading_id: reading,
 			local_date: date,
 			from_page: from,
 			to_page: to,
+			unit,
 			deleted: false
 		} as never);
 	ev('e1', 'r2', '2026-11-08', 0, 40);
@@ -81,9 +89,37 @@ describe('stats', () => {
 
 	it('estimates days left from the last four weeks', () => {
 		const d = library();
-		const r2 = { id: 'r2', pos: 100, total: 400 };
+		const r2 = { id: 'r2', pos: 100, total: 400, unit: 'pages' as const };
 		// 110 pages in 28 days ≈ 3.9 a day; 300 left → 77 days.
 		expect(daysLeft(d, r2, '2026-11-10')).toBe(77);
 		expect(daysLeft(d, r2, '2027-02-01')).toBeNull();
+	});
+
+	it('percent readings count as days read and pace in percent, but add no pages', () => {
+		const d = library();
+		d.readings.set('r4', {
+			id: 'r4',
+			book_id: 'b1',
+			deleted: false,
+			finished_on: null,
+			unit: 'percent',
+			pos: 20,
+			total: 100
+		} as never);
+		d.events.set('p1', {
+			id: 'p1',
+			reading_id: 'r4',
+			local_date: '2026-11-11',
+			from_page: 0,
+			to_page: 20,
+			unit: 'percent',
+			deleted: false
+		} as never);
+		const p = pagesPerDay(d);
+		expect(p.get('2026-11-11')).toBeUndefined();
+		expect(yearTotals(d, p, 2026)).toEqual({ finished: 1, pages: 410, days: 5 });
+		// 20% in 28 days: 80% left → 112 days.
+		const r4 = { id: 'r4', pos: 20, total: 100, unit: 'percent' as const };
+		expect(daysLeft(d, r4, '2026-11-11')).toBe(112);
 	});
 });

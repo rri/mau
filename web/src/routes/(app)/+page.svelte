@@ -3,13 +3,14 @@
 	// Everything comes from the synced library, so it works offline too.
 	import { auth } from '#lib/auth.svelte.ts';
 	import { library } from '#lib/library.svelte.ts';
-	import { liveBooks, readingList } from '#lib/derive.ts';
+	import { liveBooks, progressText, readingList } from '#lib/derive.ts';
 	import { plusOne, today as todayFn } from '#lib/actions.ts';
 	import { fmtMonthDay } from '#lib/dates.ts';
 	import { daysLeft, lastDays, pagesPerDay, yearTotals } from '#lib/stats.ts';
 	import BarChart from '#lib/components/BarChart.svelte';
 	import Cover from '#lib/components/Cover.svelte';
 	import Icon from '#lib/components/Icon.svelte';
+	import BookMenu from '#lib/components/BookMenu.svelte';
 
 	const day = $derived.by(() => {
 		void library.view;
@@ -90,16 +91,22 @@
 									><span style="width:{Math.round((100 * r.pos) / r.total)}%"></span></span
 								>
 								<span class="meta"
-									>page {nf(r.pos)} of {nf(r.total)}{#if left !== null}{' · '}about {left}
+									>{progressText(r)}{#if left !== null}{' · '}about {left}
 										{left === 1 ? 'day' : 'days'} left at your pace{/if}</span
 								>
 							</div>
-							<button
-								class="plus"
-								type="button"
-								onclick={() => plusOne(b)}
-								aria-label="Add 1 page to {b.title}"><Icon name="plus" size={18} /></button
-							>
+							<span class="actions">
+								<!-- Only active books are listed here, so there's nothing to set up. -->
+								<BookMenu info={b} onsetup={() => {}} />
+								<button
+									class="plus"
+									type="button"
+									onclick={() => plusOne(b)}
+									aria-label="Add {r.unit === 'percent' ? '1%' : '1 page'} to {b.title}"
+									title={r.unit === 'percent' ? '+1%' : '+1 page'}
+									><Icon name="step" size={18} /></button
+								>
+							</span>
 						</li>
 					{/if}
 				{/each}
@@ -254,6 +261,11 @@
 		font-size: 13px;
 		color: var(--muted);
 		font-variant-numeric: tabular-nums;
+	}
+	.actions {
+		display: flex;
+		gap: 4px;
+		align-items: center;
 	}
 	.plus {
 		width: 40px;

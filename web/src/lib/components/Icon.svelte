@@ -6,7 +6,7 @@
 		size = 16,
 		filled = true
 	}: {
-		name: 'plus' | 'pause' | 'play' | 'star' | 'check' | 'shelf' | 'up' | 'down';
+		name: 'plus' | 'pause' | 'play' | 'star' | 'check' | 'shelf' | 'up' | 'down' | 'step' | 'more';
 		size?: number;
 		filled?: boolean;
 	} = $props();
@@ -21,6 +21,20 @@
 			stroke-width="2.4"
 			stroke-linecap="round"
 		/>
+	{:else if name === 'step'}
+		<!-- One step on: a page, or 1%. -->
+		<path
+			d="M12 19V5.5M6 11.5l6-6 6 6"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2.4"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		/>
+	{:else if name === 'more'}
+		<circle cx="5.5" cy="12" r="1.9" fill="currentColor" />
+		<circle cx="12" cy="12" r="1.9" fill="currentColor" />
+		<circle cx="18.5" cy="12" r="1.9" fill="currentColor" />
 	{:else if name === 'pause'}
 		<rect x="6.5" y="5.5" width="4" height="13" rx="1.3" fill="currentColor" />
 		<rect x="13.5" y="5.5" width="4" height="13" rx="1.3" fill="currentColor" />

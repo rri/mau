@@ -66,7 +66,7 @@ describe('derive', () => {
 
 	it('DATA-06 pages today count forward moves only; last read is the latest event', () => {
 		const d = sampleLibrary();
-		expect(pagesOn(d, '00r-lhod', TODAY)).toBe(6);
+		expect(pagesOn(d, d.readings.get('00r-lhod')!, TODAY)).toBe(6);
 		expect(lastReadDate(d, '00r-lhod')).toBe(TODAY);
 		expect(lastReadDate(d, 'nope')).toBeNull();
 	});

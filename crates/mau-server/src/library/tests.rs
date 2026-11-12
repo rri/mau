@@ -419,3 +419,155 @@ async fn odd_ids_and_cover_names_are_rejected() {
         .unwrap();
     assert_eq!(book["cover_override"], "0123456789abcdef0123456789abcdef");
 }
+
+#[tokio::test]
+async fn percent_readings_count_in_percent_and_ignore_page_moves() {
+    let (app, cookie) = setup().await;
+    let t = h(2000, "aaa");
+    let res = sync(
+        &app,
+        &cookie,
+        0,
+        json!([
+            op("p1", &t, json!({"type": "reading.create", "id": "r2", "book_id": "b1", "started_on": "2026-11-02", "total": 100, "unit": "percent", "pages": 304})),
+            op("p2", &h(2100, "aaa"), json!({"type": "progress", "event_id": "e1", "reading_id": "r2", "base": t, "from": 0, "to": 3, "local_date": "2026-11-02", "unit": "percent"})),
+            // Meant for pages (another device hadn't seen the switch): dropped.
+            op("p3", &h(2200, "bbb"), json!({"type": "progress", "event_id": "e2", "reading_id": "r2", "base": h(2100, "aaa"), "from": 3, "to": 40, "local_date": "2026-11-02"})),
+        ]),
+    )
+    .await;
+    assert_eq!(res["dropped"], json!(["p3"]));
+    let r = res["changes"]["readings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["id"] == "r2")
+        .unwrap()
+        .clone();
+    assert_eq!(
+        (r["unit"].clone(), r["pos"].clone(), r["pages"].clone()),
+        (json!("percent"), json!(3), json!(304))
+    );
+    assert_eq!(res["changes"]["events"][0]["unit"], "percent");
+
+    // A percent reading's total stays 100.
+    let (status, _) = app
+        .post(
+            "/api/sync",
+            json!({"since": 0, "ops": [op("p4", &h(2300, "aaa"), json!({"type": "reading.create", "id": "r3", "book_id": "b1", "started_on": "2026-11-02", "total": 250, "unit": "percent"}))]}),
+            Some(&cookie),
+        )
+        .await;
+    assert_eq!(status, 200);
+}
+
+#[tokio::test]
+async fn switching_units_moves_the_position_and_keeps_the_page_count() {
+    let (app, cookie) = setup().await;
+    let reading = |res: &Value| res["changes"]["readings"][0].clone();
+    // r1 is 100 pages at page 0; read to 40, then switch to percent.
+    let res = sync(
+        &app,
+        &cookie,
+        0,
+        json!([
+            tap("a", &h(2000, "aaa"), &h(1000, "aaa"), 0, 40),
+            op("u1", &h(3000, "aaa"), json!({"type": "progress.unit", "reading_id": "r1", "base": h(2000, "aaa"), "unit": "percent", "total": 100, "to": 40})),
+        ]),
+    )
+    .await;
+    assert_eq!(res["dropped"], json!([]));
+    let r = reading(&res);
+    assert_eq!(
+        (
+            r["unit"].clone(),
+            r["total"].clone(),
+            r["pos"].clone(),
+            r["pages"].clone()
+        ),
+        (json!("percent"), json!(100), json!(40), json!(100))
+    );
+    // Only the page event counts as reading; the switch logs nothing.
+    assert_eq!(res["changes"]["events"].as_array().unwrap().len(), 1);
+
+    // A switch based on an old position loses, like any stale move.
+    let res = sync(
+        &app,
+        &cookie,
+        0,
+        json!([op("u2", &h(2500, "bbb"), json!({"type": "progress.unit", "reading_id": "r1", "base": h(1000, "aaa"), "unit": "pages", "total": 300, "to": 0}))]),
+    )
+    .await;
+    assert_eq!(res["dropped"], json!(["u2"]));
+
+    // Back to pages: the total is what the reader entered; the page count goes.
+    let res = sync(
+        &app,
+        &cookie,
+        0,
+        json!([op("u3", &h(4000, "aaa"), json!({"type": "progress.unit", "reading_id": "r1", "base": h(3000, "aaa"), "unit": "pages", "total": 320, "to": 128}))]),
+    )
+    .await;
+    let r = reading(&res);
+    assert_eq!(
+        (
+            r["unit"].clone(),
+            r["total"].clone(),
+            r["pos"].clone(),
+            r["pages"].clone()
+        ),
+        (json!("pages"), json!(320), json!(128), Value::Null)
+    );
+}
+
+#[tokio::test]
+async fn a_new_device_downloads_its_library_in_pages_active_books_first() {
+    let app = TestApp::new().await;
+    let (_, cookie) = app.user("rri", false).await;
+    let n = crate::library::DOWNLOAD_PAGE + 50;
+    let mut ops = Vec::new();
+    for i in 0..n {
+        let w = format!("w{i:04}");
+        shared_work(&app, &w, "A book").await;
+        ops.push(op(&format!("c{i}"), &h(1000, "aaa"), json!({"type": "book.create", "id": format!("b{i:04}"), "work_id": w, "rank": "V", "added_at": 1})));
+    }
+    ops.push(op(
+        "act",
+        &h(1100, "aaa"),
+        json!({"type": "book.set", "id": "b0200", "fields": {"active": true}}),
+    ));
+    for chunk in ops.chunks(400) {
+        assert_eq!(
+            sync(&app, &cookie, 0, json!(chunk)).await["dropped"],
+            json!([])
+        );
+    }
+    let mut cursor = Value::Null;
+    let mut pages = Vec::new();
+    loop {
+        let (status, res) = app
+            .post(
+                "/api/sync/download",
+                json!({ "cursor": cursor }),
+                Some(&cookie),
+            )
+            .await;
+        assert_eq!(status, 200, "{res}");
+        assert_eq!(res["books_total"], n);
+        let ids: Vec<String> = res["changes"]["books"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|b| b["id"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(res["changes"]["works"].as_array().unwrap().len(), ids.len());
+        pages.push(ids);
+        cursor = res["next"].clone();
+        if cursor.is_null() {
+            break;
+        }
+    }
+    assert_eq!(pages[0], vec!["b0200"], "the active book comes first");
+    assert_eq!(pages[1].len() as i64, crate::library::DOWNLOAD_PAGE);
+    assert_eq!(pages.iter().skip(1).map(Vec::len).sum::<usize>() as i64, n);
+}

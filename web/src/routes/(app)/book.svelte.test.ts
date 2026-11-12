@@ -149,7 +149,9 @@ describe('Book page: status', () => {
 		expect(screen.getByText('Not started')).toBeInTheDocument();
 		await userEvent.click(screen.getByRole('button', { name: 'Start' }));
 		await userEvent.click(screen.getByRole('button', { name: 'Start reading' }));
-		expect(screen.getByText('Enter the number of pages in your copy.')).toBeInTheDocument();
+		expect(
+			screen.getByText('Enter the number of pages in your copy, or track by percent.')
+		).toBeInTheDocument();
 		await userEvent.click(screen.getByRole('button', { name: 'Catalog lists 333 pages' }));
 		await userEvent.click(screen.getByRole('button', { name: 'Start reading' }));
 		expect(info('se').state).toBe('active');
@@ -162,6 +164,40 @@ describe('Book page: status', () => {
 		await userEvent.click(screen.getByRole('button', { name: 'Re-read' }));
 		expect(info('pir').state).toBe('active');
 		expect(info('pir').readings).toHaveLength(2);
+	});
+});
+
+describe('Book page: reading menu and percent', () => {
+	it('BOOK-15 the ⋯ beside the status has the same choices as elsewhere (no Open book here)', async () => {
+		useLibrary();
+		open('pir');
+		await userEvent.click(screen.getByRole('button', { name: 'More for Piranesi' }));
+		expect(
+			within(screen.getByRole('menu'))
+				.getAllByRole('menuitem')
+				.map((m) => m.textContent)
+		).toEqual(['Re-read']);
+	});
+
+	it('BOOK-16 a percent reading shows percent, adds 1%, and its history reads in percent', async () => {
+		const d = sampleLibrary();
+		addBook(d, {
+			id: 'pc',
+			title: 'Percent Book',
+			author: 'P. Author',
+			active: true,
+			reading: { pos: 40, total: 100, started: '2026-11-01', unit: 'percent' },
+			events: [['2026-11-10', 30, 40]]
+		});
+		useLibrary(d);
+		open('pc');
+		expect(screen.getByRole('button', { name: '40%' })).toBeInTheDocument();
+		await userEvent.click(screen.getByRole('button', { name: 'Add 1%' }));
+		expect(screen.getByText('+1% today')).toBeInTheDocument();
+		expect(screen.getByText('30% → 40%')).toBeInTheDocument();
+		const stats = document.querySelector('.stats')!;
+		expect(stats).toHaveTextContent('2 days read');
+		expect(stats).toHaveTextContent('0 pages');
 	});
 });
 

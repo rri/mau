@@ -1,8 +1,19 @@
 // The reading controls (spec §4 ordering rules): what each does to the
 // library, the toast it shows, and its undo.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { moveBook, pause, plusOne, resume, setPages, startReading } from './actions.ts';
+import {
+	finish,
+	moveBook,
+	pause,
+	plusOne,
+	resume,
+	setPages,
+	startLike,
+	startReading,
+	switchUnit
+} from './actions.ts';
 import { bookInfo, readingList } from './derive.ts';
+import { cloneData } from './sync/apply.ts';
 import { library } from './library.svelte.ts';
 import { toasts } from './toast.svelte.ts';
 import { freezeTime, signIn, TODAY, useLibrary } from '../test/fixtures.ts';
@@ -81,7 +92,7 @@ describe('READ-ACT: reading actions', () => {
 	});
 
 	it('READ-ACT-08 starting a never-read book creates a reading at page 0 and activates it', () => {
-		startReading(info('se'), 333);
+		startReading(info('se'), { unit: 'pages', total: 333 });
 		const b = info('se');
 		expect(b.state).toBe('active');
 		expect(b.reading).toMatchObject({ pos: 0, total: 333, started_on: TODAY });
@@ -92,7 +103,7 @@ describe('READ-ACT: reading actions', () => {
 	});
 
 	it('READ-ACT-09 a re-read starts a new reading; the finished one is kept', () => {
-		startReading(info('pir'), 245);
+		startReading(info('pir'), startLike(info('pir')));
 		const b = info('pir');
 		expect(b.state).toBe('active');
 		expect(b.readings).toHaveLength(2);
@@ -134,5 +145,72 @@ describe('READ-DRAG: drag to reorder', () => {
 	it('READ-DRAG-05 the edge between the groups changes nobody’s state', () => {
 		moveBook(info('bk'), 2, setup);
 		expect(order()).toEqual(['lhod:active', 'mm:active', 'bk:inactive', 'se:inactive']);
+	});
+
+	it('READ-ACT-10 Finish marks an active book finished today, where it was; undo takes it back', () => {
+		const events = () => [...library.view.events.values()].filter((e) => !e.deleted).length;
+		const before = events();
+		finish(info('lhod'));
+		const b = info('lhod');
+		expect(b.state).toBe('finished');
+		expect(b.reading).toMatchObject({ finished_on: TODAY, pos: 140 });
+		expect(b.book.active).toBe(false);
+		// Nothing counts as read today.
+		expect(events()).toBe(before);
+		expect(toasts.current?.message).toBe('Finished The Left Hand of Darkness');
+		toasts.runAction();
+		expect(info('lhod').state).toBe('active');
+		expect(info('lhod').reading!.finished_on).toBeNull();
+	});
+
+	it('READ-ACT-11 Finish on a never-started book adds a reading finished today (percent without a page count)', () => {
+		finish(info('se'));
+		expect(info('se').reading).toMatchObject({ unit: 'pages', total: 333, finished_on: TODAY });
+		toasts.runAction();
+		expect(info('se').reading).toBeNull();
+		expect(info('se').state).toBe('inactive');
+
+		const d = cloneData(library.view);
+		const w = d.works.get(d.books.get('se')!.work_id)!;
+		d.works.set(w.id, { ...w, editions: [] });
+		useLibrary(d);
+		finish(info('se'));
+		expect(info('se').reading).toMatchObject({ unit: 'percent', total: 100, finished_on: TODAY });
+	});
+
+	it('READ-ACT-12 percent: the up arrow adds 1%, and 100% finishes the book', () => {
+		startReading(info('se'), { unit: 'percent' });
+		expect(info('se').reading).toMatchObject({ unit: 'percent', total: 100, pos: 0, pages: null });
+		plusOne(info('se'));
+		expect(info('se').reading!.pos).toBe(1);
+		expect(toasts.current?.message).toBe('+1% on Station Eleven');
+		const ev = [...library.view.events.values()].find(
+			(e) => e.reading_id === info('se').reading!.id
+		)!;
+		expect(ev).toMatchObject({ unit: 'percent', from_page: 0, to_page: 1 });
+		setPages(info('se'), 100);
+		expect(info('se').state).toBe('finished');
+	});
+
+	it('READ-ACT-13 switching units moves the position and keeps the page count; undo switches back', () => {
+		switchUnit(info('lhod'), 'percent');
+		expect(info('lhod').reading).toMatchObject({
+			unit: 'percent',
+			pos: 46,
+			total: 100,
+			pages: 304
+		});
+		expect(toasts.current?.message).toBe('The Left Hand of Darkness now counts by percent, at 46%');
+		toasts.runAction();
+		expect(info('lhod').reading).toMatchObject({ unit: 'pages', pos: 140, total: 304 });
+
+		switchUnit(info('lhod'), 'percent');
+		switchUnit(info('lhod'), 'pages', 320, 150);
+		expect(info('lhod').reading).toMatchObject({
+			unit: 'pages',
+			pos: 150,
+			total: 320,
+			pages: null
+		});
 	});
 });

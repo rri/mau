@@ -9,6 +9,7 @@ import type { EventRow } from '../api/generated/EventRow.ts';
 import type { Op } from '../api/generated/Op.ts';
 import type { ReadingRow } from '../api/generated/ReadingRow.ts';
 import type { TagRow } from '../api/generated/TagRow.ts';
+import type { Unit } from '../api/generated/Unit.ts';
 import type { WorkRow } from '../api/generated/WorkRow.ts';
 
 export type Data = {
@@ -77,7 +78,7 @@ function chains(ops: Op[]): Map<string, Chain> {
 	const order: { opId: string; idx: number; first: boolean }[] = [];
 	for (const op of ops) {
 		const k = op.op;
-		if (k.type !== 'progress' && k.type !== 'progress.undo') continue;
+		if (k.type !== 'progress' && k.type !== 'progress.undo' && k.type !== 'progress.unit') continue;
 		const o = open.get(k.reading_id);
 		let idx: number;
 		let first = false;
@@ -107,10 +108,16 @@ export function applyOps(d: Data, ops: Op[]): Data {
 		return b && !b.deleted ? b : null;
 	};
 
-	function move(op: Op, readingId: string, to: number): boolean {
+	/** The position rule (mau_core::progress). `unit`: the unit the device
+	 *  saw; a move in the other unit loses, and the rest of its chain. */
+	function move(op: Op, readingId: string, to: number, unit?: Unit): boolean {
 		const r = d.readings.get(readingId);
 		const c = chainOf.get(op.id);
 		if (!r || r.deleted || !c) return false;
+		if (unit && unit !== r.unit) {
+			if (c.first) outcome.set(c.chain, false);
+			return false;
+		}
 		if (!c.first) {
 			if (outcome.get(c.chain) !== true) return false;
 		} else {
@@ -126,7 +133,7 @@ export function applyOps(d: Data, ops: Op[]): Data {
 						d.events.set(id, { ...e, deleted: true });
 			}
 		}
-		d.readings.set(readingId, { ...r, pos: to, pos_clock: op.hlc });
+		d.readings.set(readingId, { ...d.readings.get(readingId)!, pos: to, pos_clock: op.hlc });
 		return true;
 	}
 
@@ -250,24 +257,32 @@ export function applyOps(d: Data, ops: Op[]): Data {
 			}
 			case 'reading.create': {
 				if (d.readings.has(k.id) || !liveBook(k.book_id)) break;
+				const unit = k.unit ?? 'pages';
 				d.readings.set(k.id, {
 					id: k.id,
 					book_id: k.book_id,
 					started_on: k.started_on,
 					finished_on: null,
+					unit,
 					total: k.total,
 					pos: 0,
+					pages: unit === 'percent' ? (k.pages ?? null) : null,
 					pos_clock: hlc,
 					deleted: false,
-					clock: { total: hlc, finished_on: hlc }
+					clock: { total: hlc, finished_on: hlc, pages: hlc }
 				});
 				break;
 			}
 			case 'reading.set': {
 				const r = d.readings.get(k.id);
 				if (!r || r.deleted) break;
-				const next = lww(r, k.fields as Partial<Record<keyof ReadingRow, unknown>>, hlc, (f, v) =>
-					f === 'finished_on' && v === '' ? null : v
+				// A total is for pages readings, a page count for percent ones.
+				const { total, pages, ...rest } = k.fields;
+				const fields: Record<string, unknown> = { ...rest };
+				if (r.unit === 'pages') fields.total = total;
+				else fields.pages = pages;
+				const next = lww(r, fields as Partial<Record<keyof ReadingRow, unknown>>, hlc, (f, v) =>
+					(f === 'finished_on' && v === '') || (f === 'pages' && v === 0) ? null : v
 				);
 				if (next) d.readings.set(k.id, next);
 				break;
@@ -281,7 +296,7 @@ export function applyOps(d: Data, ops: Op[]): Data {
 				break;
 			}
 			case 'progress': {
-				if (!move(op, k.reading_id, k.to)) break;
+				if (!move(op, k.reading_id, k.to, k.unit ?? 'pages')) break;
 				d.events.set(k.event_id, {
 					id: k.event_id,
 					reading_id: k.reading_id,
@@ -289,14 +304,29 @@ export function applyOps(d: Data, ops: Op[]): Data {
 					local_date: k.local_date,
 					from_page: k.from,
 					to_page: k.to,
+					unit: k.unit ?? 'pages',
 					deleted: false
 				});
 				break;
 			}
 			case 'progress.undo': {
-				if (!move(op, k.reading_id, k.to)) break;
+				if (!move(op, k.reading_id, k.to, k.unit ?? 'pages')) break;
 				const e = d.events.get(k.event_id);
 				if (e) d.events.set(k.event_id, { ...e, deleted: true });
+				break;
+			}
+			case 'progress.unit': {
+				const r = d.readings.get(k.reading_id);
+				if (!r || !move(op, k.reading_id, k.to)) break;
+				// To percent keeps a known page count; to pages makes it the total.
+				const pages = k.unit === 'pages' ? null : r.unit === 'pages' ? r.total : r.pages;
+				d.readings.set(k.reading_id, {
+					...d.readings.get(k.reading_id)!,
+					unit: k.unit,
+					total: k.total,
+					pages,
+					clock: { ...r.clock, total: hlc, pages: hlc }
+				});
 				break;
 			}
 		}

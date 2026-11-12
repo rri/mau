@@ -53,7 +53,15 @@ type BookSpec = {
 	pages?: number;
 	year?: number;
 	/** current reading: position and total; omit for a never-started book */
-	reading?: { pos: number; total: number; started: string; finished?: string | null };
+	reading?: {
+		pos: number;
+		total: number;
+		started: string;
+		finished?: string | null;
+		unit?: 'pages' | 'percent';
+		/** A percent reading's page count, if known. */
+		pages?: number | null;
+	};
 	/** extra finished readings */
 	finished?: string[];
 	tags?: string[];
@@ -122,8 +130,10 @@ export function addBook(d: Data, b: BookSpec) {
 			book_id: b.id,
 			started_on: '2026-01-01',
 			finished_on: f,
+			unit: 'pages',
 			total: b.pages ?? 300,
 			pos: b.pages ?? 300,
+			pages: null,
 			pos_clock: '',
 			deleted: false,
 			clock: {}
@@ -136,8 +146,10 @@ export function addBook(d: Data, b: BookSpec) {
 			book_id: b.id,
 			started_on: b.reading.started,
 			finished_on: b.reading.finished ?? null,
+			unit: b.reading.unit ?? 'pages',
 			total: b.reading.total,
 			pos: b.reading.pos,
+			pages: b.reading.pages ?? null,
 			pos_clock: '',
 			deleted: false,
 			clock: {}
@@ -151,6 +163,7 @@ export function addBook(d: Data, b: BookSpec) {
 				local_date: date,
 				from_page: from,
 				to_page: to,
+				unit: b.reading.unit ?? 'pages',
 				deleted: false
 			});
 		}

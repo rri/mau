@@ -10,11 +10,12 @@ use serde::{Deserialize, Serialize};
 use crate::app::AppState;
 use crate::auth::session::Authed;
 use crate::error::ApiResult;
-use crate::library::{self, Changes, Person};
+use crate::library::{self, Changes, Person, Unit};
 
 pub const FORMAT: &str = "mau-export";
 /// 2 added each book's catalog source (`provider`, `provider_id`, `private`).
-pub const VERSION: u32 = 2;
+/// 3 added readings tracked by percent (`unit`, `pages`) and each event's `unit`.
+pub const VERSION: u32 = 3;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Export {
@@ -81,8 +82,13 @@ pub struct Copy {
 pub struct Reading {
     pub started_on: String,
     pub finished_on: Option<String>,
+    /// Pages or percent (then `total` is 100 and `pages` the copy's count, if known).
+    #[serde(default)]
+    pub unit: Unit,
     pub total: i64,
     pub pos: i64,
+    #[serde(default)]
+    pub pages: Option<i64>,
     pub events: Vec<Event>,
 }
 
@@ -91,6 +97,8 @@ pub struct Event {
     pub date: String,
     pub from: i64,
     pub to: i64,
+    #[serde(default)]
+    pub unit: Unit,
 }
 
 pub async fn build(state: &AppState, user: &crate::auth::User) -> ApiResult<Export> {
@@ -177,14 +185,17 @@ pub async fn build(state: &AppState, user: &crate::auth::User) -> ApiResult<Expo
                     Reading {
                         started_on: r.started_on.clone(),
                         finished_on: r.finished_on.clone(),
+                        unit: r.unit,
                         total: r.total,
                         pos: r.pos,
+                        pages: r.pages,
                         events: events
                             .into_iter()
                             .map(|e| Event {
                                 date: e.local_date.clone(),
                                 from: e.from_page,
                                 to: e.to_page,
+                                unit: e.unit,
                             })
                             .collect(),
                     }
@@ -281,8 +292,18 @@ pub async fn csv(State(state): State<AppState>, Authed(s): Authed) -> ApiResult<
             b.title_override.clone().unwrap_or_else(|| b.title.clone()),
             authors.join(", "),
             state.into(),
-            r.map(|r| r.pos.to_string()).unwrap_or_default(),
-            r.map(|r| r.total.to_string()).unwrap_or_default(),
+            // A percent reading: "42%", and the page count if known.
+            r.map(|r| match r.unit {
+                Unit::Pages => r.pos.to_string(),
+                Unit::Percent => format!("{}%", r.pos),
+            })
+            .unwrap_or_default(),
+            r.and_then(|r| match r.unit {
+                Unit::Pages => Some(r.total),
+                Unit::Percent => r.pages,
+            })
+            .map(|t| t.to_string())
+            .unwrap_or_default(),
             r.map(|r| r.started_on.clone())
                 .filter(|d| d != crate::importer::UNKNOWN_DATE)
                 .unwrap_or_default(),

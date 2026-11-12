@@ -124,6 +124,7 @@ pub fn router(state: AppState) -> Router {
         .route("/recovery-codes/regenerate", post(manage::regenerate_codes))
         // Library sync
         .route("/sync", post(crate::library::sync))
+        .route("/sync/download", post(crate::library::download))
         // Catalog and covers
         .route("/catalog/search", get(crate::catalog::search))
         .route("/catalog/editions", get(crate::catalog::editions))

@@ -1,8 +1,9 @@
 <script lang="ts">
 	// One book in the Reading view's grid: a clean cover, then the progress,
-	// a row with the pages and pause / + (or play), then the title.
-	import type { BookInfo } from '../derive.ts';
+	// a row with the progress, ⋯, and pause / up arrow (or play), then the title.
+	import { progressShort, type BookInfo } from '../derive.ts';
 	import { pause, plusOne, resume } from '../actions.ts';
+	import BookMenu from './BookMenu.svelte';
 	import Cover from './Cover.svelte';
 	import Icon from './Icon.svelte';
 
@@ -18,7 +19,8 @@
 	>
 	<span class="mini" class:empty={!r}><span style="width:{pct}%"></span></span>
 	<div class="controls">
-		<span class="pages">{r ? `p. ${r.pos}/${r.total}` : 'Not started'}</span>
+		<span class="pages">{r ? progressShort(r) : 'Not started'}</span>
+		<BookMenu {info} {onsetup} size="sm" />
 		{#if info.state === 'active'}
 			<button
 				class="pause"
@@ -31,7 +33,8 @@
 				class="plus"
 				type="button"
 				onclick={() => plusOne(info)}
-				aria-label="Add 1 page to {info.title}"><Icon name="plus" size={16} /></button
+				aria-label="Add {r?.unit === 'percent' ? '1%' : '1 page'} to {info.title}"
+				title={r?.unit === 'percent' ? '+1%' : '+1 page'}><Icon name="step" size={16} /></button
 			>
 		{:else}
 			<button

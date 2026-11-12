@@ -29,7 +29,7 @@ use crate::auth::session::Authed;
 use crate::catalog;
 use crate::error::{ApiError, ApiResult};
 use crate::export;
-use crate::library::{self, Person};
+use crate::library::{self, Person, Unit};
 use crate::providers::{self, Candidate, ProviderConfig, ProviderName};
 use crate::util::{HOUR_MS, new_id, now_ms};
 
@@ -1294,8 +1294,10 @@ async fn save(
                     export::Reading {
                         started_on: r.started.clone().unwrap_or_else(|| finished.clone()),
                         finished_on: Some(finished),
+                        unit: Unit::Pages,
                         total,
                         pos: total,
+                        pages: None,
                         events: vec![],
                     }
                 })
@@ -1305,16 +1307,24 @@ async fn save(
             let reading_id = new_id();
             let rh = next_hlc();
             sqlx::query(
-                "INSERT INTO readings (id, book_id, user_id, started_on, finished_on, total, pos, pos_clock, clock, seq)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO readings (id, book_id, user_id, started_on, finished_on, unit, total, pos, pages, pos_clock, clock, seq)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             )
             .bind(&reading_id)
             .bind(&book_id)
             .bind(user_id)
             .bind(&r.started_on)
             .bind(&r.finished_on)
-            .bind(r.total.clamp(1, 100_000))
-            .bind(r.pos.clamp(0, 100_000))
+            .bind(r.unit.as_str())
+            .bind(match r.unit {
+                Unit::Pages => r.total.clamp(1, 100_000),
+                Unit::Percent => 100,
+            })
+            .bind(match r.unit {
+                Unit::Pages => r.pos.clamp(0, 100_000),
+                Unit::Percent => r.pos.clamp(0, 100),
+            })
+            .bind(r.pages.filter(|_| r.unit == Unit::Percent).map(|p| p.clamp(1, 100_000)))
             .bind(&rh)
             .bind(format!(r#"{{"total":"{rh}","finished_on":"{rh}"}}"#))
             .bind(seq)
@@ -1324,7 +1334,7 @@ async fn save(
             for e in &r.events {
                 last = next_hlc();
                 sqlx::query(
-                    "INSERT INTO progress_events (id, reading_id, user_id, hlc, local_date, from_page, to_page, seq) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO progress_events (id, reading_id, user_id, hlc, local_date, from_page, to_page, unit, seq) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 )
                 .bind(new_id())
                 .bind(&reading_id)
@@ -1333,6 +1343,7 @@ async fn save(
                 .bind(&e.date)
                 .bind(e.from)
                 .bind(e.to)
+                .bind(e.unit.as_str())
                 .bind(seq)
                 .execute(&mut *tx)
                 .await?;
@@ -1844,7 +1855,7 @@ mod tests {
         let again: Value =
             serde_json::from_str(&router_get_text(&app, "/api/export.json", &cookie).await)
                 .unwrap();
-        assert_eq!(again["version"], 2);
+        assert_eq!(again["version"], export::VERSION);
         let books = again["books"].as_array().unwrap();
         let find = |title: &str| books.iter().find(|b| b["title"] == title).unwrap();
         assert_eq!(find("The Lathe of Heaven")["provider"], "openlibrary");

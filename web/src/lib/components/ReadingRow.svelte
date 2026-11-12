@@ -1,12 +1,15 @@
 <script lang="ts">
 	// One book in the Reading view.
 	import { ago, dateOfMs } from '../dates.ts';
-	import { lastReadDate, pagesOn, type BookInfo } from '../derive.ts';
+	import { lastReadDate, pagesOn, progressText, type BookInfo } from '../derive.ts';
 	import { library } from '../library.svelte.ts';
 	import { auth } from '../auth.svelte.ts';
-	import { pause, plusOne, resume, setPages } from '../actions.ts';
+	import { pause, plusOne, resume, type Start } from '../actions.ts';
+	import BookMenu from './BookMenu.svelte';
 	import Cover from './Cover.svelte';
 	import Icon from './Icon.svelte';
+	import ProgressEditor from './ProgressEditor.svelte';
+	import StartForm from './StartForm.svelte';
 
 	let {
 		info,
@@ -34,7 +37,7 @@
 		onedit: () => void;
 		onsetup: () => void;
 		oncancel: () => void;
-		onstart: (total: number) => void;
+		onstart: (start: Start) => void;
 		ongrab: (e: PointerEvent) => void;
 		/** Arrow keys on the handle: one place up (-1) or down (1). */
 		onmove: (by: -1 | 1) => void;
@@ -42,58 +45,10 @@
 
 	const r = $derived(info.reading);
 	const pct = $derived(r ? Math.round((100 * r.pos) / r.total) : 0);
-	const todayPages = $derived(r ? pagesOn(library.view, r.id, today) : 0);
+	const todayPages = $derived(r ? pagesOn(library.view, r, today) : 0);
+	const step = $derived(r?.unit === 'percent' ? '1%' : '1 page');
 	const lastRead = $derived(r ? lastReadDate(library.view, r.id) : null);
 	const addedOn = $derived(dateOfMs(info.book.added_at, auth.me?.time_zone ?? 'UTC'));
-
-	let editPos = $state(0);
-	let editTotal = $state(0);
-	let setupTotal = $state('');
-	let setupError = $state('');
-
-	$effect(() => {
-		if (editing && r) {
-			editPos = r.pos;
-			editTotal = r.total;
-		}
-	});
-
-	function saveEdit() {
-		if (!r) return;
-		const total = Number.isFinite(editTotal) && editTotal >= 1 ? Math.floor(editTotal) : r.total;
-		const pos = Number.isFinite(editPos) ? Math.floor(editPos) : r.pos;
-		oncancel();
-		if (pos !== r.pos || total !== r.total) setPages(info, pos, total);
-	}
-
-	function editKey(e: KeyboardEvent) {
-		if (e.key === 'Enter') {
-			e.preventDefault();
-			saveEdit();
-		} else if (e.key === 'Escape') oncancel();
-	}
-
-	function editFocusOut(e: FocusEvent) {
-		const group = e.currentTarget as HTMLElement;
-		if (e.relatedTarget instanceof Node && group.contains(e.relatedTarget)) return;
-		if (editing) saveEdit();
-	}
-
-	function startSetup(e: SubmitEvent) {
-		e.preventDefault();
-		const n = Number(setupTotal);
-		if (!Number.isInteger(n) || n < 1) {
-			setupError = 'Enter the number of pages in your copy.';
-			return;
-		}
-		setupError = '';
-		onstart(n);
-	}
-
-	function focusFirst(node: HTMLInputElement) {
-		node.focus();
-		node.select();
-	}
 
 	// Inline forms can open near the bottom of the screen; bring the whole
 	// form into view (scroll-padding keeps it clear of the phone tab bar).
@@ -151,42 +106,20 @@
 				<span>Not started</span>
 				<span>added {ago(addedOn, today)}</span>
 			{:else if editing}
-				<span
-					class="edit"
-					role="group"
-					aria-label="Edit pages"
-					onfocusout={editFocusOut}
-					use:reveal
-				>
-					page <input
-						type="number"
-						inputmode="numeric"
-						min="0"
-						bind:value={editPos}
-						onkeydown={editKey}
-						aria-label="Current page"
-						use:focusFirst
-					/>
-					of
-					<input
-						type="number"
-						inputmode="numeric"
-						min="1"
-						bind:value={editTotal}
-						onkeydown={editKey}
-						aria-label="Total pages"
-					/>
-					<button class="btn sm primary" type="button" onclick={saveEdit}>Save</button>
-				</span>
+				<ProgressEditor {info} ondone={oncancel} />
 			{:else}
 				<button
 					class="pos"
 					type="button"
 					onclick={onedit}
-					aria-label="Edit pages, now page {r.pos} of {r.total}">page {r.pos} of {r.total}</button
+					aria-label="Edit progress, now {progressText(r)}">{progressText(r)}</button
 				>
 				{#if todayPages > 0}
-					<span class="today">+{todayPages} {todayPages === 1 ? 'page' : 'pages'} today</span>
+					<span class="today"
+						>+{r.unit === 'percent'
+							? `${todayPages}%`
+							: `${todayPages} ${todayPages === 1 ? 'page' : 'pages'}`} today</span
+					>
 				{:else if r.pos === 0 && !lastRead}
 					<span>no progress yet</span>
 				{:else}
@@ -195,8 +128,9 @@
 			{/if}
 		</div>
 	</div>
-	{#if !setup}
+	{#if !setup && !editing}
 		<div class="actions">
+			<BookMenu {info} {onsetup} />
 			{#if info.state === 'active'}
 				<button
 					class="pause"
@@ -209,7 +143,8 @@
 					class="plus"
 					type="button"
 					onclick={() => plusOne(info)}
-					aria-label="Add 1 page to {info.title}"><Icon name="plus" size={20} /></button
+					aria-label="Add {step} to {info.title}"
+					title="+{step}"><Icon name="step" size={20} /></button
 				>
 			{:else}
 				<button
@@ -223,33 +158,9 @@
 		</div>
 	{/if}
 	{#if setup}
-		<form class="setup" onsubmit={startSetup} use:reveal>
-			<label class="field" for="setup-{info.book.id}"
-				>How many pages does your copy have?
-				<input
-					id="setup-{info.book.id}"
-					type="number"
-					inputmode="numeric"
-					min="1"
-					bind:value={setupTotal}
-					placeholder="Total pages"
-					use:focusFirst
-				/></label
-			>
-			{#if info.catalogPages}
-				<button
-					class="link hint"
-					type="button"
-					onclick={() => (setupTotal = String(info.catalogPages))}
-					>Catalog lists {info.catalogPages} pages</button
-				>
-			{/if}
-			{#if setupError}<p class="error" role="alert">{setupError}</p>{/if}
-			<div class="row-end">
-				<button class="btn" type="button" onclick={oncancel}>Cancel</button>
-				<button class="btn primary" type="submit">Start reading</button>
-			</div>
-		</form>
+		<div class="setup" use:reveal>
+			<StartForm {info} {onstart} {oncancel} />
+		</div>
 	{/if}
 </li>
 
@@ -376,20 +287,6 @@
 	.pos:hover {
 		background: var(--accent-soft);
 	}
-	.edit {
-		display: inline-flex;
-		flex-wrap: wrap;
-		gap: 6px;
-		align-items: center;
-		color: var(--ink);
-	}
-	.edit input {
-		width: 72px;
-		padding: 2px 6px;
-		border: 1px solid var(--accent);
-		border-radius: 6px;
-		background: var(--surface);
-	}
 	.today {
 		color: var(--accent);
 		font-weight: 600;
@@ -451,9 +348,5 @@
 		border: 1px solid var(--line);
 		border-radius: 12px;
 		background: var(--bg);
-	}
-	.hint {
-		justify-self: start;
-		font-size: 14px;
 	}
 </style>

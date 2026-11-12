@@ -1,5 +1,5 @@
 // Reading (spec §4): the list and grid of unfinished books and their controls.
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import Reading from './reading/+page.svelte';
@@ -90,7 +90,9 @@ describe('Reading list', () => {
 	it('READ-04 the page count opens an inline editor; Enter saves, Escape cancels', async () => {
 		useLibrary();
 		render(Reading);
-		await userEvent.click(screen.getByRole('button', { name: 'Edit pages, now page 299 of 880' }));
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Edit progress, now page 299 of 880' })
+		);
 		const cur = screen.getByRole('spinbutton', { name: 'Current page' });
 		expect(cur).toHaveFocus();
 		await userEvent.clear(cur);
@@ -98,7 +100,9 @@ describe('Reading list', () => {
 		expect(info('mm').reading!.pos).toBe(350);
 		expect(toasts.current?.message).toBe('Moved to page 350');
 
-		await userEvent.click(screen.getByRole('button', { name: 'Edit pages, now page 350 of 880' }));
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Edit progress, now page 350 of 880' })
+		);
 		await userEvent.type(screen.getByRole('spinbutton', { name: 'Current page' }), '9{Escape}');
 		expect(info('mm').reading!.pos).toBe(350);
 		expect(screen.queryByRole('spinbutton', { name: 'Current page' })).toBeNull();
@@ -111,7 +115,9 @@ describe('Reading list', () => {
 		const total = screen.getByLabelText('How many pages does your copy have?');
 		expect(total).toHaveFocus();
 		await userEvent.click(screen.getByRole('button', { name: 'Start reading' }));
-		expect(screen.getByRole('alert')).toHaveTextContent('Enter the number of pages in your copy.');
+		expect(screen.getByRole('alert')).toHaveTextContent(
+			'Enter the number of pages in your copy, or track by percent.'
+		);
 		await userEvent.click(screen.getByRole('button', { name: 'Catalog lists 333 pages' }));
 		expect(total).toHaveValue(333);
 		await userEvent.click(screen.getByRole('button', { name: 'Start reading' }));
@@ -241,5 +247,55 @@ describe('Reading list', () => {
 		await userEvent.clear(screen.getByLabelText("Search books you're reading"));
 		await userEvent.click(screen.getByRole('button', { name: 'Show 15 more' }));
 		expect(rows()).toHaveLength(75);
+	});
+
+	it('READ-15 the up arrow adds a step; a book can start by percent and switch to pages later', async () => {
+		useLibrary();
+		render(Reading);
+		await userEvent.click(screen.getByRole('button', { name: 'Start Station Eleven' }));
+		await userEvent.click(screen.getByRole('button', { name: "Don't know? Track by percent" }));
+		expect(info('se').reading).toMatchObject({ unit: 'percent', pos: 0 });
+		await userEvent.click(screen.getByRole('button', { name: 'Add 1% to Station Eleven' }));
+		expect(row('Station Eleven')).toHaveTextContent('1%');
+		expect(row('Station Eleven')).toHaveTextContent('+1% today');
+
+		await userEvent.click(screen.getByRole('button', { name: 'Edit progress, now 1%' }));
+		const toPages = screen.getByRole('button', { name: 'Count pages instead' });
+		expect(toPages).toBeDisabled();
+		await userEvent.type(screen.getByLabelText('Pages in your copy'), '400');
+		await userEvent.click(toPages);
+		expect(info('se').reading).toMatchObject({ unit: 'pages', total: 400, pos: 4 });
+		expect(row('Station Eleven')).toHaveTextContent('page 4 of 400');
+	});
+
+	it('READ-16 the ⋯ menu: Finish, Pause, Open book (active); Start or Resume, Finish (inactive)', async () => {
+		useLibrary();
+		render(Reading);
+		await userEvent.click(screen.getByRole('button', { name: 'More for Middlemarch' }));
+		const menu = screen.getByRole('menu');
+		expect(
+			within(menu)
+				.getAllByRole('menuitem')
+				.map((m) => m.textContent)
+		).toEqual(['Finish', 'Pause', 'Open book']);
+		await vi.waitFor(() => expect(within(menu).getAllByRole('menuitem')[0]).toHaveFocus());
+		await userEvent.keyboard('{Escape}');
+		expect(screen.queryByRole('menu')).toBeNull();
+		expect(screen.getByRole('button', { name: 'More for Middlemarch' })).toHaveFocus();
+
+		await userEvent.click(screen.getByRole('button', { name: 'More for Middlemarch' }));
+		await userEvent.click(screen.getByRole('menuitem', { name: 'Finish' }));
+		expect(info('mm').state).toBe('finished');
+		expect(rows().some((r) => r.textContent?.includes('Middlemarch'))).toBe(false);
+		expect(toasts.current?.message).toBe('Finished Middlemarch');
+
+		await userEvent.click(screen.getByRole('button', { name: 'More for Station Eleven' }));
+		expect(
+			within(screen.getByRole('menu'))
+				.getAllByRole('menuitem')
+				.map((m) => m.textContent)
+		).toEqual(['Start', 'Finish', 'Open book']);
+		await userEvent.click(screen.getByRole('menuitem', { name: 'Start' }));
+		expect(screen.getByLabelText('How many pages does your copy have?')).toBeInTheDocument();
 	});
 });

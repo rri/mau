@@ -109,12 +109,26 @@ export function eventsOf(d: Data, readingId: string): EventRow[] {
 	return index(d).eventsByReading.get(readingId) ?? [];
 }
 
-/** Pages read on `date` in this reading (forward moves only). */
-export function pagesOn(d: Data, readingId: string, date: string): number {
+/** Pages (or percent, for a reading tracked by percent) read on `date` in
+ *  this reading: forward moves in its current unit only. */
+export function pagesOn(d: Data, reading: ReadingRow, date: string): number {
 	let n = 0;
-	for (const e of eventsOf(d, readingId))
-		if (e.local_date === date && e.to_page > e.from_page) n += e.to_page - e.from_page;
+	for (const e of eventsOf(d, reading.id))
+		if (e.local_date === date && e.unit === reading.unit && e.to_page > e.from_page)
+			n += e.to_page - e.from_page;
 	return n;
+}
+
+/** "page 140 of 304", or "42%" for a reading tracked by percent. */
+export function progressText(r: ReadingRow): string {
+	return r.unit === 'percent'
+		? `${r.pos}%`
+		: `page ${r.pos.toLocaleString()} of ${r.total.toLocaleString()}`;
+}
+
+/** The short form for tiles: "p. 140/304" or "42%". */
+export function progressShort(r: ReadingRow): string {
+	return r.unit === 'percent' ? `${r.pos}%` : `p. ${r.pos}/${r.total}`;
 }
 
 /** The last date anything was read in this reading. */

@@ -175,10 +175,10 @@
 		<StartDialog
 			info={setupInfo}
 			oncancel={() => (setup = null)}
-			onstart={(total) => {
+			onstart={(start) => {
 				const info = setupInfo;
 				setup = null;
-				startReading(info, total);
+				startReading(info, start);
 			}}
 		/>
 	{/if}
@@ -206,10 +206,10 @@
 						editing = null;
 						setup = null;
 					}}
-					onstart={(total) => {
+					onstart={(start) => {
 						const rank = setup?.rank;
 						setup = null;
-						startReading(info, total, rank);
+						startReading(info, start, rank);
 					}}
 					ongrab={(e) => grab(info, e)}
 					onmove={(by) => step(info, by)}

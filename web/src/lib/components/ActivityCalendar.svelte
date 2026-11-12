@@ -1,17 +1,26 @@
 <script lang="ts">
-	// One row per year with reading (empty years skipped), shaded by pages a day.
+	// One row per year with reading (empty years skipped), shaded by pages a
+	// day; a day read only by percent is shaded by its percent.
 	import { addDays, fmtDate } from '../dates.ts';
 
 	let {
 		perDay,
+		percentPerDay = new Map(),
 		today,
 		includeYear = null
-	}: { perDay: Map<string, number>; today: string; includeYear?: number | null } = $props();
+	}: {
+		perDay: Map<string, number>;
+		percentPerDay?: Map<string, number>;
+		today: string;
+		includeYear?: number | null;
+	} = $props();
 
 	const MONTHS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-	const level = (p: number) => (p <= 0 ? 0 : p < 10 ? 1 : p < 25 ? 2 : p < 50 ? 3 : 4);
+	const byPages = (p: number) => (p <= 0 ? 0 : p < 10 ? 1 : p < 25 ? 2 : p < 50 ? 3 : 4);
+	const byPercent = (p: number) => (p <= 0 ? 0 : p < 2 ? 1 : p < 5 ? 2 : p < 10 ? 3 : 4);
+	const level = (c: Cell) => byPages(c.pages) || byPercent(c.percent);
 
-	type Cell = { date: string; pages: number; kind: 'day' | 'out' | 'future' };
+	type Cell = { date: string; pages: number; percent: number; kind: 'day' | 'out' | 'future' };
 	type Year = {
 		year: number;
 		weeks: number;
@@ -22,7 +31,8 @@
 
 	const years = $derived.by((): Year[] => {
 		const set = new Set<number>();
-		for (const [d, p] of perDay) if (p > 0) set.add(Number(d.slice(0, 4)));
+		for (const m of [perDay, percentPerDay])
+			for (const [d, p] of m) if (p > 0) set.add(Number(d.slice(0, 4)));
 		if (includeYear) set.add(includeYear);
 		return [...set]
 			.sort((a, b) => b - a)
@@ -36,13 +46,19 @@
 				let total = 0;
 				while (day <= `${year}-12-31`) {
 					for (let i = 0; i < 7; i++) {
-						if (!day.startsWith(`${year}-`)) cells.push({ date: day, pages: 0, kind: 'out' });
+						if (!day.startsWith(`${year}-`))
+							cells.push({ date: day, pages: 0, percent: 0, kind: 'out' });
 						else {
 							if (day.endsWith('-01'))
 								months.push({ col, label: MONTHS[Number(day.slice(5, 7)) - 1] });
 							const pages = perDay.get(day) ?? 0;
 							total += pages;
-							cells.push({ date: day, pages, kind: day > today ? 'future' : 'day' });
+							cells.push({
+								date: day,
+								pages,
+								percent: percentPerDay.get(day) ?? 0,
+								kind: day > today ? 'future' : 'day'
+							});
 						}
 						day = addDays(day, 1);
 					}
@@ -57,7 +73,14 @@
 		if (c.kind !== 'day') return (tip = null);
 		const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
 		tip = {
-			text: `${fmtDate(c.date)}: ${c.pages ? `${c.pages} ${c.pages === 1 ? 'page' : 'pages'}` : 'no reading'}`,
+			text: `${fmtDate(c.date)}: ${
+				[
+					c.pages ? `${c.pages} ${c.pages === 1 ? 'page' : 'pages'}` : '',
+					c.percent ? `${c.percent}%` : ''
+				]
+					.filter(Boolean)
+					.join(', ') || 'no reading'
+			}`,
 			x: r.left + r.width / 2,
 			y: r.top
 		};
@@ -79,7 +102,7 @@
 			<div class="grid" role="img" aria-label="Pages read per day in {y.year}">
 				{#each y.cells as c (c.date)}
 					<span
-						class="cell l{level(c.pages)}"
+						class="cell l{level(c)}"
 						class:out={c.kind === 'out'}
 						class:future={c.kind === 'future'}
 						class:today={c.date === today}

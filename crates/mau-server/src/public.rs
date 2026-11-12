@@ -35,6 +35,7 @@ struct Item {
     finished_on: Option<String>,
     pos: i64,
     total: i64,
+    percent: bool,
 }
 
 fn month_year(date: &str) -> String {
@@ -64,12 +65,12 @@ fn title_of(s: &ShareRow) -> String {
 /// The books in a share, in display order.
 async fn items(state: &AppState, owner: &str, s: &ShareRow) -> sqlx::Result<Vec<Item>> {
     // Each book with its latest reading.
-    let rows: Vec<(String, Option<String>, Option<String>, Option<String>, Option<String>, i64, Option<String>, Option<i64>, Option<i64>, i64, bool, String)> =
+    let rows: Vec<(String, Option<String>, Option<String>, Option<String>, Option<String>, i64, Option<String>, Option<i64>, Option<i64>, i64, bool, String, Option<String>)> =
         sqlx::query_as(
             "SELECT w.title, b.title_override, b.authors_override,
                     COALESCE(b.cover_override, w.cover),
                     (SELECT group_concat(name, ', ') FROM (SELECT name FROM work_people p WHERE p.work_id = w.id AND p.role = 'author' ORDER BY position)),
-                    b.rating, r.finished_on, r.pos, r.total, b.added_at, b.active, b.id
+                    b.rating, r.finished_on, r.pos, r.total, b.added_at, b.active, b.id, r.unit
              FROM books b JOIN works w ON w.id = b.work_id
              LEFT JOIN readings r ON r.id = (SELECT MAX(id) FROM readings x WHERE x.book_id = b.id AND x.deleted = 0)
              WHERE b.user_id = ? AND b.deleted = 0",
@@ -112,6 +113,7 @@ async fn items(state: &AppState, owner: &str, s: &ShareRow) -> sqlx::Result<Vec<
                     finished_on: r.6,
                     pos: r.7.unwrap_or(0),
                     total: r.8.unwrap_or(0),
+                    percent: r.12.as_deref() == Some("percent"),
                 },
                 r.10,
                 r.9,
@@ -201,7 +203,11 @@ fn reading_list(list: &[Item]) -> Markup {
                 (cover(i))
                 div {
                     div.t { (i.title) }
-                    div.d { (i.authors) " · page " (i.pos) " of " (i.total) }
+                    @if i.percent {
+                        div.d { (i.authors) " · " (i.pos) "%" }
+                    } @else {
+                        div.d { (i.authors) " · page " (i.pos) " of " (i.total) }
+                    }
                     div.bar { span style=(format!("width:{}%", if i.total > 0 { 100 * i.pos / i.total } else { 0 })) {} }
                 }
             }

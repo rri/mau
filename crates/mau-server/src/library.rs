@@ -12,7 +12,7 @@ use axum::Json;
 use axum::extract::State;
 use mau_core::hlc::Hlc;
 use serde::{Deserialize, Serialize};
-use sqlx::{Sqlite, SqliteConnection, Transaction};
+use sqlx::{AssertSqlSafe, Sqlite, SqliteConnection, Transaction};
 use ts_rs::TS;
 
 use crate::app::AppState;
@@ -110,10 +110,15 @@ pub struct ReadingRow {
     pub book_id: String,
     pub started_on: String,
     pub finished_on: Option<String>,
+    /// What `pos` and `total` count: pages, or percent (`total` is then 100).
+    pub unit: Unit,
     #[ts(type = "number")]
     pub total: i64,
     #[ts(type = "number")]
     pub pos: i64,
+    /// The copy's page count, kept while tracking by percent (if entered).
+    #[ts(type = "number | null")]
+    pub pages: Option<i64>,
     pub pos_clock: String,
     pub deleted: bool,
     pub clock: Clock,
@@ -130,7 +135,36 @@ pub struct EventRow {
     pub from_page: i64,
     #[ts(type = "number")]
     pub to_page: i64,
+    /// The unit of `from_page` and `to_page`.
+    pub unit: Unit,
     pub deleted: bool,
+}
+
+/// What a reading's position counts.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum Unit {
+    #[default]
+    Pages,
+    Percent,
+}
+
+impl Unit {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Unit::Pages => "pages",
+            Unit::Percent => "percent",
+        }
+    }
+
+    pub fn parse(s: &str) -> Unit {
+        if s == "percent" {
+            Unit::Percent
+        } else {
+            Unit::Pages
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -181,8 +215,12 @@ pub struct CopyFields {
 #[derive(Debug, Clone, Default, Deserialize, TS)]
 #[ts(export)]
 pub struct ReadingFields {
+    /// Pages readings only (a percent reading's total is always 100).
     #[ts(as = "Option<i32>", optional)]
     pub total: Option<i64>,
+    /// Percent readings only: the copy's page count; 0 means unknown.
+    #[ts(as = "Option<i32>", optional)]
+    pub pages: Option<i64>,
     /// `""` means not finished.
     #[ts(optional)]
     pub finished_on: Option<String>,
@@ -251,8 +289,16 @@ pub enum OpKind {
         id: String,
         book_id: String,
         started_on: String,
+        /// 100 for a percent reading.
         #[ts(type = "number")]
         total: i64,
+        #[serde(default)]
+        #[ts(as = "Option<Unit>", optional)]
+        unit: Unit,
+        /// Percent readings: the copy's page count, if known.
+        #[serde(default)]
+        #[ts(as = "Option<i32>", optional)]
+        pages: Option<i64>,
     },
     #[serde(rename = "reading.set")]
     ReadingSet { id: String, fields: ReadingFields },
@@ -270,6 +316,10 @@ pub enum OpKind {
         #[ts(type = "number")]
         to: i64,
         local_date: String,
+        /// The unit the device saw; a move in another unit is dropped.
+        #[serde(default)]
+        #[ts(as = "Option<Unit>", optional)]
+        unit: Unit,
     },
     /// Takes back a progress event (the undo toast).
     #[serde(rename = "progress.undo")]
@@ -277,6 +327,22 @@ pub enum OpKind {
         reading_id: String,
         event_id: String,
         base: String,
+        #[ts(type = "number")]
+        to: i64,
+        #[serde(default)]
+        #[ts(as = "Option<Unit>", optional)]
+        unit: Unit,
+    },
+    /// Switches a reading between pages and percent, moving the position to
+    /// `to` in the new unit (`total` is 100 for percent). It's a position
+    /// change like `progress` (same conflict rule) but logs no reading.
+    #[serde(rename = "progress.unit")]
+    ProgressUnit {
+        reading_id: String,
+        base: String,
+        unit: Unit,
+        #[ts(type = "number")]
+        total: i64,
         #[ts(type = "number")]
         to: i64,
     },
@@ -787,25 +853,38 @@ pub async fn apply(
             book_id,
             started_on,
             total,
+            unit,
+            pages,
         } => {
             check_date(started_on)?;
             if *total < 1 || *total > MAX_PAGES {
                 return Err(bad("total pages out of range"));
             }
+            if *unit == Unit::Percent && *total != 100 {
+                return Err(bad("a percent reading's total is 100"));
+            }
+            if let Some(p) = pages
+                && !(1..=MAX_PAGES).contains(p)
+            {
+                return Err(bad("pages out of range"));
+            }
+            let pages = pages.filter(|_| *unit == Unit::Percent);
             if !live_book(conn, user_id, book_id).await? {
                 return Ok(Applied::Dropped);
             }
             let n = sqlx::query(
-                "INSERT INTO readings (id, book_id, user_id, started_on, total, pos_clock, clock, seq)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING",
+                "INSERT INTO readings (id, book_id, user_id, started_on, total, unit, pages, pos_clock, clock, seq)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING",
             )
             .bind(id)
             .bind(book_id)
             .bind(user_id)
             .bind(started_on)
             .bind(total)
+            .bind(unit.as_str())
+            .bind(pages)
             .bind(hlc)
-            .bind(full_clock(&["total", "finished_on"], hlc))
+            .bind(full_clock(&["total", "finished_on", "pages"], hlc))
             .bind(seq)
             .execute(&mut *conn)
             .await?
@@ -817,26 +896,49 @@ pub async fn apply(
             })
         }
         ReadingSet { id, fields } => {
-            let row: Option<(String, bool, i64, Option<String>, String)> = sqlx::query_as(
-                "SELECT user_id, deleted, total, finished_on, clock FROM readings WHERE id = ?",
+            type Row = (
+                String,
+                bool,
+                i64,
+                Option<String>,
+                String,
+                String,
+                Option<i64>,
+            );
+            let row: Option<Row> = sqlx::query_as(
+                "SELECT user_id, deleted, total, finished_on, clock, unit, pages FROM readings WHERE id = ?",
             )
             .bind(id)
             .fetch_optional(&mut *conn)
             .await?;
-            let Some((owner, deleted, mut total, mut finished, clock)) = row else {
+            let Some((owner, deleted, mut total, mut finished, clock, unit, mut pages)) = row
+            else {
                 return Ok(Applied::Dropped);
             };
             if owner != user_id || deleted {
                 return Ok(Applied::Dropped);
             }
+            let unit = Unit::parse(&unit);
             let mut clock = parse_clock(&clock);
             let mut changed = false;
+            // A total for a percent reading, or a page count for a pages
+            // reading, was meant for the other unit (another device switched
+            // meanwhile): it's ignored.
             if let Some(t) = fields.total {
                 if !(1..=MAX_PAGES).contains(&t) {
                     return Err(bad("total pages out of range"));
                 }
-                if claim(&mut clock, "total", hlc) {
+                if unit == Unit::Pages && claim(&mut clock, "total", hlc) {
                     total = t;
+                    changed = true;
+                }
+            }
+            if let Some(p) = fields.pages {
+                if !(0..=MAX_PAGES).contains(&p) {
+                    return Err(bad("pages out of range"));
+                }
+                if unit == Unit::Percent && claim(&mut clock, "pages", hlc) {
+                    pages = (p > 0).then_some(p);
                     changed = true;
                 }
             }
@@ -853,10 +955,11 @@ pub async fn apply(
                 return Ok(Applied::Dropped);
             }
             sqlx::query(
-                "UPDATE readings SET total = ?, finished_on = ?, clock = ?, seq = ? WHERE id = ?",
+                "UPDATE readings SET total = ?, finished_on = ?, pages = ?, clock = ?, seq = ? WHERE id = ?",
             )
             .bind(total)
             .bind(finished)
+            .bind(pages)
             .bind(serde_json::to_string(&clock).unwrap())
             .bind(seq)
             .bind(id)
@@ -889,17 +992,31 @@ pub async fn apply(
             from,
             to,
             local_date,
+            unit,
         } => {
             check_date(local_date)?;
             check_pages(*from)?;
             check_pages(*to)?;
             let _ = base;
-            if !move_position(conn, user_id, reading_id, chain, hlc, *to, seq).await? {
+            if !move_position(
+                conn,
+                user_id,
+                reading_id,
+                chain,
+                hlc,
+                Move {
+                    to: *to,
+                    unit: Some(*unit),
+                },
+                seq,
+            )
+            .await?
+            {
                 return Ok(Applied::Dropped);
             }
             sqlx::query(
-                "INSERT INTO progress_events (id, reading_id, user_id, hlc, local_date, from_page, to_page, seq)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING",
+                "INSERT INTO progress_events (id, reading_id, user_id, hlc, local_date, from_page, to_page, unit, seq)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING",
             )
             .bind(event_id)
             .bind(reading_id)
@@ -908,6 +1025,7 @@ pub async fn apply(
             .bind(local_date)
             .bind(from)
             .bind(to)
+            .bind(unit.as_str())
             .bind(seq)
             .execute(&mut *conn)
             .await?;
@@ -918,10 +1036,24 @@ pub async fn apply(
             event_id,
             base,
             to,
+            unit,
         } => {
             check_pages(*to)?;
             let _ = base;
-            if !move_position(conn, user_id, reading_id, chain, hlc, *to, seq).await? {
+            if !move_position(
+                conn,
+                user_id,
+                reading_id,
+                chain,
+                hlc,
+                Move {
+                    to: *to,
+                    unit: Some(*unit),
+                },
+                seq,
+            )
+            .await?
+            {
                 return Ok(Applied::Dropped);
             }
             sqlx::query(
@@ -934,8 +1066,82 @@ pub async fn apply(
             .await?;
             Ok(Applied::Yes)
         }
+        ProgressUnit {
+            reading_id,
+            base,
+            unit,
+            total,
+            to,
+        } => {
+            let _ = base;
+            match unit {
+                Unit::Percent if *total != 100 => {
+                    return Err(bad("a percent reading's total is 100"));
+                }
+                _ if !(1..=MAX_PAGES).contains(total) => {
+                    return Err(bad("total pages out of range"));
+                }
+                _ => {}
+            }
+            if !(0..=*total).contains(to) {
+                return Err(bad("position out of range"));
+            }
+            let row: Option<(String, i64, String)> =
+                sqlx::query_as("SELECT unit, total, clock FROM readings WHERE id = ?")
+                    .bind(reading_id)
+                    .fetch_optional(&mut *conn)
+                    .await?;
+            let Some((old_unit, old_total, clock)) = row else {
+                return Ok(Applied::Dropped);
+            };
+            if !move_position(
+                conn,
+                user_id,
+                reading_id,
+                chain,
+                hlc,
+                Move {
+                    to: *to,
+                    unit: None,
+                },
+                seq,
+            )
+            .await?
+            {
+                return Ok(Applied::Dropped);
+            }
+            // Going to percent keeps a known page count; going to pages
+            // makes it the total. Older total and page-count edits lose.
+            let mut clock = parse_clock(&clock);
+            for f in ["total", "pages"] {
+                clock.insert(f.to_owned(), hlc.to_owned());
+            }
+            let pages = (*unit == Unit::Percent && Unit::parse(&old_unit) == Unit::Pages)
+                .then_some(old_total);
+            sqlx::query(
+                "UPDATE readings SET unit = ?, total = ?,
+                     pages = CASE WHEN ? = 'pages' THEN NULL ELSE COALESCE(?, pages) END,
+                     clock = ? WHERE id = ?",
+            )
+            .bind(unit.as_str())
+            .bind(total)
+            .bind(unit.as_str())
+            .bind(pages)
+            .bind(serde_json::to_string(&clock).unwrap())
+            .bind(reading_id)
+            .execute(&mut *conn)
+            .await?;
+            Ok(Applied::Yes)
+        }
         WorkCreate { work } => create_private_work(conn, user_id, seq, work).await,
     }
+}
+
+/// Where a position change goes: `to`, in the unit the device saw (`None`
+/// for a unit switch, which applies whatever the unit).
+struct Move {
+    to: i64,
+    unit: Option<Unit>,
 }
 
 /// The fork-aware position rule. Returns false if the move loses.
@@ -945,7 +1151,7 @@ async fn move_position(
     reading_id: &str,
     chain: Option<ChainCtx<'_>>,
     hlc: &str,
-    to: i64,
+    Move { to, unit }: Move,
     seq: i64,
 ) -> ApiResult<bool> {
     let Some(ChainCtx { info, outcomes }) = chain else {
@@ -953,15 +1159,23 @@ async fn move_position(
             "progress operation without chain context",
         ));
     };
-    let row: Option<(String, bool, String)> =
-        sqlx::query_as("SELECT user_id, deleted, pos_clock FROM readings WHERE id = ?")
+    let row: Option<(String, bool, String, String)> =
+        sqlx::query_as("SELECT user_id, deleted, pos_clock, unit FROM readings WHERE id = ?")
             .bind(reading_id)
             .fetch_optional(&mut *conn)
             .await?;
-    let Some((owner, deleted, current)) = row else {
+    let Some((owner, deleted, current, current_unit)) = row else {
         return Ok(false);
     };
     if owner != user_id || deleted {
+        return Ok(false);
+    }
+    // A move in the other unit (another device switched meanwhile) loses,
+    // and the rest of its chain with it.
+    if unit.is_some_and(|u| u != Unit::parse(&current_unit)) {
+        if info.first {
+            outcomes[info.chain] = Some(false);
+        }
         return Ok(false);
     }
     if !info.first {
@@ -1159,66 +1373,13 @@ fn book_from(t: BookTuple) -> BookRow {
 
 pub async fn pull(conn: &mut SqliteConnection, user_id: &str, since: i64) -> ApiResult<Changes> {
     let seq = current_seq(conn).await?;
-    // A new device (`since` 0) has nothing to delete, so it gets live rows only.
-    let books: Vec<BookTuple> = sqlx::query_as(
-        "SELECT id, work_id, rank, active, rating, notes, title_override, authors_override, cover_override, added_at, deleted, clock
-         FROM books WHERE user_id = ? AND seq > ? AND (? OR deleted = 0)",
-    )
-    .bind(user_id)
-    .bind(since)
-    .bind(since > 0)
-    .fetch_all(&mut *conn)
-    .await?;
-    let books: Vec<BookRow> = books.into_iter().map(book_from).collect();
-
-    let tags: Vec<(String, String, bool, String)> = sqlx::query_as(
-        "SELECT book_id, tag, present, clock FROM book_tags WHERE user_id = ? AND seq > ? AND (? OR present = 1)",
-    )
-    .bind(user_id)
-    .bind(since)
-    .bind(since > 0)
-    .fetch_all(&mut *conn)
-    .await?;
-    let copies: Vec<(String, String, String, String, Option<String>, bool, String)> = sqlx::query_as(
-        "SELECT id, book_id, format, location, edition_id, deleted, clock FROM copies WHERE user_id = ? AND seq > ? AND (? OR deleted = 0)",
-    )
-    .bind(user_id)
-    .bind(since)
-    .bind(since > 0)
-    .fetch_all(&mut *conn)
-    .await?;
-    let readings: Vec<(
-        String,
-        String,
-        String,
-        Option<String>,
-        i64,
-        i64,
-        String,
-        bool,
-        String,
-    )> = sqlx::query_as(
-        "SELECT id, book_id, started_on, finished_on, total, pos, pos_clock, deleted, clock
-         FROM readings WHERE user_id = ? AND seq > ? AND (? OR deleted = 0)",
-    )
-    .bind(user_id)
-    .bind(since)
-    .bind(since > 0)
-    .fetch_all(&mut *conn)
-    .await?;
-    let events: Vec<(String, String, String, String, i64, i64, bool)> = sqlx::query_as(
-        "SELECT id, reading_id, hlc, local_date, from_page, to_page, deleted FROM progress_events WHERE user_id = ? AND seq > ? AND (? OR deleted = 0)",
-    )
-    .bind(user_id)
-    .bind(since)
-    .bind(since > 0)
-    .fetch_all(&mut *conn)
-    .await?;
+    let mut changes = rows(conn, user_id, Scope::Since(since)).await?;
+    changes.seq = seq;
 
     // Works: those of changed books, plus catalog edits to works on the list
     // (found from the edits, by index, not by reading the whole list). A new
     // device gets every book, so their works are all there already.
-    let mut work_ids: HashSet<String> = books.iter().map(|b| b.work_id.clone()).collect();
+    let mut work_ids: HashSet<String> = changes.books.iter().map(|b| b.work_id.clone()).collect();
     if since > 0 {
         let edited: Vec<String> = sqlx::query_scalar(
             "SELECT c.id FROM (
@@ -1233,11 +1394,110 @@ pub async fn pull(conn: &mut SqliteConnection, user_id: &str, since: i64) -> Api
         work_ids.extend(edited);
     }
     let work_ids: Vec<String> = work_ids.into_iter().collect();
-    let works = load_works(conn, &work_ids, Some(user_id)).await?;
+    changes.works = load_works(conn, &work_ids, Some(user_id)).await?;
+    Ok(changes)
+}
+
+/// Which of a user's rows to read.
+enum Scope<'a> {
+    /// Changed after this change number; with 0 (a new device, which has
+    /// nothing to delete) live rows only.
+    Since(i64),
+    /// The live rows of these books (a page of a new device's download).
+    Books(&'a [String]),
+}
+
+/// A user's rows (all but works) in `scope`.
+async fn rows(conn: &mut SqliteConnection, user_id: &str, scope: Scope<'_>) -> ApiResult<Changes> {
+    // ?1 user, ?2 since, ?3 book IDs (JSON); each condition uses one of them.
+    let (since, ids, by_book) = match scope {
+        Scope::Since(n) => (n, "[]".to_owned(), false),
+        Scope::Books(ids) => (
+            0,
+            serde_json::to_string(ids).expect("strings serialize"),
+            true,
+        ),
+    };
+    // The SQL is put together from the constant pieces below only.
+    // `member`: how a row belongs to one of the books.
+    let cond = |member: &str, live: &str| {
+        if by_book {
+            format!("user_id = ?1 AND {member} AND {live}")
+        } else {
+            format!("user_id = ?1 AND seq > ?2 AND (?2 > 0 OR {live})")
+        }
+    };
+    let of_books = "book_id IN (SELECT value FROM json_each(?3))";
+
+    let books: Vec<BookTuple> = sqlx::query_as(AssertSqlSafe(format!(
+        "SELECT id, work_id, rank, active, rating, notes, title_override, authors_override, cover_override, added_at, deleted, clock
+         FROM books WHERE {}",
+        cond("id IN (SELECT value FROM json_each(?3))", "deleted = 0")
+    )))
+    .bind(user_id)
+    .bind(since)
+    .bind(&ids)
+    .fetch_all(&mut *conn)
+    .await?;
+    let tags: Vec<(String, String, bool, String)> = sqlx::query_as(AssertSqlSafe(format!(
+        "SELECT book_id, tag, present, clock FROM book_tags WHERE {}",
+        cond(of_books, "present = 1")
+    )))
+    .bind(user_id)
+    .bind(since)
+    .bind(&ids)
+    .fetch_all(&mut *conn)
+    .await?;
+    let copies: Vec<(String, String, String, String, Option<String>, bool, String)> =
+        sqlx::query_as(AssertSqlSafe(format!(
+            "SELECT id, book_id, format, location, edition_id, deleted, clock FROM copies WHERE {}",
+            cond(of_books, "deleted = 0")
+        )))
+        .bind(user_id)
+        .bind(since)
+        .bind(&ids)
+        .fetch_all(&mut *conn)
+        .await?;
+    type ReadingTuple = (
+        String,
+        String,
+        String,
+        Option<String>,
+        String,
+        i64,
+        i64,
+        Option<i64>,
+        String,
+        bool,
+        String,
+    );
+    let readings: Vec<ReadingTuple> = sqlx::query_as(AssertSqlSafe(format!(
+        "SELECT id, book_id, started_on, finished_on, unit, total, pos, pages, pos_clock, deleted, clock
+         FROM readings WHERE {}",
+        cond(of_books, "deleted = 0")
+    )))
+    .bind(user_id)
+    .bind(since)
+    .bind(&ids)
+    .fetch_all(&mut *conn)
+    .await?;
+    let events: Vec<(String, String, String, String, i64, i64, String, bool)> =
+        sqlx::query_as(AssertSqlSafe(format!(
+            "SELECT id, reading_id, hlc, local_date, from_page, to_page, unit, deleted FROM progress_events WHERE {}",
+            cond(
+                &format!("reading_id IN (SELECT id FROM readings WHERE {of_books})"),
+                "deleted = 0"
+            )
+        )))
+        .bind(user_id)
+        .bind(since)
+        .bind(&ids)
+        .fetch_all(&mut *conn)
+        .await?;
 
     Ok(Changes {
-        seq,
-        books,
+        seq: 0,
+        books: books.into_iter().map(book_from).collect(),
         tags: tags
             .into_iter()
             .map(|(book_id, tag, present, clock)| TagRow {
@@ -1264,14 +1524,28 @@ pub async fn pull(conn: &mut SqliteConnection, user_id: &str, since: i64) -> Api
         readings: readings
             .into_iter()
             .map(
-                |(id, book_id, started_on, finished_on, total, pos, pos_clock, deleted, clock)| {
+                |(
+                    id,
+                    book_id,
+                    started_on,
+                    finished_on,
+                    unit,
+                    total,
+                    pos,
+                    pages,
+                    pos_clock,
+                    deleted,
+                    clock,
+                )| {
                     ReadingRow {
                         id,
                         book_id,
                         started_on,
                         finished_on,
+                        unit: Unit::parse(&unit),
                         total,
                         pos,
+                        pages,
                         pos_clock,
                         deleted,
                         clock: parse_clock(&clock),
@@ -1282,18 +1556,19 @@ pub async fn pull(conn: &mut SqliteConnection, user_id: &str, since: i64) -> Api
         events: events
             .into_iter()
             .map(
-                |(id, reading_id, hlc, local_date, from_page, to_page, deleted)| EventRow {
+                |(id, reading_id, hlc, local_date, from_page, to_page, unit, deleted)| EventRow {
                     id,
                     reading_id,
                     hlc,
                     local_date,
                     from_page,
                     to_page,
+                    unit: Unit::parse(&unit),
                     deleted,
                 },
             )
             .collect(),
-        works,
+        works: Vec::new(),
     })
 }
 
@@ -1449,6 +1724,9 @@ pub fn progress_chains(
             }
             | OpKind::ProgressUndo {
                 reading_id, base, ..
+            }
+            | OpKind::ProgressUnit {
+                reading_id, base, ..
             } => Some(mau_core::progress::Change {
                 reading: reading_id,
                 base,
@@ -1463,7 +1741,9 @@ pub fn progress_chains(
     let per_op = ops
         .iter()
         .map(|op| match op.op {
-            OpKind::Progress { .. } | OpKind::ProgressUndo { .. } => infos.next(),
+            OpKind::Progress { .. } | OpKind::ProgressUndo { .. } | OpKind::ProgressUnit { .. } => {
+                infos.next()
+            }
             _ => None,
         })
         .collect();
@@ -1516,6 +1796,111 @@ pub async fn sync(
         dropped,
         rejected,
         changes,
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// A new device's download
+
+/// Where a download stands. The first request sends none.
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
+#[ts(export)]
+pub struct DownloadCursor {
+    /// The change number when the download started: afterwards the device
+    /// syncs from here, which brings whatever changed meanwhile.
+    #[ts(type = "number")]
+    pub upto: i64,
+    /// Active books come first (what Home and Reading show at the top), then
+    /// every book (active ones again, harmlessly).
+    pub active_only: bool,
+    /// The last book ID sent in this pass.
+    pub after: String,
+}
+
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct DownloadRequest {
+    pub cursor: Option<DownloadCursor>,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct DownloadResponse {
+    /// Up to `DOWNLOAD_PAGE` books with their tags, copies, readings, events,
+    /// and works (live rows only). `seq` is the download's `upto`.
+    pub changes: Changes,
+    /// What to send next; none once the library is all there.
+    pub next: Option<DownloadCursor>,
+    /// Books in the library, for "Downloading… 400 of 1,028".
+    #[ts(type = "number")]
+    pub books_total: i64,
+}
+
+pub const DOWNLOAD_PAGE: i64 = 200;
+
+/// Sends a new device its library a page at a time, so it can show books
+/// while the rest arrive. Pages go by book ID, which never changes, so no
+/// book is missed; anything changed during the download has a change number
+/// after `upto` and comes with the next sync.
+pub async fn download(
+    State(state): State<AppState>,
+    Authed(s): Authed,
+    Json(req): Json<DownloadRequest>,
+) -> ApiResult<Json<DownloadResponse>> {
+    let mut tx = state.db.begin().await?;
+    let user_id = &s.user.id;
+    let cursor = match req.cursor {
+        Some(c) => c,
+        None => DownloadCursor {
+            upto: current_seq(&mut tx).await?,
+            active_only: true,
+            after: String::new(),
+        },
+    };
+    let ids: Vec<String> = sqlx::query_scalar(
+        "SELECT id FROM books WHERE user_id = ? AND deleted = 0 AND (? = 0 OR active = 1) AND id > ?
+         ORDER BY id LIMIT ?",
+    )
+    .bind(user_id)
+    .bind(cursor.active_only)
+    .bind(&cursor.after)
+    .bind(DOWNLOAD_PAGE)
+    .fetch_all(&mut *tx)
+    .await?;
+    let mut changes = rows(&mut tx, user_id, Scope::Books(&ids)).await?;
+    changes.seq = cursor.upto;
+    let work_ids: Vec<String> = changes
+        .books
+        .iter()
+        .map(|b| b.work_id.clone())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    changes.works = load_works(&mut tx, &work_ids, Some(user_id)).await?;
+    let books_total: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM books WHERE user_id = ? AND deleted = 0")
+            .bind(user_id)
+            .fetch_one(&mut *tx)
+            .await?;
+    tx.commit().await?;
+
+    let next = match ids.last() {
+        Some(last) if ids.len() as i64 == DOWNLOAD_PAGE => Some(DownloadCursor {
+            after: last.clone(),
+            ..cursor
+        }),
+        // This pass is done: after the active books, every book.
+        _ if cursor.active_only => Some(DownloadCursor {
+            upto: cursor.upto,
+            active_only: false,
+            after: String::new(),
+        }),
+        _ => None,
+    };
+    Ok(Json(DownloadResponse {
+        changes,
+        next,
+        books_total,
     }))
 }
 

@@ -107,6 +107,16 @@
 			{/each}
 		</nav>
 		<main class="content">
+			{#if library.downloading}
+				{@const d = library.downloading}
+				<p class="downloading" role="status">
+					Downloading your library · {d.done.toLocaleString()} of {d.total.toLocaleString()}
+					books
+					<span class="track"
+						><span style="width:{(100 * d.done) / Math.max(1, d.total)}%"></span></span
+					>
+				</p>
+			{/if}
 			{@render children()}
 		</main>
 	</div>
@@ -132,6 +142,28 @@
 		/* Room to scroll the last row above the tab bar. */
 		padding-bottom: calc(var(--tabbar-h) + var(--tabbar-gap) + 16px);
 		background: var(--surface);
+	}
+	/* A new device's first download (the app works meanwhile). */
+	.downloading {
+		margin: 0;
+		padding: 8px 20px 10px;
+		display: grid;
+		gap: 6px;
+		font-size: 13px;
+		color: var(--muted);
+		background: var(--accent-soft);
+	}
+	.track {
+		height: 3px;
+		border-radius: 99px;
+		background: color-mix(in srgb, var(--accent) 20%, transparent);
+		overflow: hidden;
+	}
+	.track span {
+		display: block;
+		height: 100%;
+		background: var(--accent);
+		transition: width 0.3s;
 	}
 	.tabs {
 		position: fixed;

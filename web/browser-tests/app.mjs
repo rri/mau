@@ -32,7 +32,7 @@ export async function run() {
 		});
 
 		await step('Reading: edit pages inline, Enter saves', async () => {
-			await click('button[aria-label^="Edit pages, now page 140 of 304"]');
+			await click('button[aria-label^="Edit progress, now page 140 of 304"]');
 			await type('input[aria-label="Current page"]', '120');
 			await page.keyboard.press('Enter');
 			await until('Moved back to page 120');

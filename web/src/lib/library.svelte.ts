@@ -3,6 +3,9 @@
 // and sync in the background, so everything works offline.
 
 import { ApiError, post } from './api/client.ts';
+import type { Changes } from './api/generated/Changes.ts';
+import type { DownloadCursor } from './api/generated/DownloadCursor.ts';
+import type { DownloadResponse } from './api/generated/DownloadResponse.ts';
 import type { Op } from './api/generated/Op.ts';
 import type { OpKind } from './api/generated/OpKind.ts';
 import type { SyncResponse } from './api/generated/SyncResponse.ts';
@@ -28,10 +31,13 @@ class Library {
 	pending = $state(0);
 	online = $state(typeof navigator === 'undefined' ? true : navigator.onLine);
 	syncing = $state(false);
+	/** A new device's download, page by page: books here of the library's. */
+	downloading = $state<{ done: number; total: number } | null>(null);
 
 	private server: Data = emptyData();
 	private outbox: Op[] = [];
 	private since = 0;
+	private download: DownloadCursor | null = null;
 	private store: Store | null = null;
 	private userId: string | null = null;
 	private pushTimer: ReturnType<typeof setTimeout> | undefined;
@@ -47,9 +53,11 @@ class Library {
 		this.server = p.server;
 		this.outbox = p.outbox;
 		this.since = p.since;
+		this.download = p.download;
 		for (const r of this.server.readings.values()) observe(r.pos_clock);
 		this.rebuild();
-		const synced = this.since > 0;
+		// Synced before, or part-way through the first download: show it now.
+		const synced = this.since > 0 || this.server.books.size > 0;
 		if (synced) this.ready = true;
 		window.addEventListener('online', this.onOnline);
 		window.addEventListener('offline', this.onOffline);
@@ -81,6 +89,9 @@ class Library {
 		this.view = emptyData();
 		this.ready = false;
 		this.pending = 0;
+		this.since = 0;
+		this.download = null;
+		this.downloading = null;
 	}
 
 	/** Deletes this device's copy (signing out, or a revoked session). */
@@ -134,6 +145,9 @@ class Library {
 		}
 		this.syncing = true;
 		try {
+			// A new device first downloads its library, a page at a time.
+			if (this.since === 0) await this.downloadAll(store);
+			if (this.store !== store) return;
 			do {
 				this.syncAgain = false;
 				const batch = this.outbox.slice(0, BATCH);
@@ -170,8 +184,39 @@ class Library {
 		}
 	}
 
+	/** Downloads the library page by page (active books first), showing each
+	 *  page as it arrives, so the app is usable from the first one. Resumes
+	 *  where it stopped (a reload, going offline). Changes made meanwhile wait
+	 *  in the outbox; changes on other devices come with the next sync. */
+	private async downloadAll(store: Store) {
+		let cursor = this.download;
+		for (;;) {
+			const res = await post<DownloadResponse>('/sync/download', { cursor });
+			if (this.store !== store) return;
+			this.online = true;
+			cursor = res.next;
+			this.download = cursor;
+			this.absorb(res.changes);
+			await store.saveChanges(res.changes, cursor);
+			let done = 0;
+			for (const b of this.server.books.values()) if (!b.deleted) done++;
+			this.downloading = cursor ? { done, total: Number(res.books_total) } : null;
+			if (done > 0 || !cursor) this.ready = true;
+			if (!cursor) {
+				this.since = res.changes.seq;
+				return;
+			}
+		}
+	}
+
 	private merge(res: SyncResponse) {
-		const c = res.changes;
+		this.since = res.changes.seq;
+		this.store?.saveChanges(res.changes);
+		this.absorb(res.changes);
+	}
+
+	/** Adds synced rows to this device's copy and redraws if anything came. */
+	private absorb(c: Changes) {
 		const s = this.server;
 		for (const b of c.books) s.books.set(b.id, b);
 		for (const t of c.tags) s.tags.set(tagKey(t.book_id, t.tag), t);
@@ -182,8 +227,6 @@ class Library {
 		}
 		for (const e of c.events) s.events.set(e.id, e);
 		for (const w of c.works) s.works.set(w.id, w);
-		this.since = c.seq;
-		this.store?.saveChanges(c);
 		// Most syncs (the minutely check) bring nothing: keep the same view, so
 		// the screens don't redraw.
 		const rows =

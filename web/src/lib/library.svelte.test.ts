@@ -6,7 +6,7 @@ import { auth } from './auth.svelte.ts';
 import { library } from './library.svelte.ts';
 import { toasts } from './toast.svelte.ts';
 import { Store } from './sync/store.ts';
-import { ME, mockApi, signIn, work } from '../test/fixtures.ts';
+import { ME, mockApi as mockAll, signIn, work } from '../test/fixtures.ts';
 
 const changes = (over: object = {}) => ({
 	seq: 1,
@@ -19,6 +19,16 @@ const changes = (over: object = {}) => ({
 	...over
 });
 const W = work({ id: 'a', title: 'Alpha', author: 'A' });
+
+// A new device first downloads its library (SYNC-09); unless a test says
+// otherwise, that's one empty page, after which syncs start from 1.
+const page = (over: object = {}, next: unknown = null) => ({
+	changes: changes(over),
+	next,
+	books_total: 0
+});
+const mockApi: typeof mockAll = (routes) =>
+	mockAll({ 'POST /sync/download': page({ seq: 1 }), ...routes });
 const addBook: OpKind[] = [
 	{ type: 'book.create', id: 'b1', work_id: W.id, rank: 'M', added_at: 1 }
 ];
@@ -130,17 +140,14 @@ describe('Library sync', () => {
 		await library.open(ME.id);
 		await vi.waitFor(() => expect(sent(fetch)).toHaveLength(1));
 		await library.sync();
-		await vi.waitFor(() => expect(sent(fetch).map((b) => b.since)).toEqual([0, 10]));
+		await vi.waitFor(() => expect(sent(fetch).map((b) => b.since)).toEqual([1, 10]));
 	});
-	it('SYNC-07 a new device shows its library once the first sync answers, not an empty one before', async () => {
+	it('SYNC-07 a new device shows its library once the first page arrives, not an empty one before', async () => {
 		let answer: (v: unknown) => void = () => {};
 		mockApi({
-			'POST /sync': () =>
-				new Promise((r) => (answer = r)).then(() => ({
-					dropped: [],
-					rejected: [],
-					changes: changes({ seq: 5, works: [W] })
-				}))
+			'POST /sync/download': () =>
+				new Promise((r) => (answer = r)).then(() => page({ seq: 5, works: [W] })),
+			'POST /sync': { dropped: [], rejected: [], changes: changes({ seq: 5 }) }
 		});
 		await library.open(ME.id);
 		expect(library.ready).toBe(false);
@@ -157,7 +164,7 @@ describe('Library sync', () => {
 	});
 
 	it('SYNC-07 offline on a new device, it stops waiting when the first sync fails', async () => {
-		mockApi({ 'POST /sync': () => Promise.reject(new TypeError('offline')) });
+		mockApi({ 'POST /sync/download': () => Promise.reject(new TypeError('offline')) });
 		await library.open(ME.id);
 		await vi.waitFor(() => expect(library.ready).toBe(true));
 		expect(library.online).toBe(false);
@@ -171,5 +178,65 @@ describe('Library sync', () => {
 		const before = library.view;
 		await library.sync();
 		expect(library.view).toBe(before);
+	});
+
+	it('SYNC-09 a new device downloads its library a page at a time, usable from the first', async () => {
+		const book = (id: string, active = false) => ({
+			id,
+			work_id: W.id,
+			rank: 'V',
+			active,
+			rating: 0,
+			notes: '',
+			title_override: null,
+			authors_override: null,
+			cover_override: null,
+			added_at: 1,
+			deleted: false,
+			clock: {}
+		});
+		const cursor = { upto: 7, active_only: false, after: 'b1' };
+		let second: (v: unknown) => void = () => {};
+		let offline = false;
+		const fetch = mockApi({
+			'POST /sync/download': (body: { cursor: unknown }) =>
+				body.cursor === null
+					? { ...page({ seq: 7, books: [book('b1', true)], works: [W] }, cursor), books_total: 2 }
+					: offline
+						? Promise.reject(new TypeError('offline'))
+						: new Promise((r) => (second = r)).then(() => ({
+								...page({ seq: 7, books: [book('b2')], works: [W] }),
+								books_total: 2
+							})),
+			'POST /sync': { dropped: [], rejected: [], changes: changes({ seq: 9 }) }
+		});
+		await library.open(ME.id);
+		await vi.waitFor(() => expect(library.view.books.size).toBe(1));
+		expect(library.ready).toBe(true);
+		expect(library.downloading).toEqual({ done: 1, total: 2 });
+		// A change made meanwhile waits until the download is done.
+		library.commit([{ type: 'book.set', id: 'b1', fields: { rating: 5 } }]);
+		second(null);
+		await vi.waitFor(() => expect(library.downloading).toBeNull());
+		expect(library.view.books.size).toBe(2);
+		await vi.waitFor(() => expect(library.pending).toBe(0), { timeout: 2000 });
+		expect(sent(fetch)[0]).toMatchObject({ since: 7, ops: [{ op: { type: 'book.set' } }] });
+
+		// Cut off part-way, a reload shows what came and carries on from there.
+		library.close();
+		await Store.destroy(ME.id);
+		offline = true;
+		await library.open(ME.id);
+		await vi.waitFor(() => expect(library.online).toBe(false));
+		expect(library.view.books.size).toBe(1);
+		library.close();
+		offline = false;
+		await library.open(ME.id);
+		expect(library.ready).toBe(true);
+		expect(library.view.books.size).toBe(1);
+		const downloads = fetch.mock.calls.filter(([u]) => String(u) === '/api/sync/download');
+		expect(JSON.parse(String(downloads.at(-1)![1]!.body))).toEqual({ cursor });
+		second(null);
+		await vi.waitFor(() => expect(library.view.books.size).toBe(2));
 	});
 });

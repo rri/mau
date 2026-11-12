@@ -1,22 +1,34 @@
 // Reading statistics for the home page, all derived from the synced library
-// (so they work offline). Pages count forward moves only, as everywhere else.
+// (so they work offline). Pages count forward moves only, as everywhere else,
+// and only moves in pages: a reading tracked by percent has no page count.
 
+import type { Unit } from './api/generated/Unit.ts';
 import type { Data } from './sync/apply.ts';
 import { addDays, daysBetween, UNKNOWN_DATE } from './dates.ts';
 
-/** Pages read per local date, across every live book. */
-export function pagesPerDay(d: Data): Map<string, number> {
+function forwardEvents(d: Data) {
 	const liveReadings = new Set<string>();
 	for (const r of d.readings.values()) {
 		const book = d.books.get(r.book_id);
 		if (!r.deleted && book && !book.deleted) liveReadings.add(r.id);
 	}
+	return [...d.events.values()].filter(
+		(e) => !e.deleted && liveReadings.has(e.reading_id) && e.to_page > e.from_page
+	);
+}
+
+/** Pages read per local date, across every live book. */
+export function pagesPerDay(d: Data): Map<string, number> {
 	const out = new Map<string, number>();
-	for (const e of d.events.values()) {
-		if (e.deleted || !liveReadings.has(e.reading_id) || e.to_page <= e.from_page) continue;
-		out.set(e.local_date, (out.get(e.local_date) ?? 0) + (e.to_page - e.from_page));
-	}
+	for (const e of forwardEvents(d))
+		if (e.unit === 'pages')
+			out.set(e.local_date, (out.get(e.local_date) ?? 0) + (e.to_page - e.from_page));
 	return out;
+}
+
+/** Local dates with any reading, in pages or percent. */
+export function readingDays(d: Data): Set<string> {
+	return new Set(forwardEvents(d).map((e) => e.local_date));
 }
 
 /** The last `n` days, oldest first. */
@@ -42,20 +54,17 @@ function finishedIn(d: Data, year: number): string[] {
 /** Totals for one calendar year. */
 export function yearTotals(d: Data, perDay: Map<string, number>, year: number) {
 	let pages = 0;
+	for (const [date, p] of perDay) if (date.startsWith(`${year}-`)) pages += p;
 	let days = 0;
-	for (const [date, p] of perDay)
-		if (date.startsWith(`${year}-`) && p > 0) {
-			pages += p;
-			days++;
-		}
+	for (const date of readingDays(d)) if (date.startsWith(`${year}-`)) days++;
 	return { finished: finishedIn(d, year).length, pages, days };
 }
 
-/** Days left for a reading at its pace over the last four weeks, or null when
- *  there's no recent reading to go by. */
+/** Days left for a reading at its pace over the last four weeks (in its
+ *  unit, pages or percent), or null when there's no recent reading to go by. */
 export function daysLeft(
 	d: Data,
-	reading: { id: string; pos: number; total: number },
+	reading: { id: string; pos: number; total: number; unit: Unit },
 	today: string,
 	window = 28
 ): number | null {
@@ -63,7 +72,13 @@ export function daysLeft(
 	if (left <= 0) return 0;
 	let pages = 0;
 	for (const e of d.events.values()) {
-		if (e.deleted || e.reading_id !== reading.id || e.to_page <= e.from_page) continue;
+		if (
+			e.deleted ||
+			e.reading_id !== reading.id ||
+			e.unit !== reading.unit ||
+			e.to_page <= e.from_page
+		)
+			continue;
 		const age = daysBetween(e.local_date, today);
 		if (age >= 0 && age < window) pages += e.to_page - e.from_page;
 	}

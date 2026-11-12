@@ -3,5 +3,18 @@ import type { BookFields } from "./BookFields.ts";
 import type { CopyFields } from "./CopyFields.ts";
 import type { NewWork } from "./NewWork.ts";
 import type { ReadingFields } from "./ReadingFields.ts";
+import type { Unit } from "./Unit.ts";
 
-export type OpKind = { "type": "book.create", id: string, work_id: string, rank: string, added_at: number, } | { "type": "book.set", id: string, fields: BookFields, } | { "type": "book.delete", id: string, } | { "type": "tag.set", book_id: string, tag: string, present: boolean, } | { "type": "copy.create", id: string, book_id: string, format: string, location: string, edition_id: string | null, } | { "type": "copy.set", id: string, fields: CopyFields, } | { "type": "copy.delete", id: string, } | { "type": "reading.create", id: string, book_id: string, started_on: string, total: number, } | { "type": "reading.set", id: string, fields: ReadingFields, } | { "type": "reading.delete", id: string, } | { "type": "progress", event_id: string, reading_id: string, base: string, from: number, to: number, local_date: string, } | { "type": "progress.undo", reading_id: string, event_id: string, base: string, to: number, } | { "type": "work.create", work: NewWork, };
+export type OpKind = { "type": "book.create", id: string, work_id: string, rank: string, added_at: number, } | { "type": "book.set", id: string, fields: BookFields, } | { "type": "book.delete", id: string, } | { "type": "tag.set", book_id: string, tag: string, present: boolean, } | { "type": "copy.create", id: string, book_id: string, format: string, location: string, edition_id: string | null, } | { "type": "copy.set", id: string, fields: CopyFields, } | { "type": "copy.delete", id: string, } | { "type": "reading.create", id: string, book_id: string, started_on: string, 
+/**
+ * 100 for a percent reading.
+ */
+total: number, unit?: Unit, 
+/**
+ * Percent readings: the copy's page count, if known.
+ */
+pages?: number, } | { "type": "reading.set", id: string, fields: ReadingFields, } | { "type": "reading.delete", id: string, } | { "type": "progress", event_id: string, reading_id: string, base: string, from: number, to: number, local_date: string, 
+/**
+ * The unit the device saw; a move in another unit is dropped.
+ */
+unit?: Unit, } | { "type": "progress.undo", reading_id: string, event_id: string, base: string, to: number, unit?: Unit, } | { "type": "progress.unit", reading_id: string, base: string, unit: Unit, total: number, to: number, } | { "type": "work.create", work: NewWork, };
