@@ -901,3 +901,17 @@ Mine, details:
   hashes the password and 10 recovery codes, about 0.22 s each unoptimized,
   too slow for a 5-second wait on a 2-core runner. Release builds were never
   affected. Rust tests also dropped from 8.8 s to 3 s locally.
+- **The image crates are optimized in debug builds too**, with their overflow
+  checks and debug assertions off (`image`, `zune-jpeg`, `zune-core`,
+  `image-webp`, `png`, `fdeflate`, `gif`, `weezl`). Measured: a phone photo
+  (4032×3024) as a cover took 18 s unoptimized, 1.8 s optimized with the
+  checks on, 0.43 s with them off (release: 0.46 s); a real 9.4 MB upload to
+  the debug server now takes 0.6 s. Optimizing every dependency instead was
+  slower to build and still 1.8 s.
+- **CI keeps the Rust cache when a run fails** (`cache-on-failure`); the first
+  runs failed and so rebuilt everything each time.
+- **Measured and left alone:** response compression in debug (0.2 s for the
+  950 KB scanner module), debug info in CI (no gain), SQLite and other C code
+  (the Rust tests take 3 s), splitting the CI test job (under a minute
+  saved), precompressing assets and `x86-64-v3` builds for production (small
+  gains; the latter crashes on older CPUs).

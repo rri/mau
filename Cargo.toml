@@ -47,6 +47,49 @@ opt-level = 3
 [profile.dev.package.blake2]
 opt-level = 3
 
+# Cover images: decoding and resizing a phone photo takes 18 s unoptimized and
+# 0.4 s like this. Optimizing alone isn't enough (1.8 s); their overflow checks
+# and debug assertions cost the rest.
+[profile.dev.package.image]
+opt-level = 3
+overflow-checks = false
+debug-assertions = false
+
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+overflow-checks = false
+debug-assertions = false
+
+[profile.dev.package.zune-core]
+opt-level = 3
+overflow-checks = false
+debug-assertions = false
+
+[profile.dev.package.image-webp]
+opt-level = 3
+overflow-checks = false
+debug-assertions = false
+
+[profile.dev.package.png]
+opt-level = 3
+overflow-checks = false
+debug-assertions = false
+
+[profile.dev.package.fdeflate]
+opt-level = 3
+overflow-checks = false
+debug-assertions = false
+
+[profile.dev.package.gif]
+opt-level = 3
+overflow-checks = false
+debug-assertions = false
+
+[profile.dev.package.weezl]
+opt-level = 3
+overflow-checks = false
+debug-assertions = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
