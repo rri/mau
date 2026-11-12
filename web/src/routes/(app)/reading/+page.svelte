@@ -5,10 +5,12 @@
 	import { matchesSearch, readingList, type BookInfo } from '#lib/derive.ts';
 	import { moveBook, startReading, today } from '#lib/actions.ts';
 	import { getPref, setPref } from '#lib/prefs.ts';
+	import { Pager } from '#lib/paging.svelte.ts';
 	import ReadingRow from '#lib/components/ReadingRow.svelte';
 	import ReadingTile from '#lib/components/ReadingTile.svelte';
 	import LayoutToggle from '#lib/components/LayoutToggle.svelte';
 	import StartDialog from '#lib/components/StartDialog.svelte';
+	import ShowMore from '#lib/components/ShowMore.svelte';
 
 	// The layout is remembered on this device (apart from the Catalog's); the
 	// search starts empty on each visit.
@@ -20,6 +22,15 @@
 	const all = $derived(readingList(library.view));
 	// Reordering needs the whole list, so dragging is off while searching.
 	const list = $derived(needle ? all.filter((b) => matchesSearch(b, needle)) : all);
+	// The first page of rows, then more on scrolling; a new search starts
+	// again from the top. Dragging works among the rows drawn.
+	const pager = new Pager();
+	export const snapshot = pager.snapshot;
+	$effect(() => {
+		void needle;
+		pager.reset();
+	});
+	const drawn = $derived(list.slice(0, pager.limit));
 	const day = $derived.by(() => {
 		void library.view; // recompute when data changes (cheap)
 		return today();
@@ -42,7 +53,7 @@
 		e.preventDefault();
 		const rows = [...(listEl?.querySelectorAll<HTMLElement>(':scope > li') ?? [])];
 		others = rows
-			.map((el, i) => ({ el, info: list[i] }))
+			.map((el, i) => ({ el, info: drawn[i] }))
 			.filter((x) => x.info && x.info.book.id !== info.book.id)
 			.map((x) => ({
 				top: x.el.offsetTop,
@@ -153,10 +164,13 @@
 	<p class="loading">No books you're reading match “{q.trim()}”.</p>
 {:else if layout === 'grid'}
 	<ul class="grid">
-		{#each list as info (info.book.id)}
+		{#each drawn as info (info.book.id)}
 			<ReadingTile {info} onsetup={() => (setup = { id: info.book.id })} />
 		{/each}
 	</ul>
+	{#if list.length > drawn.length}
+		<ShowMore remaining={list.length - drawn.length} onmore={() => pager.more()} />
+	{/if}
 	{#if setupInfo}
 		<StartDialog
 			info={setupInfo}
@@ -171,7 +185,7 @@
 {:else}
 	<div class="list-wrap">
 		<ul class="list" bind:this={listEl}>
-			{#each list as info (info.book.id)}
+			{#each drawn as info (info.book.id)}
 				<ReadingRow
 					{info}
 					today={day}
@@ -208,6 +222,9 @@
 			</div>
 		{/if}
 	</div>
+	{#if list.length > drawn.length}
+		<ShowMore remaining={list.length - drawn.length} onmore={() => pager.more()} />
+	{/if}
 {/if}
 
 <style>

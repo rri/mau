@@ -1,6 +1,7 @@
 <script lang="ts">
 	// The catalog: every book on the user's list, in a list or grid.
 	import { library } from '#lib/library.svelte.ts';
+	import { Pager } from '#lib/paging.svelte.ts';
 	import { liveBooks, matchesSearch, type BookInfo, type BookState } from '#lib/derive.ts';
 	import { getPref, setPref } from '#lib/prefs.ts';
 	import { authorKey, titleKey } from '#lib/sorting.ts';
@@ -8,6 +9,7 @@
 	import StateText from '#lib/components/StateText.svelte';
 	import LayoutToggle from '#lib/components/LayoutToggle.svelte';
 	import Icon from '#lib/components/Icon.svelte';
+	import ShowMore from '#lib/components/ShowMore.svelte';
 
 	const LAYOUTS = ['list', 'grid'] as const;
 	const SORTS = ['added', 'title', 'author', 'finished'] as const;
@@ -28,10 +30,28 @@
 	$effect(() => setPref('catalog.layout', layout));
 	$effect(() => setPref('catalog.sort', sort));
 
+	// The first page of rows, then more on scrolling; a new search, filter,
+	// or sort starts again from the top.
+	const pager = new Pager();
+	export const snapshot = pager.snapshot;
+	$effect(() => {
+		void [q, sort, states, ownedOnly, tags];
+		pager.reset();
+	});
+
 	const all = $derived(liveBooks(library.view));
 	const allTags = $derived(
 		[...new Set(all.flatMap((b) => b.tags))].sort((a, b) => a.localeCompare(b))
 	);
+
+	function once(f: (b: BookInfo) => string): (b: BookInfo) => string {
+		const seen = new Map<BookInfo, string>();
+		return (b) => {
+			let v = seen.get(b);
+			if (v === undefined) seen.set(b, (v = f(b)));
+			return v;
+		};
+	}
 
 	function finishedOn(b: BookInfo): string {
 		return [...b.readings].reverse().find((r) => r.finished_on)?.finished_on ?? '';
@@ -47,16 +67,19 @@
 				matchesSearch(b, needle)
 		);
 		const byAdded = (a: BookInfo, b: BookInfo) => b.book.added_at - a.book.added_at;
+		// Sort keys are worked out once per book, not on every comparison.
+		const title = once((b) => titleKey(b.title));
+		const author = once((b) => authorKey(b.authors[0]));
+		const finished = once(finishedOn);
 		const cmp: Record<(typeof SORTS)[number], (a: BookInfo, b: BookInfo) => number> = {
 			added: byAdded,
-			title: (a, b) => titleKey(a.title).localeCompare(titleKey(b.title)),
-			author: (a, b) =>
-				authorKey(a.authors[0]).localeCompare(authorKey(b.authors[0])) ||
-				titleKey(a.title).localeCompare(titleKey(b.title)),
-			finished: (a, b) => finishedOn(b).localeCompare(finishedOn(a)) || byAdded(a, b)
+			title: (a, b) => title(a).localeCompare(title(b)),
+			author: (a, b) => author(a).localeCompare(author(b)) || title(a).localeCompare(title(b)),
+			finished: (a, b) => finished(b).localeCompare(finished(a)) || byAdded(a, b)
 		};
 		return list.sort(cmp[sort]);
 	});
+	const drawn = $derived(shown.slice(0, pager.limit));
 
 	const filtering = $derived(
 		states.length !== 3 || ownedOnly || tags.length > 0 || q.trim() !== ''
@@ -150,7 +173,7 @@
 	</p>
 {:else if layout === 'list'}
 	<ul class="list">
-		{#each shown as b (b.book.id)}
+		{#each drawn as b (b.book.id)}
 			<li>
 				<a class="item" href="/catalog/{b.book.id}">
 					<span class="cov"
@@ -184,9 +207,12 @@
 			</li>
 		{/each}
 	</ul>
+	{#if shown.length > drawn.length}
+		<ShowMore remaining={shown.length - drawn.length} onmore={() => pager.more()} />
+	{/if}
 {:else}
 	<ul class="grid">
-		{#each shown as b (b.book.id)}
+		{#each drawn as b (b.book.id)}
 			<li>
 				<a class="tile" href="/catalog/{b.book.id}">
 					<span class="art">
@@ -221,6 +247,9 @@
 			</li>
 		{/each}
 	</ul>
+	{#if shown.length > drawn.length}
+		<ShowMore remaining={shown.length - drawn.length} onmore={() => pager.more()} />
+	{/if}
 {/if}
 
 <style>

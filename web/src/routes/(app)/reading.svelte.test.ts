@@ -7,7 +7,7 @@ import { bookInfo } from '#lib/derive.ts';
 import { library } from '#lib/library.svelte.ts';
 import { toasts } from '#lib/toast.svelte.ts';
 import { emptyData } from '#lib/sync/apply.ts';
-import { freezeTime, signIn, useLibrary } from '../../test/fixtures.ts';
+import { addBook, freezeTime, signIn, useLibrary } from '../../test/fixtures.ts';
 
 const info = (id: string) => bookInfo(library.view, library.view.books.get(id)!);
 const rows = () => screen.getAllByRole('listitem').filter((li) => li.classList.contains('row'));
@@ -223,5 +223,23 @@ describe('Reading list', () => {
 	it('READ-12 while loading, it says so', () => {
 		render(Reading);
 		expect(screen.getByText('Loading your library…')).toBeInTheDocument();
+	});
+	it('READ-14 a long list draws 60 books at a time; search covers them all', async () => {
+		const d = emptyData();
+		for (let i = 1; i <= 75; i++)
+			addBook(d, {
+				id: `b${i}`,
+				title: `Book ${String(i).padStart(3, '0')}`,
+				author: 'Ann Author',
+				rank: `V${String(i).padStart(3, '0')}`
+			});
+		useLibrary(d);
+		render(Reading);
+		expect(rows()).toHaveLength(60);
+		await userEvent.type(screen.getByLabelText("Search books you're reading"), 'Book 075');
+		expect(rows().map((r) => within(r).getByRole('link').textContent)).toEqual(['Book 075']);
+		await userEvent.clear(screen.getByLabelText("Search books you're reading"));
+		await userEvent.click(screen.getByRole('button', { name: 'Show 15 more' }));
+		expect(rows()).toHaveLength(75);
 	});
 });

@@ -4,7 +4,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import Catalog from './catalog/+page.svelte';
 import { emptyData } from '#lib/sync/apply.ts';
-import { freezeTime, signIn, useLibrary } from '../../test/fixtures.ts';
+import { addBook, freezeTime, signIn, useLibrary } from '../../test/fixtures.ts';
 
 const titles = () =>
 	screen
@@ -137,5 +137,33 @@ describe('Catalog', () => {
 		expect(
 			screen.getAllByRole('link', { name: 'Add a book' }).map((a) => a.getAttribute('href'))
 		).toEqual(['/add', '/add']);
+	});
+	it('CAT-09 a long catalog draws 60 books at a time; counts, search, and sort cover them all', async () => {
+		const d = emptyData();
+		for (let i = 1; i <= 130; i++)
+			addBook(d, {
+				id: `b${i}`,
+				title: `Book ${String(i).padStart(3, '0')}`,
+				author: 'Ann Author',
+				added: `2026-0${1 + Math.floor(i / 20)}-${String(1 + (i % 20)).padStart(2, '0')}`
+			});
+		useLibrary(d);
+		render(Catalog);
+		expect(screen.getByText('130 books')).toBeInTheDocument();
+		expect(titles()).toHaveLength(60);
+		await userEvent.click(screen.getByRole('button', { name: 'Show 60 more' }));
+		expect(titles()).toHaveLength(120);
+		await userEvent.click(screen.getByRole('button', { name: 'Show 10 more' }));
+		expect(titles()).toHaveLength(130);
+		expect(screen.queryByRole('button', { name: /^Show \d+ more$/ })).toBeNull();
+
+		// Search finds books that weren't drawn yet, and starts again from the top.
+		await userEvent.type(screen.getByLabelText('Search your catalog'), 'Book 00');
+		expect(screen.getByText('9 of 130 books')).toBeInTheDocument();
+		await userEvent.clear(screen.getByLabelText('Search your catalog'));
+		expect(titles()).toHaveLength(60);
+		await userEvent.selectOptions(screen.getByLabelText('Sort'), 'title');
+		expect(titles().slice(0, 2)).toEqual(['Book 001', 'Book 002']);
+		expect(titles().at(-1)).toBe('Book 060');
 	});
 });
