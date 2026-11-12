@@ -1138,3 +1138,31 @@ Details decided along the way:
   Changes made meanwhile wait and sync when it's done. Measured with the
   1,028-book library on this machine: first books after about 0.4 s, all
   after 0.75 s.
+
+## Reading buttons instead of the ⋯ menu; profile rows; toast (2026-11-12)
+
+Chosen by the user:
+
+- **No ⋯ menu on books** (and no "Open book": the cover and title open it).
+  Instead, the same round buttons wherever a book has reading controls,
+  all one size, right-aligned so they line up: active **step, finish,
+  pause**; inactive **finish, start** (resume when started); finished books
+  keep **Re-read** on the book page.
+- **The step button is an upward triangle** (filled, on the solid accent
+  button); **finish is a check mark**.
+- **Profile previews fill whole rows.**
+
+Details:
+
+- One shared component draws the buttons (Home, Reading rows and tiles, the
+  book page), 40px (30px in tiles). In tiles they sit on their own line
+  under the progress, since three don't fit beside it. The step button stays
+  filled, as the one used most; the others are outlined. The book page's
+  header ⋯ (Edit details, Suggest, Remove) stays: it isn't about reading.
+- **Profile covers** are five across (three on phones) instead of as many as
+  fit, and a preview shows 10 (two rows of five; phones show 9 when the list
+  is cut short, three rows of three). The full list (`/s/…`) still ends with
+  a part row when it must.
+- **The toast is centered on the content**: beside the sidebar (900–1119px)
+  that's 100px right of the screen's center, and from 1120px, where the
+  content is centered, the screen's center. It used the first everywhere.
