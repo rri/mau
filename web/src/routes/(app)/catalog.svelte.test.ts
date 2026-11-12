@@ -166,4 +166,20 @@ describe('Catalog', () => {
 		expect(titles().slice(0, 2)).toEqual(['Book 001', 'Book 002']);
 		expect(titles().at(-1)).toBe('Book 060');
 	});
+
+	it('CAT-01 a percent reading shows its percent', () => {
+		const d = emptyData();
+		addBook(d, {
+			id: 'p',
+			title: 'Percent Book',
+			author: 'P. Author',
+			active: true,
+			reading: { pos: 42, total: 100, started: '2026-11-01', unit: 'percent' }
+		});
+		useLibrary(d);
+		render(Catalog);
+		expect(screen.getByText('Percent Book', { selector: '.title' }).closest('a')).toHaveTextContent(
+			'Active · 42%'
+		);
+	});
 });

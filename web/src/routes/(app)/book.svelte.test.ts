@@ -164,7 +164,7 @@ describe('Book page: status', () => {
 	it('BOOK-14 a finished book shows its date and offers a re-read', async () => {
 		useLibrary();
 		open('pir');
-		expect(screen.getByText('Finished Oct 28, 2026')).toBeInTheDocument();
+		expect(screen.getByText('Finished · Oct 28, 2026')).toBeInTheDocument();
 		await userEvent.click(screen.getByRole('button', { name: 'Re-read' }));
 		expect(info('pir').state).toBe('active');
 		expect(info('pir').readings).toHaveLength(2);
@@ -190,7 +190,31 @@ describe('Book page: percent', () => {
 		expect(screen.getByText('30% → 40%')).toBeInTheDocument();
 		const stats = document.querySelector('.stats')!;
 		expect(stats).toHaveTextContent('2 days read');
-		expect(stats).toHaveTextContent('0 pages');
+		expect(stats).not.toHaveTextContent('pages');
+	});
+});
+
+describe('Book page: readings without dates', () => {
+	it('BOOK-17 an imported finished read without dates: no zero stats, no empty calendar, plain wording', () => {
+		const d = sampleLibrary();
+		addBook(d, {
+			id: 'imp',
+			title: 'Imported Book',
+			author: 'I. Author',
+			pages: 300,
+			finished: ['0000-01-01']
+		});
+		const r = [...d.readings.values()].find((x) => x.book_id === 'imp')!;
+		d.readings.set(r.id, { ...r, started_on: '0000-01-01' });
+		useLibrary(d);
+		open('imp');
+		expect(screen.getByText('Finished · date unknown')).toBeInTheDocument();
+		const stats = document.querySelector('.stats')!;
+		expect(stats).toHaveTextContent(/^\s*1 reading\s*$/);
+		expect(document.querySelector('.legend')).toBeNull();
+		expect(screen.getByText('Reading 1')).toBeInTheDocument();
+		expect(screen.getByText('Dates unknown')).toBeInTheDocument();
+		expect(screen.getByText('No pages logged')).toBeInTheDocument();
 	});
 });
 

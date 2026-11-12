@@ -56,6 +56,20 @@ export const UNKNOWN_DATE = '0000-01-01';
 
 export const fmtDate = (d: string) =>
 	d === UNKNOWN_DATE ? 'date unknown' : full.format(new Date(d + 'T00:00:00Z'));
+/** When a reading happened, for its heading on the book page: "Oct 1, 2026 –
+ *  Oct 28, 2026", "Oct 1, 2026 – now", "Finished Oct 28, 2026" (start
+ *  unknown), "Started Oct 1, 2026" (finished, date unknown), or "Dates
+ *  unknown". Imports often know neither. */
+export function readingSpan(started: string, finished: string | null): string {
+	const s = started === UNKNOWN_DATE ? null : fmtDate(started);
+	if (finished === null) return s ? `${s} – now` : 'Started, date unknown';
+	const f = finished === UNKNOWN_DATE ? null : fmtDate(finished);
+	if (s && f) return `${s} – ${f}`;
+	if (f) return `Finished ${f}`;
+	if (s) return `Started ${s}`;
+	return 'Dates unknown';
+}
+
 export const fmtMonthDay = (d: string) => monthDay.format(new Date(d + 'T00:00:00Z'));
 export const fmtMonthYear = (d: string) =>
 	d === UNKNOWN_DATE ? 'date unknown' : monthYear.format(new Date(d + 'T00:00:00Z'));

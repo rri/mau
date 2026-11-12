@@ -3,6 +3,7 @@ import {
 	addDays,
 	ago,
 	daysBetween,
+	readingSpan,
 	fmtDate,
 	fmtMonthYear,
 	todayIn,
@@ -39,5 +40,15 @@ describe('dates', () => {
 		expect(fmtDate('2026-10-28')).toBe('Oct 28, 2026');
 		expect(fmtDate(UNKNOWN_DATE)).toBe('date unknown');
 		expect(fmtMonthYear(UNKNOWN_DATE)).toBe('date unknown');
+	});
+
+	it('BOOK-17 a reading’s span says what’s known', () => {
+		const U = '0000-01-01';
+		expect(readingSpan('2026-10-01', '2026-10-28')).toBe('Oct 1, 2026 – Oct 28, 2026');
+		expect(readingSpan('2026-10-01', null)).toBe('Oct 1, 2026 – now');
+		expect(readingSpan(U, '2026-10-28')).toBe('Finished Oct 28, 2026');
+		expect(readingSpan('2026-10-01', U)).toBe('Started Oct 1, 2026');
+		expect(readingSpan(U, U)).toBe('Dates unknown');
+		expect(readingSpan(U, null)).toBe('Started, date unknown');
 	});
 });

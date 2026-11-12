@@ -1181,3 +1181,24 @@ Chosen by the user:
 
 Details: the dialog focus test (UI-11) now uses the password confirmation
 dialog, the last dialog of its kind. The `step` icon is removed.
+
+## Readings without dates on the book page (2026-11-12)
+
+Imported reads often have neither a start nor a finish date. The book page
+showed "0 days read · 0 pages", a calendar legend with no calendar,
+"Reading 1 · finished" beside "date unknown – date unknown", and "No
+progress yet" under a finished book. Now:
+
+- **Stats show only what was logged**: days read and pages appear when
+  there are some; the count of readings always.
+- **No calendar (nor its legend) without reading days.**
+- **A reading's heading** is "Reading N" and what's known of its dates:
+  "Oct 1, 2026 – Oct 28, 2026", "Oct 1, 2026 – now", "Finished Oct 28, 2026",
+  "Started Oct 1, 2026", or "Dates unknown". The "· finished" suffix went:
+  the dates say it.
+- **A finished reading with nothing logged says "No pages logged"**
+  ("No progress yet" stays for unfinished ones).
+- **The status line reads "Finished · date"** (and "Finished · date
+  unknown"), like the Catalog.
+- **The Catalog's state line shows percent** ("Active · 42%"); it said
+  "page 42 of 100".

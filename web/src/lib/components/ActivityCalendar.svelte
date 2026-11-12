@@ -89,35 +89,37 @@
 
 <!-- Day tooltips are a pointer convenience; the grid itself is labelled for screen readers. -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="years" onpointerleave={() => (tip = null)}>
-	{#each years as y (y.year)}
-		<div class="year" style="--w:{y.weeks}">
-			<div class="year-head">
-				<b>{y.year}</b>
-				<span>{y.total} {y.total === 1 ? 'page' : 'pages'}</span>
+{#if years.length}
+	<div class="years" onpointerleave={() => (tip = null)}>
+		{#each years as y (y.year)}
+			<div class="year" style="--w:{y.weeks}">
+				<div class="year-head">
+					<b>{y.year}</b>
+					<span>{y.total} {y.total === 1 ? 'page' : 'pages'}</span>
+				</div>
+				<div class="months" aria-hidden="true">
+					{#each y.months as m (m.col)}<span style="grid-column:{m.col + 1}">{m.label}</span>{/each}
+				</div>
+				<div class="grid" role="img" aria-label="Pages read per day in {y.year}">
+					{#each y.cells as c (c.date)}
+						<span
+							class="cell l{level(c)}"
+							class:out={c.kind === 'out'}
+							class:future={c.kind === 'future'}
+							class:today={c.date === today}
+							onpointerenter={(e) => show(e, c)}
+						></span>
+					{/each}
+				</div>
 			</div>
-			<div class="months" aria-hidden="true">
-				{#each y.months as m (m.col)}<span style="grid-column:{m.col + 1}">{m.label}</span>{/each}
-			</div>
-			<div class="grid" role="img" aria-label="Pages read per day in {y.year}">
-				{#each y.cells as c (c.date)}
-					<span
-						class="cell l{level(c)}"
-						class:out={c.kind === 'out'}
-						class:future={c.kind === 'future'}
-						class:today={c.date === today}
-						onpointerenter={(e) => show(e, c)}
-					></span>
-				{/each}
-			</div>
+		{/each}
+		<div class="legend" aria-hidden="true">
+			Less <span class="cell"></span><span class="cell l1"></span><span class="cell l2"></span><span
+				class="cell l3"
+			></span><span class="cell l4"></span> More
 		</div>
-	{/each}
-	<div class="legend" aria-hidden="true">
-		Less <span class="cell"></span><span class="cell l1"></span><span class="cell l2"></span><span
-			class="cell l3"
-		></span><span class="cell l4"></span> More
 	</div>
-</div>
+{/if}
 {#if tip}
 	<div class="tip" style="left:{tip.x}px;top:{tip.y}px">{tip.text}</div>
 {/if}

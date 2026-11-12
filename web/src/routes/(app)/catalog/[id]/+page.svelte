@@ -5,7 +5,7 @@
 	import { ApiError, post } from '#lib/api/client.ts';
 	import type { EditionRow } from '#lib/api/generated/EditionRow.ts';
 	import { resume, startLike, startReading, today } from '#lib/actions.ts';
-	import { fmtDate, fmtMonthDay } from '#lib/dates.ts';
+	import { fmtDate, fmtMonthDay, readingSpan } from '#lib/dates.ts';
 	import { bookInfo, eventsOf, liveBooks, pagesOn, progressText } from '#lib/derive.ts';
 	import { library } from '#lib/library.svelte.ts';
 	import { modal } from '#lib/modal.ts';
@@ -375,7 +375,7 @@
 					{#if pagesEditing && r}
 						<ProgressEditor {info} ondone={() => (pagesEditing = false)} />
 					{:else if info.state === 'finished' && r?.finished_on}
-						<span>Finished {fmtDate(r.finished_on)}</span>
+						<span>Finished · {fmtDate(r.finished_on)}</span>
 					{:else if r}
 						<button class="pos" type="button" onclick={() => (pagesEditing = true)}
 							>{progressText(r)}</button
@@ -507,8 +507,9 @@
 		<h2>Reading activity</h2>
 		{#if info.readings.length}
 			<div class="stats">
-				<span><b>{daysRead}</b> {daysRead === 1 ? 'day' : 'days'} read</span>
-				<span><b>{totalPages}</b> {totalPages === 1 ? 'page' : 'pages'}</span>
+				<!-- Only what was logged: an imported finished read may have neither. -->
+				{#if daysRead}<span><b>{daysRead}</b> {daysRead === 1 ? 'day' : 'days'} read</span>{/if}
+				{#if totalPages}<span><b>{totalPages}</b> {totalPages === 1 ? 'page' : 'pages'}</span>{/if}
 				<span
 					><b>{info.readings.length}</b> {info.readings.length === 1 ? 'reading' : 'readings'}</span
 				>
@@ -523,10 +524,8 @@
 				{@const lines = summaries(rd.id)}
 				<details class="reading" open={i === 0}>
 					<summary
-						><span class="rt"
-							>Reading {info.readings.length - i}{rd.finished_on ? ' · finished' : ''}</span
-						><span class="muted"
-							>{fmtDate(rd.started_on)} – {rd.finished_on ? fmtDate(rd.finished_on) : 'now'}</span
+						><span class="rt">Reading {info.readings.length - i}</span><span class="muted"
+							>{readingSpan(rd.started_on, rd.finished_on)}</span
 						></summary
 					>
 					<!-- Scrolls when long, so keyboard users need to reach it (WCAG 2.1.1). -->
@@ -549,7 +548,11 @@
 										>{/if}
 								</li>
 							{:else}
-								<li><span></span><span class="rewind">No progress yet</span><span></span></li>
+								<li>
+									<span></span><span class="rewind"
+										>{rd.finished_on ? 'No pages logged' : 'No progress yet'}</span
+									><span></span>
+								</li>
 							{/each}
 						</ul>
 					</div>
