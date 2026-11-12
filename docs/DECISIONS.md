@@ -977,6 +977,10 @@ Approved (findings V2-1 to V2-5 in `docs/THREAT_MODEL.md`):
   or refusing, no Google key) falls back to normal matching. This replaces
   building the work from the export (and the keyless Google cover address,
   now removed).
+- **A work already in this instance's shared catalog** (same provider and
+  ID) is matched directly, with no lookup: it's already trusted, and a second
+  person importing the same library (say, a household) gets the same works,
+  Google ones included, without a key.
 - **Only well-formed IDs are looked up:** Open Library `OL<digits>W` (or `M`),
   Google 8–20 characters of `[A-Za-z0-9_-]`; other providers aren't looked
   up. Confirmed works are cached for 30 days like other provider answers.

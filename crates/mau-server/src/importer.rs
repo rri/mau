@@ -535,16 +535,34 @@ async fn match_row(
     if dupe {
         return Matched::of(MatchKind::Dupe);
     }
-    // From another mau: the same catalog work, if its provider confirms it.
-    // Otherwise the row is matched like any other.
+    // From another mau: the same catalog work, if it's already in this
+    // instance's shared catalog or its provider confirms it. Otherwise the
+    // row is matched like any other.
     if let Some(b) = mau
         && let (Some(provider), Some(id)) = (&b.provider, &b.provider_id)
-        && let Some(c) = exported_work(state, searcher, provider, id).await
+        && exported_source_ok(provider, id)
     {
-        return Matched {
-            candidates: vec![c],
-            ..Matched::of(MatchKind::Matched)
-        };
+        let local: Option<String> = sqlx::query_scalar(
+            "SELECT id FROM works WHERE owner_id IS NULL AND source = ? AND source_id = ?",
+        )
+        .bind(provider)
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await
+        .ok()
+        .flatten();
+        if local.is_some() {
+            return Matched {
+                local_work: local,
+                ..Matched::of(MatchKind::Matched)
+            };
+        }
+        if let Some(c) = exported_work(state, searcher, provider, id).await {
+            return Matched {
+                candidates: vec![c],
+                ..Matched::of(MatchKind::Matched)
+            };
+        }
     }
     // Something already in the shared catalog with this ISBN.
     if let Some(isbn) = &row.isbn13 {
@@ -1834,6 +1852,30 @@ mod tests {
         assert_eq!(find("The Lathe of Heaven")["private"], false);
         assert!(find("Zine No. 4")["provider"].is_null());
         assert_eq!(find("Zine No. 4")["private"], true);
+
+        // Someone else on the instance importing the same book matches the
+        // shared work already here, with no provider lookup (providers are
+        // off) and nothing taken from their file.
+        let (_, other) = app.user("anu", false).await;
+        let theirs = file(vec![book(
+            "Something Else Entirely",
+            "Nobody",
+            json!({
+                "provider": "openlibrary", "provider_id": "OL59858W", "private": false,
+                "editions": [{ "publisher": "Made Up", "binding": null, "year": 2099, "isbn13": "9780000000019", "pages": 1 }]
+            }),
+        )]);
+        let res = run_import(&app, &other, "mau", &theirs).await;
+        assert_eq!(res["rows"][0]["kind"], "matched");
+        let (_, sync) = app
+            .post("/api/sync", json!({ "since": 0, "ops": [] }), Some(&other))
+            .await;
+        assert_eq!(sync["changes"]["works"][0]["title"], "The Lathe of Heaven");
+        let shared: i64 = sqlx::query_scalar("SELECT count(*) FROM works WHERE owner_id IS NULL")
+            .fetch_one(&app.state.db)
+            .await
+            .unwrap();
+        assert_eq!(shared, 1);
 
         // A file from a newer mau is refused.
         let newer = export.replacen("\"version\":2", "\"version\":99", 1);

@@ -274,7 +274,8 @@ A list of sections, each its own page, then **Sign out**.
   finished with an unknown date; shelves become tags verbatim. Export: full
   JSON (re-importable, also into another mau instance) or simple CSV.
 - **Importing a mau export:** a book that came from a catalog provider is
-  added from that same record, as the provider describes it now (Open
+  matched to that work if it's already in the shared catalog, otherwise
+  added from that same record as the provider describes it now (Open
   Library; Google with the importer's own key); a private manual entry stays
   one; anything the provider doesn't confirm, and books from older exports,
   are matched like any other file.
