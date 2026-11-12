@@ -1007,3 +1007,67 @@ importing.
   Considered and not chosen: a local stand-in through npm `overrides`, and
   dismissing the alert. Revisit when the plugin drops or updates
   `deepmerge`.
+
+## Large libraries, loading, and phone layout (2026-11-12)
+
+Measured first, in Firefox with the real 1,028-book library: the server
+answers a full sync in about 60 ms (2.5 MB of JSON, about 370 KB with
+Brotli) and a quiet minutely sync in about 2 ms. The time went to the
+screens drawing every book: Reading 350–500 ms (678 rows), Catalog
+330–390 ms (1,028 rows), and every search keystroke redrew the whole list.
+After: Reading and Catalog about 200 ms on a full reload (most of it loading
+the app and the device copy), a search keystroke 10–25 ms.
+
+- **Lists draw 60 books at a time** and the next 60 when the end is within
+  1,500px (an IntersectionObserver), with a **Show N more** button for
+  keyboards and as a fallback. The data stays whole on the device, so
+  search, filters, sort and counts still cover every book, offline too.
+  Considered and not chosen: asking the server for pages (it would break
+  offline use and make search depend on the server), and virtual scrolling
+  (keeps the DOM smallest, but row heights vary, and dragging, focus, and
+  Find in page get harder).
+- **A new search, filter, or sort starts from the top** (60 again).
+  **Back from a book keeps the books drawn and the scroll position**
+  (a SvelteKit snapshot; SvelteKit scrolls before restoring snapshots, so the
+  page scrolls again once the rows are back).
+- **Dragging in the Reading view works among the books drawn**; dropping
+  below them means scrolling first, which draws more.
+- **Catalog sort keys are worked out once per book** per sort, not on every
+  comparison.
+- **A sync that brings nothing keeps the same view**, so the minutely sync no
+  longer redraws every screen.
+- **A sync still running when the device copy closes is ignored** (it used to
+  write into whatever copy was open next).
+- **Server: a new device's first sync carries live rows only** (no deleted
+  books, readings, copies, events, or removed tags; it has nothing to
+  delete). **Works are loaded in three queries** instead of three per work.
+  **Catalog edits are found from the edits** (new indexes on `works.seq` and
+  `editions.seq`, migration 0009), not by reading the whole library on every
+  sync, so a quiet sync costs the same for 100 books or 100,000.
+- Many users: each signed-in device syncs once a minute and while visible;
+  those syncs are now index lookups on what changed. Admin pages count or
+  list with single queries (users with their book counts, the audit log 200
+  at a time, catalog search 20 at a time), so nothing else grows with the
+  number of users. Not changed: a new device downloads the whole library in
+  one answer. Editions are 60% of it, since every edition of every work comes
+  along for the edition picker. At 10,000 books that's about 25 MB (3–4 MB
+  compressed) once per device; paging that first sync, or sending editions
+  on demand, is the next step if libraries get that big.
+
+- **No empty library while loading** (the add/import welcome flashed on
+  Home, Reading, and Catalog): a device that has never synced (a new browser,
+  after signing out, Safari clearing site data) now waits for its first sync
+  before showing anything but "Loading your library…". If that sync fails
+  (offline), it stops waiting. A device that synced before shows its copy at
+  once, as before.
+
+- **The phone tab bar floats**: rounded, 12px in from the sides, and
+  14px above the bottom edge or the home indicator's safe area, whichever is
+  more. Tabs are 62px tall, with 22px icons, and the current tab is tinted.
+  The page gets `viewport-fit=cover`, so iPhones report the home-indicator
+  area (`env(safe-area-inset-bottom)`); the shell, sign-in pages, and the
+  scanner keep clear of the notch and home indicator. Toasts sit just above
+  the bar. Only checked in Firefox at phone width: Safari's own bottom bar
+  needs a check on a real iPhone.
+- **The year's tiles are always three across**; numbers shrink a little on
+  narrow phones (20–28px) and stay on one line, and labels may wrap.

@@ -134,7 +134,8 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
   that book; hidden without recent reading). "All N books" opens Reading.
 - **Your reading trends** (same heading style), with two subheadings:
   **Last 14 days** (pages per day as bars) and **2026 (so far)** (books
-  finished, pages read, days with reading; unknown finish dates don't count).
+  finished, pages read, days with reading; unknown finish dates don't count),
+  three tiles side by side at every width.
 - No streaks, no "nothing yet today", no per-day average, no monthly chart.
 - All figures come from the synced library, so the page works offline.
 
@@ -197,6 +198,11 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
   added first).
 - Layout and sort are remembered; filters reset on each visit. A count line
   ("16 books" / "3 of 16 books").
+- Long lists draw 60 books at a time and the next 60 as you near the end
+  (also a **Show N more** button). Search, filters, sort, and the count
+  cover the whole library; a new search, filter, or sort starts from the top.
+  Coming back from a book keeps the books drawn and the scroll position. The
+  Reading view does the same.
 - List rows: cover, title, author, state ("Inactive" with pages if any
   progress; "Finished · date" with only the latest date), up to two tags, and a
   shelf icon if owned.
@@ -335,7 +341,10 @@ A list of sections, each its own page, then **Sign out**.
   as the tab buttons (176px) at the top of the wide-screen sidebar, and a 112px badge on the sign-in,
   sign-up, invite, reset, and setup pages. Installed-app splash screens are
   navy (#1E242B) to match.
-- Bottom tab bar: Home · Reading · Catalog · Settings. On wide screens it becomes a
+- Phones: a tab bar Home · Reading · Catalog · Settings floating above the
+  bottom edge (at least 14px, more where the phone needs room for its home
+  indicator), rounded, with tabs 62px tall; the current tab is tinted. It
+  stays clear of the browser's own bottom bar. On wide screens it becomes a
   sidebar docked to the left of a 720px content panel; the content stays
   centered on screen (from 1120px wide; narrower, the pair is centered).
 - Covers: real covers everywhere. Without one, a generated image that looks
@@ -352,6 +361,10 @@ A list of sections, each its own page, then **Sign out**.
 ## 11. Offline and sync
 
 - Every screen works offline. Each device keeps a copy of the user's data.
+  A device that has never synced shows "Loading your library…" until its
+  first sync answers (or fails offline), never an empty library meanwhile;
+  after that its copy shows at once. A new device's first sync carries only
+  live rows (nothing deleted).
 - Changes are recorded as an operation log (ID, device timestamp with a hybrid
   logical clock) and synced; the server applies them in timestamp order with
   per-action rules.
@@ -427,7 +440,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 |---|---|---|---|
 | SHELL-01 | `/` signed out | Shows the landing page (§14.3), no app chrome. | C |
 | SHELL-02 | Any other app page signed out | Replaces the address with `/signin`. | C, B |
-| SHELL-03 | Navigation | Wide screens: a sidebar with the 176px logo (link "mau home" to `/`), then Reading, Catalog, Settings, each with an icon. Phones: a bottom tab bar Home · Reading · Catalog · Settings (Home is phones only). The current section has `aria-current="page"`. | C |
+| SHELL-03 | Navigation | Wide screens: a sidebar with the 176px logo (link "mau home" to `/`), then Reading, Catalog, Settings, each with an icon. Phones: a floating tab bar Home · Reading · Catalog · Settings above the bottom edge and the home indicator (Home is phones only). The current section has `aria-current="page"`. | C |
 | SHELL-04 | Tab on a book or Add a book | The tab of the section the reader came from stays highlighted (Home, Reading or Catalog; Catalog when opened directly). | C |
 | SHELL-05 | Settings tab | Highlighted on every `/settings/…` page. On `/` the logo has an accent ring. | C |
 | SHELL-06 | Origin | Visiting Home, Reading or Catalog makes it the origin for later books and Add (kept per browser tab, across reloads). | C |
@@ -443,7 +456,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | ID | Element | Behavior | Tests |
 |---|---|---|---|
 | HOME-01 | Header | Eyebrow: today's date in the reader's time zone ("Wednesday 11 November"). Heading: "Good night" (before 5), "Good morning" (before 12), "Good afternoon" (before 18), "Good evening", then ", *display name*!", by the device's clock. | C |
-| HOME-02 | Loading | "Loading your library…" until the device copy is open. | C |
+| HOME-02 | Loading | "Loading your library…" until the device copy is open, and on a device that has never synced until the first sync answers (SYNC-07). | C |
 | HOME-03 | Empty library | Heading "Welcome, *name*!", the text "Your books and reading trends will appear here once you add a book.", **Add your first book** (`/add`) and **Import from Goodreads, StoryGraph…** (`/settings/import`). No sections. | C |
 | HOME-04 | Pick up where you left off | Section heading, and "All N books" (N = unfinished books) linking to `/reading`. Each active book in Reading order: cover and title linking to the book, a progress bar, "page X of Y · about N days left at your pace". | C, B |
 | HOME-05 | Pace | Days left = pages left ÷ (pages read in this reading in the last 28 days ÷ 28), rounded up, at least 1. Hidden when nothing was read in those 28 days. | U, C |
@@ -452,7 +465,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | HOME-08 | + | Adds one page to that book, with an undo toast "+1 page on *title*". | C |
 | HOME-09 | Links | Cover (hidden from screen readers, not a tab stop) and title open the book. | C |
 | HOME-10 | Last 14 days | Subheading, 14 bars oldest first; labels every other day plus "today" under the last bar; hover shows "Nov 9: 20 pages" (or "no reading"); a hidden table lists every day for screen readers. | C |
-| HOME-11 | *Year* (so far) | Three tiles: books finished this year (unknown dates don't count), pages read this year, days with reading this year. Pages count forward moves only. | U, C |
+| HOME-11 | *Year* (so far) | Three tiles, side by side at every width: books finished this year (unknown dates don't count), pages read this year, days with reading this year. Pages count forward moves only. | U, C |
 | HOME-12 | Live | Everything updates as the library changes, online or off. | C |
 
 ### 14.3 Landing (`/`, signed out)
@@ -499,6 +512,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | READ-11 | Empty | "Welcome, *name*." with Add and Import; no search or layout toggle. | C |
 | READ-12 | Loading | "Loading your library…". | C |
 | READ-13 | Keyboard reorder | ↑ and ↓ on a drag handle move the book one place within its group; never across groups. | C |
+| READ-14 | Long lists | 60 books are drawn, then 60 more near the end (or **Show N more**); search covers every book and starts again from the top; dragging works among the books drawn. Back from a book keeps the books drawn and the scroll position. | C |
 | READ-ACT-01…09 | Actions | +, set pages (clamped 0…total), finishing and its undo, pause, resume, start, re-read: the exact changes and toasts. | U |
 | READ-DRAG-01…05 | Drag rules | §4 ordering rules for every drop position; a never-started book dropped among active books asks for its pages first. A drop label shows "Move here", "Activate here", "Start here", or "Stays active: goes to end of active". | U (rules); the pointer gesture: — |
 
@@ -514,6 +528,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | CAT-06 | Sort | Recently added, Title (ignores The/A/An), Author (first author's surname, then title), Recently finished. Remembered on this device. | C, U |
 | CAT-07 | Grid | Cover with a finished check or active dot (top left) and an owned badge (top right); a progress strip whose space is always kept; the title. The link's accessible name adds authors, state and ownership. | C |
 | CAT-08 | Empty catalog | "Your catalog is empty." with **Add a book**; the header + always opens Add. | C |
+| CAT-09 | Long lists | As READ-14: 60 at a time, more near the end or with **Show N more**; the count, search, filters and sort cover every book; a new search, filter or sort starts from the top. | C |
 
 ### 14.7 Book page (`/catalog/<id>`)
 
@@ -627,6 +642,8 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | UI-31 | Bar chart | Bars from a shared baseline scaled to the largest, zero bars flat, the current bar highlighted, hover tips, and a hidden table. | C |
 | DATA-01…07 | Book info | State, overrides, ownership, tag order, deleted books, Reading order, pages today, search matching. | U |
 | SYNC-01…06 | Device copy | §11: changes show at once and sync shortly after; offline they wait (also across reloads) and go when the connection returns, even if it returns during a failing attempt; rejected changes are dropped with a toast; a revoked session wipes the device and opens sign-in; syncs fetch only what changed. | C, A, E |
+| SYNC-07 | New device | Not ready (pages say "Loading your library…") until the first sync answers or fails; a device that synced before shows its copy at once. The first sync has live rows only. | C, A |
+| SYNC-08 | Quiet syncs | A sync that brings nothing keeps the same view, so screens don't redraw every minute. A sync still running when the copy closes (signing out) is ignored. | C |
 
 ### 14.13 Public pages (server-rendered)
 
@@ -674,4 +691,11 @@ behavior above has at least one automated test, except:
 - **Installing as an app, and the service worker's cached app shell and
   covers**: offline sync is covered by the Playwright offline test, but
   opening the app with no connection at all isn't.
+- **Drawing more on scroll, and the scroll position after Back** (READ-14,
+  CAT-09): the page tests use **Show N more** (jsdom has no scrolling); the
+  scrolling and Back were checked by hand in Firefox with a 1,028-book
+  library.
+- **The floating tab bar on iPhone Safari** (SHELL-03): checked in Firefox at
+  phone width; Safari's own bottom bar and the home indicator only on a
+  real iPhone.
 - **Pixel layout**: checked by eye from screenshots; no visual-diff tests.
