@@ -162,7 +162,7 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
   pages once a page count is entered); the position converts and the switch
   logs no reading. Percent readings count toward days read and pace, never
   toward pages read.
-- **+1** (a filled round button labelled "+1"; tooltip "+1 page" or "+1
+- **+1** (a filled round button with "+1" drawn like the other icons; tooltip "+1 page" or "+1
   percent") appears only on active rows and adds 1 page (1% in percent). Each change shows an undo
   toast for 10 seconds.
 - Tapping the progress opens inline fields: current page and total pages
@@ -181,7 +181,7 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
   and "+N pages today" or "last read …". Active rows have a teal edge, a pause
   button, and the solid round +1. Inactive rows are dimmed and have a play button.
 - **Reading buttons**, the same wherever a book has them (Home, Reading list
-  rows, the book page; not the Reading grid): round, all one size, right-aligned so they line
+  rows, the book page): round, all one size, right-aligned so they line
   up from row to row. Active: +1, finish (check mark),
   pause. Inactive: finish, start (play; resume if started). Finished books
   have **Re-read** on their book page. The cover or title opens the book.
@@ -193,12 +193,8 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
   unfinished books only, with "N of M books" and **Clear search** while typed.
   It starts empty on each visit. Drag handles hide while searching; the reading
   buttons and page edits still work on the results.
-- **List or grid**, switchable in the header and remembered on this device
-  separately from the Catalog's. Grid tiles keep the same order and show the
-  clean cover, a progress bar, "p. X/Y" (or "42%", or "Not started"), then
-  the title (two lines at most). Nothing sits on the cover, and tiles have
-  no buttons: tapping the cover or title opens the book page, which has
-  them. Page edits, the reading buttons, and reordering are list only.
+- **A list only.** Covers in a grid are the Catalog's (with the Active and
+  Inactive chips for the same books).
 
 ## 5. Catalog view
 
@@ -355,8 +351,7 @@ A list of sections, each its own page, then **Sign out**.
 - Follows the system light or dark mode, with an override in Settings.
 - Comfortable density: 64px rows, 40px round reading buttons, 20px side padding.
 - Active books sit on a softly tinted card with an accent bar on the left;
-  inactive books have desaturated covers and grey titles. In the grid,
-  active covers have an accent outline.
+  inactive books have desaturated covers and grey titles.
 - Logo: two Bengal cats reading an open book on a navy badge, no lettering
   (web/static/logo.svg). It's the favicon and every app icon, a badge as wide
   as the tab buttons (176px) at the top of the wide-screen sidebar, and a 112px badge on the sign-in,
@@ -529,15 +524,14 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | READ-05 | First start | Play on a never-started book opens inline "How many pages does your copy have?" (empty, focused), "Catalog lists N pages" fills it, an invalid number says "Enter the number of pages in your copy.", **Start reading** starts at page 0. | C, B |
 | READ-06 | Search | "Search title or author"; while typed, "N of M books" and **Clear search**; drag handles hide (their column stays). Starts empty each visit. | C, B |
 | READ-07 | No match | "No books you're reading match "*q*"." | C |
-| READ-08 | Grid | Tiles: cover (link), progress bar, "p. X/Y", "42%", or "Not started", the title (link). No buttons; the book page has them. | C, B |
-| READ-09 | Layout | The List/Grid toggle is remembered on this device, separately from the Catalog's. | C, B |
+| READ-08 | List only | No layout switch; the grid is the Catalog's. | C |
 | READ-10 | Status | Next to the title: "Offline · N unsynced" or "Syncing…". | C |
 | READ-11 | Empty | "Welcome, *name*." with Add and Import; no search or layout toggle. | C |
 | READ-12 | Loading | "Loading your library…". | C |
 | READ-13 | Keyboard reorder | ↑ and ↓ on a drag handle move the book one place within its group; never across groups. | C |
 | READ-14 | Long lists | 60 books are drawn, then 60 more near the end (or **Show N more**); search covers every book and starts again from the top; dragging works among the books drawn. Back from a book keeps the books drawn and the scroll position. | C |
 | READ-15 | Percent | Setup offers **Don't know? Track by percent**; the row shows "N%" and "+N% today"; the editor has percent and the copy's page count, **Count pages instead** (once a count is entered) and, for pages, **Track by percent instead**. | C, U, A |
-| READ-16 | Reading buttons | The same round, same-size buttons wherever a book has them (§4; not the grid), right-aligned: active +1, finish, pause; inactive finish, start (or resume). Finish: today, undo toast, no reading logged. | C, U |
+| READ-16 | Reading buttons | The same round, same-size buttons wherever a book has them (§4), right-aligned: active +1, finish, pause; inactive finish, start (or resume). Finish: today, undo toast, no reading logged. | C, U |
 | READ-ACT-01…13 | Actions | Up arrow, set pages (clamped 0…total), finishing and its undo, pause, resume, start, re-read, Finish (READ-ACT-10, 11), percent (12), switching units (13): the exact changes and toasts. | U |
 | READ-DRAG-01…05 | Drag rules | §4 ordering rules for every drop position; a never-started book dropped among active books asks for its pages first. A drop label shows "Move here", "Activate here", "Start here", or "Stays active: goes to end of active". | U (rules); the pointer gesture: — |
 

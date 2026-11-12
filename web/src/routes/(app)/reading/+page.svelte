@@ -4,17 +4,12 @@
 	import { library } from '#lib/library.svelte.ts';
 	import { matchesSearch, readingList, type BookInfo } from '#lib/derive.ts';
 	import { moveBook, startReading, today } from '#lib/actions.ts';
-	import { getPref, setPref } from '#lib/prefs.ts';
 	import { Pager } from '#lib/paging.svelte.ts';
 	import ReadingRow from '#lib/components/ReadingRow.svelte';
-	import ReadingTile from '#lib/components/ReadingTile.svelte';
-	import LayoutToggle from '#lib/components/LayoutToggle.svelte';
 	import ShowMore from '#lib/components/ShowMore.svelte';
 
-	// The layout is remembered on this device (apart from the Catalog's); the
-	// search starts empty on each visit.
-	let layout = $state(getPref('reading.layout', ['list', 'grid'] as const, 'list'));
-	$effect(() => setPref('reading.layout', layout));
+	// A list only (covers in a grid are the Catalog's); the search starts
+	// empty on each visit.
 	let q = $state('');
 	const needle = $derived(q.trim().toLocaleLowerCase());
 
@@ -125,9 +120,6 @@
 			<span class="status">Syncing…</span>
 		{/if}
 	</div>
-	{#if all.length}
-		<div class="head-actions"><LayoutToggle bind:layout /></div>
-	{/if}
 </header>
 
 {#if library.ready && all.length}
@@ -160,15 +152,6 @@
 	</div>
 {:else if list.length === 0}
 	<p class="loading">No books you're reading match “{q.trim()}”.</p>
-{:else if layout === 'grid'}
-	<ul class="grid">
-		{#each drawn as info (info.book.id)}
-			<ReadingTile {info} />
-		{/each}
-	</ul>
-	{#if list.length > drawn.length}
-		<ShowMore remaining={list.length - drawn.length} onmore={() => pager.more()} />
-	{/if}
 {:else}
 	<div class="list-wrap">
 		<ul class="list" bind:this={listEl}>
@@ -227,10 +210,6 @@
 		align-items: baseline;
 		gap: 12px;
 	}
-	.head-actions {
-		display: flex;
-		gap: 6px;
-	}
 	.filters {
 		display: grid;
 		gap: 8px;
@@ -261,14 +240,6 @@
 		justify-content: space-between;
 		font-size: 14px;
 		color: var(--muted);
-	}
-	.grid {
-		list-style: none;
-		margin: 0;
-		padding: 18px 14px 24px;
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(122px, 1fr));
-		gap: 22px 12px;
 	}
 	h1 {
 		margin: 0;

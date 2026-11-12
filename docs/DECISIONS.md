@@ -1213,3 +1213,15 @@ progress yet" under a finished book. Now:
   Books ("it takes a few minutes"). A tinted box with an accent edge, under
   the search bar and above the import form; not dismissible, and gone once
   a key is added.
+
+## "+1" drawn as an icon; the Reading view is a list only (2026-11-12)
+
+- **"+1" is an icon** drawn on the same 24-unit grid and stroke (2.4) as the
+  check and pause, so it centers like them. As text it sat on the font's
+  baseline and looked off. No single Unicode character fits: superscript
+  ⁺¹ is tiny, and ➕ or 👍 are emoji that differ on every device.
+- **The Reading grid is gone** (the user's call, on my recommendation): the
+  Reading view is for quick updates, which were all list-only, and its grid
+  had become the Catalog's grid limited to unfinished books. The layout
+  switch goes from the Reading header; a device's old `mau.reading.layout`
+  setting is simply ignored. The Catalog keeps list and grid.

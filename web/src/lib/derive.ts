@@ -126,11 +126,6 @@ export function progressText(r: ReadingRow): string {
 		: `page ${r.pos.toLocaleString()} of ${r.total.toLocaleString()}`;
 }
 
-/** The short form for tiles: "p. 140/304" or "42%". */
-export function progressShort(r: ReadingRow): string {
-	return r.unit === 'percent' ? `${r.pos}%` : `p. ${r.pos}/${r.total}`;
-}
-
 /** The last date anything was read in this reading. */
 export function lastReadDate(d: Data, readingId: string): string | null {
 	return eventsOf(d, readingId).at(-1)?.local_date ?? null;

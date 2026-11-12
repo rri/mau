@@ -54,17 +54,11 @@ export async function run() {
 				throw new Error('still listed');
 		});
 
-		await step('Reading: search and grid layout', async () => {
+		await step('Reading: search', async () => {
 			await type('input[type=search]', 'eliot');
 			await until('Clear search');
 			if ((await page.$$('ul.list > li')).length !== 1) throw new Error('search did not filter');
 			await click('button', 'Clear search');
-			await click('button[aria-label="Grid layout"]');
-			await page.waitForSelector('ul.grid li.tile');
-			await page.reload();
-			await page.waitForSelector('ul.grid li.tile');
-			if (await page.$('ul.grid li.tile button')) throw new Error('grid tiles have buttons');
-			await click('button[aria-label="List layout"]');
 		});
 
 		await step('Changes survive a reload (synced to the server)', async () => {

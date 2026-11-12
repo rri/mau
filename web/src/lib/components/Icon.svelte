@@ -6,7 +6,7 @@
 		size = 16,
 		filled = true
 	}: {
-		name: 'plus' | 'pause' | 'play' | 'star' | 'check' | 'shelf' | 'up' | 'down';
+		name: 'plus' | 'pause' | 'play' | 'star' | 'check' | 'shelf' | 'up' | 'down' | 'plusone';
 		size?: number;
 		filled?: boolean;
 	} = $props();
@@ -20,6 +20,16 @@
 			stroke="currentColor"
 			stroke-width="2.4"
 			stroke-linecap="round"
+		/>
+	{:else if name === 'plusone'}
+		<!-- "+1", drawn on the grid so it centers like the other icons. -->
+		<path
+			d="M5 12h7M8.5 8.5v7M15.5 9 18.5 6.5v11"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2.4"
+			stroke-linecap="round"
+			stroke-linejoin="round"
 		/>
 	{:else if name === 'pause'}
 		<rect x="6.5" y="5.5" width="4" height="13" rx="1.3" fill="currentColor" />

@@ -31,7 +31,7 @@
 				type="button"
 				onclick={() => plusOne(info)}
 				aria-label="Add {percent ? '1%' : '1 page'} to {info.title}"
-				title={percent ? '+1 percent' : '+1 page'}>+1</button
+				title={percent ? '+1 percent' : '+1 page'}><Icon name="plusone" size={20} /></button
 			>
 		{/if}
 		<button
@@ -84,12 +84,8 @@
 	button:active {
 		transform: scale(0.94);
 	}
-	/* +1 is the button used most: filled, its label in text. */
+	/* +1 is the button used most: filled. */
 	.step {
-		font: inherit;
-		font-size: 15px;
-		font-weight: 650;
-		font-variant-numeric: tabular-nums;
 		border-color: var(--accent);
 		background: var(--accent);
 		color: var(--on-accent);

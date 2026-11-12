@@ -149,30 +149,11 @@ describe('Reading list', () => {
 		).toBeInTheDocument();
 	});
 
-	it('READ-08 the grid shows tiles with progress and no buttons; the book opens on a tap', async () => {
+	it('READ-08 Reading is a list only: no layout switch', () => {
 		useLibrary();
 		render(Reading);
-		await userEvent.click(screen.getByRole('button', { name: 'Grid layout' }));
-		expect(localStorage.getItem('mau.reading.layout')).toBe('grid');
-		const tiles = screen.getAllByRole('listitem').filter((li) => li.classList.contains('tile'));
-		expect(tiles).toHaveLength(4);
-		expect(tiles[0]).toHaveTextContent('p. 140/304');
-		expect(tiles[2]).toHaveTextContent('Not started');
-		for (const t of tiles) expect(within(t).queryByRole('button')).toBeNull();
-		expect(within(tiles[2]).getByRole('link', { name: 'Station Eleven' })).toHaveAttribute(
-			'href',
-			'/catalog/se'
-		);
-	});
-
-	it('READ-09 the layout choice is remembered on this device', () => {
-		localStorage.setItem('mau.reading.layout', 'grid');
-		useLibrary();
-		render(Reading);
-		expect(screen.getByRole('button', { name: 'Grid layout' })).toHaveAttribute(
-			'aria-pressed',
-			'true'
-		);
+		expect(screen.queryByRole('button', { name: 'Grid layout' })).toBeNull();
+		expect(rows()).toHaveLength(4);
 	});
 
 	it('READ-10 offline and unsynced changes show next to the title', () => {
@@ -252,7 +233,7 @@ describe('Reading list', () => {
 		await userEvent.click(screen.getByRole('button', { name: "Don't know? Track by percent" }));
 		expect(info('se').reading).toMatchObject({ unit: 'percent', pos: 0 });
 		const step = screen.getByRole('button', { name: 'Add 1% to Station Eleven' });
-		expect(step).toHaveTextContent('+1');
+		expect(step.querySelector('svg')).not.toBeNull();
 		expect(step).toHaveAttribute('title', '+1 percent');
 		expect(screen.getByRole('button', { name: 'Add 1 page to Middlemarch' })).toHaveAttribute(
 			'title',
