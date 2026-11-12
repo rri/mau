@@ -14,7 +14,10 @@ test('+ logs one page and Undo takes it back', async ({ page }) => {
 	await expect(row.getByText('page 140 of 304')).toBeVisible();
 	await page.getByRole('button', { name: PLUS }).click();
 	await expect(row.getByText('page 141 of 304')).toBeVisible();
-	await expect(page.getByRole('status')).toContainText('+1 page on The Left Hand of Darkness');
+	// A new device may still be downloading (its line is a status too).
+	await expect(
+		page.getByRole('status').filter({ hasText: '+1 page on The Left Hand of Darkness' })
+	).toBeVisible();
 	await page.getByRole('button', { name: 'Undo' }).click();
 	await expect(row.getByText('page 140 of 304')).toBeVisible();
 });
@@ -55,7 +58,7 @@ test('pausing moves a book to the top of the inactive books', async ({ page }) =
 
 test('catalog filters and the detail page', async ({ page }) => {
 	await page.goto('/catalog');
-	await expect(page.getByText('16 books')).toBeVisible();
+	await expect(page.getByText('16 books', { exact: true })).toBeVisible();
 	await page.getByRole('button', { name: 'Active', exact: true }).click();
 	await page.getByRole('button', { name: 'Inactive', exact: true }).click();
 	await expect(page.getByText('5 of 16 books')).toBeVisible();

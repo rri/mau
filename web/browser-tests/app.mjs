@@ -193,9 +193,14 @@ export async function run() {
 			const before = b.errors.length;
 			for (const [path, title] of pages) {
 				await go(path);
-				await sleep(500);
-				if ((await page.title()) !== title)
-					throw new Error(`${path}: title "${await page.title()}"`);
+				// Pages set their title once loaded; a busy machine can take a while.
+				const end = Date.now() + 5000;
+				let seen = await page.title();
+				while (seen !== title && Date.now() < end) {
+					await sleep(100);
+					seen = await page.title();
+				}
+				if (seen !== title) throw new Error(`${path}: title "${seen}"`);
 			}
 			if (b.errors.length > before) throw new Error(b.errors.slice(before).join('\n'));
 		});
