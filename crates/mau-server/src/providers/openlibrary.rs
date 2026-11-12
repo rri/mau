@@ -140,6 +140,20 @@ pub async fn by_isbn(http: &reqwest::Client, isbn: &str) -> ProviderResult<Optio
     Ok(Some(c))
 }
 
+/// A work by its ID (`OL…W`), as search shows it: title, authors, first year,
+/// and the cover. The work record itself can lack a cover that search finds
+/// through an edition.
+pub async fn work(http: &reqwest::Client, work_id: &str) -> ProviderResult<Option<Candidate>> {
+    let q = format!("key:/works/{work_id}");
+    Ok(get(
+        http,
+        "/search.json",
+        &[("q", q.as_str()), ("fields", FIELDS), ("limit", "1")],
+    )
+    .await?
+    .and_then(|v| v["docs"].get(0).and_then(work_from_doc)))
+}
+
 pub async fn editions(
     http: &reqwest::Client,
     work_id: &str,

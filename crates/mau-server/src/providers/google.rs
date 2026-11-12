@@ -72,6 +72,23 @@ fn candidate(item: &Value) -> Option<Candidate> {
     })
 }
 
+/// A volume's cover by its ID, without the API (and so without a key): the
+/// address its `thumbnail` link has. Google answers a volume without a cover
+/// with an "image not available" PNG; real covers are JPEGs.
+pub async fn cover_url(http: &reqwest::Client, volume_id: &str) -> Option<String> {
+    let url = format!(
+        "https://books.google.com/books/content?id={volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+    );
+    let res = http.get(&url).send().await.ok()?;
+    let jpeg = res.status().is_success()
+        && res
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|t| t.starts_with("image/jpeg"));
+    jpeg.then_some(url)
+}
+
 pub async fn search(http: &reqwest::Client, key: &str, q: &str) -> ProviderResult<Vec<Candidate>> {
     volumes(http, key, q).await
 }

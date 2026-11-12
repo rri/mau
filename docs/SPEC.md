@@ -272,7 +272,11 @@ A list of sections, each its own page, then **Sign out**.
   / not found (add as manual entry or skip) / already on list (skipped, nothing
   merged). Unfinished books come in inactive; read books without a date are
   finished with an unknown date; shelves become tags verbatim. Export: full
-  JSON (re-importable) or simple CSV.
+  JSON (re-importable, also into another mau instance) or simple CSV.
+- **Importing a mau export:** a book that came from a catalog provider is
+  added from that same provider record (no search; Open Library supplies its
+  cover), a private manual entry stays one, and books from older exports
+  without that information are matched like any other file.
 - **Import matching:** searches Google Books with the user's own key,
   otherwise Open Library (never the server's Google key). By ISBN when the
   file has one; then title + first author; without a clear match (same title
@@ -589,6 +593,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | IMP-03 | Corrections | Edit → Title and "Authors, separated by ;" → Search; the row stays in view on its tab. An import in progress is picked up when the page opens. | C, A |
 | IMP-04 | Other CSV | Columns mapped to fields, guessed from the headers (each field once), with a sample value; Continue starts matching ("Matching books with the catalog… n of N"). | C, A |
 | IMP-05 | Offline, export | "Importing needs a connection."; Spreadsheet (CSV) and Full export (JSON) always. | C, A |
+| IMP-07 | mau export | Books keep their catalog link (provider and ID) and privacy across instances; a newer export version is refused. | A |
 | IMP-06 | Failure | "Saving stopped: *reason*" with Done. | C |
 
 ### 14.11 Admin (`/settings/admin/…`)

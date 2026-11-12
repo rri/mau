@@ -13,7 +13,8 @@ use crate::error::ApiResult;
 use crate::library::{self, Changes, Person};
 
 pub const FORMAT: &str = "mau-export";
-pub const VERSION: u32 = 1;
+/// 2 added each book's catalog source (`provider`, `provider_id`, `private`).
+pub const VERSION: u32 = 2;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Export {
@@ -38,6 +39,15 @@ pub struct Book {
     pub people: Vec<Person>,
     pub first_year: Option<i64>,
     pub editions: Vec<Edition>,
+    /// The catalog provider the work came from ("openlibrary", "google", …)
+    /// and its ID there, so another instance can add the same work.
+    #[serde(default)]
+    pub provider: Option<String>,
+    #[serde(default)]
+    pub provider_id: Option<String>,
+    /// A manual entry only its owner sees.
+    #[serde(default)]
+    pub private: bool,
     /// Your own edits to title, authors.
     pub title_override: Option<String>,
     pub authors_override: Option<Vec<String>>,
@@ -87,6 +97,16 @@ pub async fn build(state: &AppState, user: &crate::auth::User) -> ApiResult<Expo
     let mut conn = state.db.acquire().await?;
     let c: Changes = library::pull(&mut conn, &user.id, 0).await?;
     let works: HashMap<_, _> = c.works.iter().map(|w| (w.id.clone(), w)).collect();
+    let sources: HashMap<String, (String, String)> = sqlx::query_as(
+        "SELECT w.id, w.source, w.source_id FROM works w
+         WHERE w.source_id IS NOT NULL AND w.id IN (SELECT work_id FROM books WHERE user_id = ?)",
+    )
+    .bind(&user.id)
+    .fetch_all(&mut *conn)
+    .await?
+    .into_iter()
+    .map(|(id, source, source_id)| (id, (source, source_id)))
+    .collect();
     let mut books = Vec::new();
     for b in c.books.iter().filter(|b| !b.deleted) {
         let Some(w) = works.get(&b.work_id) else {
@@ -99,10 +119,14 @@ pub async fn build(state: &AppState, user: &crate::auth::User) -> ApiResult<Expo
             .filter(|r| r.book_id == b.id && !r.deleted)
             .collect();
         readings.sort_by(|a, b| a.id.cmp(&b.id));
+        let source = sources.get(&w.id).filter(|_| !w.private);
         books.push(Book {
             title: w.title.clone(),
             people: w.people.clone(),
             first_year: w.first_year,
+            provider: source.map(|s| s.0.clone()),
+            provider_id: source.map(|s| s.1.clone()),
+            private: w.private,
             editions: w
                 .editions
                 .iter()

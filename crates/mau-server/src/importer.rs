@@ -208,6 +208,12 @@ fn rows_from_mau(text: &str) -> ApiResult<(Vec<Row>, Vec<export::Book>)> {
     if e.format != export::FORMAT {
         return Err(ApiError::bad_request("format", "This isn't a mau export."));
     }
+    if e.version > export::VERSION {
+        return Err(ApiError::bad_request(
+            "format",
+            "This export is from a newer version of mau. Update this instance first.",
+        ));
+    }
     let rows = e
         .books
         .iter()
@@ -450,15 +456,66 @@ async fn existing(state: &AppState, user_id: &str) -> sqlx::Result<Existing> {
     })
 }
 
+/// The catalog work a mau export's book came from, as a candidate built from
+/// the export itself. Open Library (if enabled) or Google supplies the cover.
+async fn exported_work(
+    state: &AppState,
+    searcher: &Searcher,
+    b: &export::Book,
+    provider: &str,
+    id: &str,
+) -> Candidate {
+    let cover_url = match (provider, &searcher.openlibrary) {
+        ("openlibrary", Some(_)) => providers::openlibrary::work(&state.http, id)
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!("import: looking up {id}: {e}");
+                None
+            })
+            .and_then(|c| c.cover_url),
+        // Used when Open Library has no cover for the ISBN (as when added).
+        ("google", _) => providers::google::cover_url(&state.http, id).await,
+        _ => None,
+    };
+    Candidate {
+        provider: provider.into(),
+        source_id: id.into(),
+        title: b.title.clone(),
+        authors: b
+            .people
+            .iter()
+            .filter(|p| p.role == "author")
+            .map(|p| p.name.clone())
+            .collect(),
+        first_year: b.first_year,
+        cover_url,
+        edition_count: None,
+        editions: b
+            .editions
+            .iter()
+            .map(|e| providers::CandidateEdition {
+                source_id: None,
+                publisher: e.publisher.clone(),
+                binding: e.binding.clone(),
+                year: e.year,
+                isbn13: e.isbn13.clone(),
+                pages: e.pages,
+                cover_url: None,
+            })
+            .collect(),
+    }
+}
+
 /// `first_title` is what the first search uses: the row's title, or for
-/// dinky.dev the title without trailing notes.
+/// dinky.dev the title without trailing notes. `mau` is the book's full
+/// record when the import is a mau export.
 async fn match_row(
     state: &AppState,
     ex: &Existing,
     searcher: &Searcher,
     row: &Row,
     first_title: &str,
-    mau: bool,
+    mau: Option<&export::Book>,
 ) -> Matched {
     let dupe = row.isbn13.as_ref().is_some_and(|i| ex.isbns.contains(i))
         || ex.titles.contains(&(
@@ -467,6 +524,15 @@ async fn match_row(
         ));
     if dupe {
         return Matched::of(MatchKind::Dupe);
+    }
+    // From another mau: the same catalog work, without searching.
+    if let Some(b) = mau
+        && let (Some(provider), Some(id)) = (&b.provider, &b.provider_id)
+    {
+        return Matched {
+            candidates: vec![exported_work(state, searcher, b, provider, id).await],
+            ..Matched::of(MatchKind::Matched)
+        };
     }
     // Something already in the shared catalog with this ISBN.
     if let Some(isbn) = &row.isbn13 {
@@ -485,8 +551,9 @@ async fn match_row(
             };
         }
     }
-    if mau {
-        // A mau export carries everything needed; don't ask providers.
+    // A manual entry stays one. (Older exports don't say, and are matched
+    // like any other file.)
+    if mau.is_some_and(|b| b.private) {
         return Matched::of(MatchKind::Unmatched);
     }
     find(state, searcher, row, first_title, true).await
@@ -565,7 +632,7 @@ async fn match_all(state: AppState, user_id: String, job: Arc<Mutex<Job>>) {
         let j = job.lock().unwrap();
         (
             j.rows.clone(),
-            j.mau.is_some(),
+            j.mau.clone().map(Arc::new),
             j.strip_notes,
             j.google_key.clone(),
         )
@@ -584,14 +651,19 @@ async fn match_all(state: AppState, user_id: String, job: Arc<Mutex<Job>>) {
     let searcher = Searcher::new(&state, google_key.as_deref()).await;
     futures::stream::iter(rows.into_iter().enumerate())
         .map(|(i, row)| {
-            let (state, ex, searcher) = (state.clone(), ex.clone(), searcher.clone());
+            let (state, ex, searcher, mau) =
+                (state.clone(), ex.clone(), searcher.clone(), mau.clone());
             async move {
                 let title = if strip {
                     import::without_notes(&row.title)
                 } else {
                     &row.title
                 };
-                (i, match_row(&state, &ex, &searcher, &row, title, mau).await)
+                let full = mau.as_ref().and_then(|m| m.get(i));
+                (
+                    i,
+                    match_row(&state, &ex, &searcher, &row, title, full).await,
+                )
             }
         })
         .buffer_unordered(CONCURRENCY)
@@ -1567,6 +1639,133 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    /// IMP-07: moving a library to another instance keeps catalog links.
+    #[tokio::test]
+    async fn mau_export_keeps_catalog_links() {
+        let app = TestApp::new().await;
+        offline(&app).await;
+        // Saving fetches the work's editions; answer from the cache.
+        crate::providers::cache_put(
+            &app.state.db,
+            "editions:openlibrary:OL59858W",
+            &Vec::<crate::providers::CandidateEdition>::new(),
+        )
+        .await;
+        let (_, cookie) = app.user("rri", false).await;
+        let book = |title: &str, author: &str, extra: Value| {
+            let mut b = json!({
+                "title": title,
+                "people": [{ "name": author, "role": "author" }],
+                "first_year": 1971,
+                "editions": [],
+                "title_override": null,
+                "authors_override": null,
+                "active": false,
+                "rank": "a",
+                "rating": 0,
+                "notes": "",
+                "tags": [],
+                "added_at": 1_700_000_000_000i64,
+                "copies": [],
+                "readings": []
+            });
+            b.as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            b
+        };
+        let export = json!({
+            "format": "mau-export",
+            "version": 2,
+            "exported_at": "2026-11-11",
+            "account": { "username": "rri", "display_name": "R", "bio": "", "time_zone": "UTC" },
+            "books": [
+                book("The Lathe of Heaven", "Ursula K. Le Guin", json!({
+                    "provider": "openlibrary",
+                    "provider_id": "OL59858W",
+                    "private": false,
+                    "rating": 5,
+                    "editions": [{ "publisher": "Avon", "binding": "Paperback", "year": 1973, "isbn13": "9780380003471", "pages": 184 }],
+                    "copies": [{ "format": "Paperback", "location": "Hall", "edition_isbn13": "9780380003471" }],
+                    "readings": [{ "started_on": "2026-10-01", "finished_on": "2026-10-09", "total": 184, "pos": 184,
+                        "events": [{ "date": "2026-10-01", "from": 0, "to": 90 }, { "date": "2026-10-09", "from": 90, "to": 184 }] }]
+                })),
+                book("Zine No. 4", "A Friend", json!({ "private": true })),
+                // An older export, without the source fields.
+                book("Cosmos", "Carl Sagan", json!({})),
+            ]
+        })
+        .to_string();
+
+        let res = run_import(&app, &cookie, "mau", &export).await;
+        let kinds: Vec<_> = res["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["kind"].as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(kinds, ["matched", "unmatched", "unmatched"]);
+        assert_eq!(res["done"]["imported"], 3);
+
+        let (_, sync) = app
+            .post("/api/sync", json!({ "since": 0, "ops": [] }), Some(&cookie))
+            .await;
+        let ch = &sync["changes"];
+        let work = |title: &str| {
+            ch["works"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|w| w["title"] == title)
+                .unwrap()
+                .clone()
+        };
+        let lathe = work("The Lathe of Heaven");
+        assert_eq!(lathe["private"], false, "{lathe}");
+        assert_eq!(lathe["editions"][0]["isbn13"], "9780380003471");
+        assert_eq!(work("Zine No. 4")["private"], true);
+        assert_eq!(work("Cosmos")["private"], true);
+        let source: (String, String) = sqlx::query_as(
+            "SELECT source, source_id FROM works WHERE title = 'The Lathe of Heaven'",
+        )
+        .fetch_one(&app.state.db)
+        .await
+        .unwrap();
+        assert_eq!(source, ("openlibrary".into(), "OL59858W".into()));
+        assert_eq!(ch["events"].as_array().unwrap().len(), 2);
+        assert_eq!(ch["copies"][0]["location"], "Hall");
+        assert!(
+            ch["copies"][0]["edition_id"].is_string(),
+            "{}",
+            ch["copies"]
+        );
+
+        // Exported again, the source fields come along.
+        let again: Value =
+            serde_json::from_str(&router_get_text(&app, "/api/export.json", &cookie).await)
+                .unwrap();
+        assert_eq!(again["version"], 2);
+        let books = again["books"].as_array().unwrap();
+        let find = |title: &str| books.iter().find(|b| b["title"] == title).unwrap();
+        assert_eq!(find("The Lathe of Heaven")["provider"], "openlibrary");
+        assert_eq!(find("The Lathe of Heaven")["provider_id"], "OL59858W");
+        assert_eq!(find("The Lathe of Heaven")["private"], false);
+        assert!(find("Zine No. 4")["provider"].is_null());
+        assert_eq!(find("Zine No. 4")["private"], true);
+
+        // A file from a newer mau is refused.
+        let newer = export.replacen("\"version\":2", "\"version\":99", 1);
+        assert_ne!(newer, export);
+        let (status, body) = app
+            .post(
+                "/api/import",
+                json!({ "source": "mau", "text": newer }),
+                Some(&cookie),
+            )
+            .await;
+        assert_eq!(status, 400, "{body}");
     }
 
     #[tokio::test]

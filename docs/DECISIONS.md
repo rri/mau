@@ -257,7 +257,8 @@ Newest entries at the bottom of each section.
   book's work data (title, people, year, editions), overrides, rank, active,
   rating, notes, tags, copies (with edition ISBN), and readings with all
   progress events. Re-importing it reuses shared works by ISBN and otherwise
-  creates private manual entries.
+  creates private manual entries. (Superseded by version 2; see "Moving a library
+  between instances".)
 - **CSV export columns:** Title, Authors, State, Current page, Total pages,
   Started, Finished, Rating, Tags, Owned, Copies, ISBN, Notes.
 - **Share links** are `/s/<22-character token>` (128 bits). Each kind of share
@@ -915,3 +916,40 @@ Mine, details:
   (the Rust tests take 3 s), splitting the CI test job (under a minute
   saved), precompressing assets and `x86-64-v3` builds for production (small
   gains; the latter crashes on older CPUs).
+
+## Moving a library between instances (2026-11-11)
+
+Importing a localhost export into maubooks.org showed all 1,028 books as
+"Not found": a mau export was only matched against the importing instance's
+own catalog, which was empty, and the export didn't say where each work came
+from. Saving would have made every book a private manual entry with no cover.
+
+Approved:
+
+- **Export version 2** adds each book's `provider` and `provider_id` (for
+  works from a catalog provider) and `private` (manual entries). Version 1
+  files still import; a version newer than the instance's is refused.
+- **Importing a mau export:** a book with a provider ID is matched to that
+  work without searching, built from the export's own data; a private book
+  stays a manual entry; anything else (version 1, or a shared work with no
+  provider) is matched like any other file (ISBN, then title and author).
+
+Mine, details:
+
+- **Covers** come from Open Library's search for the work's key
+  (`key:/works/OL…W`), which is the cover a search result shows. The work
+  record's own first cover matched in 11 of 12 sampled works; the twelfth had
+  none there but one through an edition. Skipped when an admin has turned
+  Open Library off. Google works try Open Library by ISBN first, as when they
+  were added, then Google's cover address built from the volume ID (no key
+  needed), accepting only a JPEG: Google answers volumes without a cover with
+  an "image not available" PNG.
+- **Checked on the real library** (a copy of localhost's 1,028 books, into an
+  empty instance): 911 matched (894 Open Library, all with their original
+  IDs; 17 Google), 117 private; readings and progress events all came
+  across; Open Library covers 824 of 824, Google 15 of 16 (Google no longer
+  has the other). Matching took 5 minutes and saving 9, mostly fetching
+  editions and covers.
+- **Uploaded covers** aren't in the export, so they don't move.
+- Private rows still show under "Not found" with "Add as manual entry"
+  preselected; the label is the import page's general one.
