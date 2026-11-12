@@ -6,7 +6,7 @@
 //! fork-aware rule so that the later of two concurrent offline sessions wins
 //! and the other's page events stop counting. See docs/DECISIONS.md.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use axum::Json;
 use axum::extract::State;
@@ -1159,28 +1159,32 @@ fn book_from(t: BookTuple) -> BookRow {
 
 pub async fn pull(conn: &mut SqliteConnection, user_id: &str, since: i64) -> ApiResult<Changes> {
     let seq = current_seq(conn).await?;
+    // A new device (`since` 0) has nothing to delete, so it gets live rows only.
     let books: Vec<BookTuple> = sqlx::query_as(
         "SELECT id, work_id, rank, active, rating, notes, title_override, authors_override, cover_override, added_at, deleted, clock
-         FROM books WHERE user_id = ? AND seq > ?",
+         FROM books WHERE user_id = ? AND seq > ? AND (? OR deleted = 0)",
     )
     .bind(user_id)
     .bind(since)
+    .bind(since > 0)
     .fetch_all(&mut *conn)
     .await?;
     let books: Vec<BookRow> = books.into_iter().map(book_from).collect();
 
     let tags: Vec<(String, String, bool, String)> = sqlx::query_as(
-        "SELECT book_id, tag, present, clock FROM book_tags WHERE user_id = ? AND seq > ?",
+        "SELECT book_id, tag, present, clock FROM book_tags WHERE user_id = ? AND seq > ? AND (? OR present = 1)",
     )
     .bind(user_id)
     .bind(since)
+    .bind(since > 0)
     .fetch_all(&mut *conn)
     .await?;
     let copies: Vec<(String, String, String, String, Option<String>, bool, String)> = sqlx::query_as(
-        "SELECT id, book_id, format, location, edition_id, deleted, clock FROM copies WHERE user_id = ? AND seq > ?",
+        "SELECT id, book_id, format, location, edition_id, deleted, clock FROM copies WHERE user_id = ? AND seq > ? AND (? OR deleted = 0)",
     )
     .bind(user_id)
     .bind(since)
+    .bind(since > 0)
     .fetch_all(&mut *conn)
     .await?;
     let readings: Vec<(
@@ -1195,38 +1199,41 @@ pub async fn pull(conn: &mut SqliteConnection, user_id: &str, since: i64) -> Api
         String,
     )> = sqlx::query_as(
         "SELECT id, book_id, started_on, finished_on, total, pos, pos_clock, deleted, clock
-         FROM readings WHERE user_id = ? AND seq > ?",
+         FROM readings WHERE user_id = ? AND seq > ? AND (? OR deleted = 0)",
     )
     .bind(user_id)
     .bind(since)
+    .bind(since > 0)
     .fetch_all(&mut *conn)
     .await?;
     let events: Vec<(String, String, String, String, i64, i64, bool)> = sqlx::query_as(
-        "SELECT id, reading_id, hlc, local_date, from_page, to_page, deleted FROM progress_events WHERE user_id = ? AND seq > ?",
+        "SELECT id, reading_id, hlc, local_date, from_page, to_page, deleted FROM progress_events WHERE user_id = ? AND seq > ? AND (? OR deleted = 0)",
     )
     .bind(user_id)
     .bind(since)
+    .bind(since > 0)
     .fetch_all(&mut *conn)
     .await?;
 
-    // Works: those of changed books, plus catalog edits to works on the list.
+    // Works: those of changed books, plus catalog edits to works on the list
+    // (found from the edits, by index, not by reading the whole list). A new
+    // device gets every book, so their works are all there already.
     let mut work_ids: HashSet<String> = books.iter().map(|b| b.work_id.clone()).collect();
-    let edited: Vec<String> = sqlx::query_scalar(
-        "SELECT DISTINCT w.id FROM works w JOIN books b ON b.work_id = w.id
-         WHERE b.user_id = ?1 AND b.deleted = 0
-           AND (w.seq > ?2 OR EXISTS(SELECT 1 FROM editions e WHERE e.work_id = w.id AND e.seq > ?2))",
-    )
-    .bind(user_id)
-    .bind(since)
-    .fetch_all(&mut *conn)
-    .await?;
-    work_ids.extend(edited);
-    let mut works = Vec::with_capacity(work_ids.len());
-    for id in work_ids {
-        if let Some(w) = load_work(conn, &id, Some(user_id)).await? {
-            works.push(w);
-        }
+    if since > 0 {
+        let edited: Vec<String> = sqlx::query_scalar(
+            "SELECT c.id FROM (
+                 SELECT id FROM works WHERE seq > ?2
+                 UNION ALL SELECT work_id FROM editions WHERE seq > ?2
+             ) c WHERE EXISTS(SELECT 1 FROM books b WHERE b.work_id = c.id AND b.user_id = ?1 AND b.deleted = 0)",
+        )
+        .bind(user_id)
+        .bind(since)
+        .fetch_all(&mut *conn)
+        .await?;
+        work_ids.extend(edited);
     }
+    let work_ids: Vec<String> = work_ids.into_iter().collect();
+    let works = load_works(conn, &work_ids, Some(user_id)).await?;
 
     Ok(Changes {
         seq,
@@ -1297,7 +1304,35 @@ pub async fn load_work(
     id: &str,
     viewer: Option<&str>,
 ) -> sqlx::Result<Option<WorkRow>> {
-    let row: Option<(
+    Ok(load_works(conn, &[id.to_owned()], viewer).await?.pop())
+}
+
+type EditionTuple = (
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    Option<i64>,
+    Option<String>,
+    Option<i64>,
+    Option<String>,
+    Option<String>,
+);
+
+/// Loads works like `load_work`, in three queries however many there are
+/// (a new device's first sync asks for its whole library). Works it can't
+/// see are left out; the order is the database's.
+pub async fn load_works(
+    conn: &mut SqliteConnection,
+    ids: &[String],
+    viewer: Option<&str>,
+) -> sqlx::Result<Vec<WorkRow>> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let ids = serde_json::to_string(ids).expect("strings serialize");
+    let viewer = viewer.unwrap_or("");
+    let works: Vec<(
         String,
         String,
         Option<i64>,
@@ -1305,59 +1340,67 @@ pub async fn load_work(
         Option<String>,
         bool,
     )> = sqlx::query_as(
-        "SELECT id, title, first_year, cover, owner_id, suggested FROM works WHERE id = ?",
+        "SELECT id, title, first_year, cover, owner_id, suggested FROM works
+             WHERE id IN (SELECT value FROM json_each(?1)) AND (owner_id IS NULL OR owner_id = ?2)",
     )
-    .bind(id)
-    .fetch_optional(&mut *conn)
+    .bind(&ids)
+    .bind(viewer)
+    .fetch_all(&mut *conn)
     .await?;
-    let Some((id, title, first_year, cover, owner, suggested)) = row else {
-        return Ok(None);
-    };
-    if owner.is_some() && owner.as_deref() != viewer {
-        return Ok(None);
+    let people: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT work_id, name, role FROM work_people
+         WHERE work_id IN (SELECT value FROM json_each(?)) ORDER BY work_id, position",
+    )
+    .bind(&ids)
+    .fetch_all(&mut *conn)
+    .await?;
+    let editions: Vec<EditionTuple> = sqlx::query_as(
+        "SELECT work_id, id, publisher, binding, year, isbn13, pages, cover, owner_id FROM editions
+         WHERE work_id IN (SELECT value FROM json_each(?1)) AND (owner_id IS NULL OR owner_id = ?2)
+         ORDER BY work_id, year IS NULL, year, id",
+    )
+    .bind(&ids)
+    .bind(viewer)
+    .fetch_all(&mut *conn)
+    .await?;
+
+    let mut people_of: HashMap<String, Vec<Person>> = HashMap::new();
+    for (work_id, name, role) in people {
+        people_of
+            .entry(work_id)
+            .or_default()
+            .push(Person { name, role });
     }
-    let people: Vec<(String, String)> =
-        sqlx::query_as("SELECT name, role FROM work_people WHERE work_id = ? ORDER BY position")
-            .bind(&id)
-            .fetch_all(&mut *conn)
-            .await?;
-    let editions: Vec<(String, Option<String>, Option<String>, Option<i64>, Option<String>, Option<i64>, Option<String>, Option<String>)> =
-        sqlx::query_as(
-            "SELECT id, publisher, binding, year, isbn13, pages, cover, owner_id FROM editions
-             WHERE work_id = ? AND (owner_id IS NULL OR owner_id = ?) ORDER BY year IS NULL, year, id",
-        )
-        .bind(&id)
-        .bind(viewer.unwrap_or(""))
-        .fetch_all(&mut *conn)
-        .await?;
-    Ok(Some(WorkRow {
-        title,
-        first_year,
-        cover,
-        private: owner.is_some(),
-        suggested,
-        people: people
-            .into_iter()
-            .map(|(name, role)| Person { name, role })
-            .collect(),
-        editions: editions
-            .into_iter()
-            .map(
-                |(eid, publisher, binding, year, isbn13, pages, cover, eowner)| EditionRow {
-                    id: eid,
-                    work_id: id.clone(),
-                    publisher,
-                    binding,
-                    year,
-                    isbn13,
-                    pages,
-                    cover,
-                    private: eowner.is_some(),
-                },
-            )
-            .collect(),
-        id,
-    }))
+    let mut editions_of: HashMap<String, Vec<EditionRow>> = HashMap::new();
+    for (work_id, id, publisher, binding, year, isbn13, pages, cover, owner) in editions {
+        editions_of
+            .entry(work_id.clone())
+            .or_default()
+            .push(EditionRow {
+                id,
+                work_id,
+                publisher,
+                binding,
+                year,
+                isbn13,
+                pages,
+                cover,
+                private: owner.is_some(),
+            });
+    }
+    Ok(works
+        .into_iter()
+        .map(|(id, title, first_year, cover, owner, suggested)| WorkRow {
+            title,
+            first_year,
+            cover,
+            private: owner.is_some(),
+            suggested,
+            people: people_of.remove(&id).unwrap_or_default(),
+            editions: editions_of.remove(&id).unwrap_or_default(),
+            id,
+        })
+        .collect())
 }
 
 // ---------------------------------------------------------------------------

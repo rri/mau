@@ -207,10 +207,13 @@ async fn fields_are_last_writer_wins() {
 #[tokio::test]
 async fn deleting_a_book_tombstones_everything_and_later_ops_drop() {
     let (app, cookie) = setup().await;
+    let since = sync(&app, &cookie, 0, json!([])).await["changes"]["seq"]
+        .as_i64()
+        .unwrap();
     let res = sync(
         &app,
         &cookie,
-        0,
+        since,
         json!([
             op(
                 "t1",
@@ -235,6 +238,54 @@ async fn deleting_a_book_tombstones_everything_and_later_ops_drop() {
     assert_eq!(ch["books"][0]["deleted"], true);
     assert_eq!(ch["readings"][0]["deleted"], true);
     assert_eq!(ch["tags"][0]["present"], false);
+}
+
+#[tokio::test]
+async fn a_new_device_gets_live_rows_only() {
+    let (app, cookie) = setup().await;
+    sync(
+        &app,
+        &cookie,
+        0,
+        json!([op(
+            "d1",
+            &h(3000, "aaa"),
+            json!({"type": "book.delete", "id": "b1"})
+        )]),
+    )
+    .await;
+    let fresh = sync(&app, &cookie, 0, json!([])).await;
+    assert_eq!(fresh["changes"]["books"], json!([]));
+    assert_eq!(fresh["changes"]["readings"], json!([]));
+    assert_eq!(fresh["changes"]["works"], json!([]));
+}
+
+#[tokio::test]
+async fn catalog_edits_reach_devices_that_have_the_book() {
+    let (app, cookie) = setup().await;
+    shared_work(&app, "w2", "Not on the list").await;
+    let since = sync(&app, &cookie, 0, json!([])).await["changes"]["seq"]
+        .as_i64()
+        .unwrap();
+    let edit = |sql: &'static str| {
+        let db = app.state.db.clone();
+        async move {
+            sqlx::query(sql).execute(&db).await.unwrap();
+        }
+    };
+    edit("UPDATE sync_seq SET n = n + 1").await;
+    edit("UPDATE works SET title = 'Edited', seq = (SELECT n FROM sync_seq) WHERE id IN ('w1', 'w2')").await;
+    let res = sync(&app, &cookie, since, json!([])).await;
+    let works = res["changes"]["works"].as_array().unwrap();
+    assert_eq!(works.len(), 1, "only the work on the list: {works:?}");
+    assert_eq!(works[0]["title"], "Edited");
+
+    // A new edition of it counts too.
+    let since = res["changes"]["seq"].as_i64().unwrap();
+    edit("UPDATE sync_seq SET n = n + 1").await;
+    edit("INSERT INTO editions (id, work_id, source, seq) VALUES ('e1', 'w1', 'manual', (SELECT n FROM sync_seq))").await;
+    let res = sync(&app, &cookie, since, json!([])).await;
+    assert_eq!(res["changes"]["works"][0]["editions"][0]["id"], "e1");
 }
 
 #[tokio::test]
