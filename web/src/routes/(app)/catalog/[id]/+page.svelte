@@ -4,7 +4,7 @@
 	import { page } from '$app/state';
 	import { ApiError, post } from '#lib/api/client.ts';
 	import type { EditionRow } from '#lib/api/generated/EditionRow.ts';
-	import { pause, plusOne, resume, startLike, startReading, today } from '#lib/actions.ts';
+	import { resume, startLike, startReading, today } from '#lib/actions.ts';
 	import { fmtDate, fmtMonthDay } from '#lib/dates.ts';
 	import { bookInfo, eventsOf, liveBooks, pagesOn, progressText } from '#lib/derive.ts';
 	import { library } from '#lib/library.svelte.ts';
@@ -17,7 +17,7 @@
 	import TagInput from '#lib/components/TagInput.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import Breadcrumbs from '#lib/components/Breadcrumbs.svelte';
-	import BookMenu from '#lib/components/BookMenu.svelte';
+	import ReadingButtons from '#lib/components/ReadingButtons.svelte';
 	import ProgressEditor from '#lib/components/ProgressEditor.svelte';
 	import StartForm from '#lib/components/StartForm.svelte';
 	import { origin } from '#lib/origin.svelte.ts';
@@ -390,27 +390,12 @@
 			</div>
 			{#if !pagesEditing && !setupOpen}
 				<div class="actions">
-					<BookMenu {info} onsetup={() => (setupOpen = true)} openLink={false} />
-					{#if info.state === 'active'}
-						<button
-							class="pause"
-							type="button"
-							aria-label="Pause"
-							title="Pause"
-							onclick={() => pause(info)}><Icon name="pause" size={14} /></button
-						>
-						<button
-							class="plus"
-							type="button"
-							aria-label={r?.unit === 'percent' ? 'Add 1%' : 'Add 1 page'}
-							title={r?.unit === 'percent' ? '+1%' : '+1 page'}
-							onclick={() => plusOne(info)}><Icon name="step" size={20} /></button
+					{#if info.state === 'finished'}
+						<button class="play" type="button" onclick={play}
+							><Icon name="play" size={14} /> Re-read</button
 						>
 					{:else}
-						<button class="play" type="button" onclick={play}
-							><Icon name="play" size={14} />
-							{info.state === 'finished' ? 'Re-read' : r ? 'Resume' : 'Start'}</button
-						>
+						<ReadingButtons {info} onsetup={() => (setupOpen = true)} />
 					{/if}
 				</div>
 			{/if}
@@ -785,34 +770,10 @@
 		gap: 6px;
 		align-items: center;
 	}
-	.plus,
-	.pause,
-	.play {
-		display: grid;
-		place-items: center;
-		padding: 0;
-		cursor: pointer;
-	}
-	.plus {
-		width: 42px;
-		height: 42px;
-		border-radius: 50%;
-		border: 0;
-		background: var(--accent);
-		color: var(--on-accent);
-		box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 35%, transparent);
-	}
-	.pause {
-		width: 30px;
-		height: 30px;
-		border-radius: 50%;
-		border: 1px solid var(--line);
-		background: var(--surface);
-		color: var(--muted);
-	}
 	.play {
 		display: inline-flex;
 		align-items: center;
+		cursor: pointer;
 		gap: 7px;
 		height: 40px;
 		padding: 0 16px 0 14px;
@@ -825,7 +786,6 @@
 	.play:hover {
 		border-color: var(--accent);
 	}
-	.plus:active,
 	.play:active {
 		transform: scale(0.94);
 	}

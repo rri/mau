@@ -268,34 +268,29 @@ describe('Reading list', () => {
 		expect(row('Station Eleven')).toHaveTextContent('page 4 of 400');
 	});
 
-	it('READ-16 the ⋯ menu: Finish, Pause, Open book (active); Start or Resume, Finish (inactive)', async () => {
+	it('READ-16 the same buttons on every row, right-aligned: active step, finish, pause; inactive finish, start', async () => {
 		useLibrary();
 		render(Reading);
-		await userEvent.click(screen.getByRole('button', { name: 'More for Middlemarch' }));
-		const menu = screen.getByRole('menu');
-		expect(
-			within(menu)
-				.getAllByRole('menuitem')
-				.map((m) => m.textContent)
-		).toEqual(['Finish', 'Pause', 'Open book']);
-		await vi.waitFor(() => expect(within(menu).getAllByRole('menuitem')[0]).toHaveFocus());
-		await userEvent.keyboard('{Escape}');
-		expect(screen.queryByRole('menu')).toBeNull();
-		expect(screen.getByRole('button', { name: 'More for Middlemarch' })).toHaveFocus();
+		const labels = (title: string) =>
+			within(row(title))
+				.getAllByRole('button')
+				.map((b) => b.getAttribute('aria-label'))
+				.filter((l) => !l?.startsWith('Drag') && !l?.startsWith('Edit'));
+		expect(labels('Middlemarch')).toEqual([
+			'Add 1 page to Middlemarch',
+			'Finish Middlemarch',
+			'Pause Middlemarch'
+		]);
+		expect(labels('Station Eleven')).toEqual(['Finish Station Eleven', 'Start Station Eleven']);
+		expect(labels('The Brothers Karamazov')).toEqual([
+			'Finish The Brothers Karamazov',
+			'Resume The Brothers Karamazov'
+		]);
+		expect(screen.queryByRole('button', { name: /^More for/ })).toBeNull();
 
-		await userEvent.click(screen.getByRole('button', { name: 'More for Middlemarch' }));
-		await userEvent.click(screen.getByRole('menuitem', { name: 'Finish' }));
+		await userEvent.click(screen.getByRole('button', { name: 'Finish Middlemarch' }));
 		expect(info('mm').state).toBe('finished');
 		expect(rows().some((r) => r.textContent?.includes('Middlemarch'))).toBe(false);
 		expect(toasts.current?.message).toBe('Finished Middlemarch');
-
-		await userEvent.click(screen.getByRole('button', { name: 'More for Station Eleven' }));
-		expect(
-			within(screen.getByRole('menu'))
-				.getAllByRole('menuitem')
-				.map((m) => m.textContent)
-		).toEqual(['Start', 'Finish', 'Open book']);
-		await userEvent.click(screen.getByRole('menuitem', { name: 'Start' }));
-		expect(screen.getByLabelText('How many pages does your copy have?')).toBeInTheDocument();
 	});
 });

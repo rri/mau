@@ -235,7 +235,7 @@ async fn shares_publish_only_what_they_name_and_never_notes() {
     let app = TestApp::new().await;
     let (rri, me) = app.user("rri", false).await;
     let (_, juno) = app.user("juno", false).await;
-    for i in 0..10 {
+    for i in 0..12 {
         book(
             &app,
             &rri,
@@ -256,18 +256,18 @@ async fn shares_publish_only_what_they_name_and_never_notes() {
     assert_eq!(status, 200, "{share}");
     let token = share["token"].as_str().unwrap().to_string();
 
-    // The share page: titled once, all ten books, no ratings, no notes.
+    // The share page: titled once, all twelve books, no ratings, no notes.
     let (status, page) = html(&app, &format!("/s/{token}")).await;
     assert_eq!(status, 200);
     assert_eq!(page.matches("Finished").count(), 2, "title + h1 only");
     assert!(!page.contains("<h2"));
-    assert!(page.contains("Book 9"));
+    assert!(page.contains("Book 11"));
     assert!(!page.contains('★'));
     assert!(!page.contains("secret note"));
 
-    // The profile previews eight with a link to all of them.
+    // The profile previews ten with a link to all of them.
     let (_, profile) = html(&app, "/u/rri").await;
-    assert!(profile.contains("See all 10"));
+    assert!(profile.contains("See all 12"));
 
     // Others can't change or remove it.
     let id = share["id"].as_str().unwrap();

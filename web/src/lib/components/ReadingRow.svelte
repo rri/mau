@@ -4,11 +4,10 @@
 	import { lastReadDate, pagesOn, progressText, type BookInfo } from '../derive.ts';
 	import { library } from '../library.svelte.ts';
 	import { auth } from '../auth.svelte.ts';
-	import { pause, plusOne, resume, type Start } from '../actions.ts';
-	import BookMenu from './BookMenu.svelte';
+	import type { Start } from '../actions.ts';
 	import Cover from './Cover.svelte';
-	import Icon from './Icon.svelte';
 	import ProgressEditor from './ProgressEditor.svelte';
+	import ReadingButtons from './ReadingButtons.svelte';
 	import StartForm from './StartForm.svelte';
 
 	let {
@@ -46,7 +45,6 @@
 	const r = $derived(info.reading);
 	const pct = $derived(r ? Math.round((100 * r.pos) / r.total) : 0);
 	const todayPages = $derived(r ? pagesOn(library.view, r, today) : 0);
-	const step = $derived(r?.unit === 'percent' ? '1%' : '1 page');
 	const lastRead = $derived(r ? lastReadDate(library.view, r.id) : null);
 	const addedOn = $derived(dateOfMs(info.book.added_at, auth.me?.time_zone ?? 'UTC'));
 
@@ -129,33 +127,7 @@
 		</div>
 	</div>
 	{#if !setup && !editing}
-		<div class="actions">
-			<BookMenu {info} {onsetup} />
-			{#if info.state === 'active'}
-				<button
-					class="pause"
-					type="button"
-					onclick={() => pause(info)}
-					aria-label="Pause {info.title}"
-					title="Pause"><Icon name="pause" size={14} /></button
-				>
-				<button
-					class="plus"
-					type="button"
-					onclick={() => plusOne(info)}
-					aria-label="Add {step} to {info.title}"
-					title="+{step}"><Icon name="step" size={20} /></button
-				>
-			{:else}
-				<button
-					class="play"
-					type="button"
-					onclick={() => (r ? resume(info) : onsetup())}
-					aria-label="{r ? 'Resume' : 'Start'} {info.title}"
-					title={r ? 'Resume' : 'Start'}><Icon name="play" size={18} /></button
-				>
-			{/if}
-		</div>
+		<ReadingButtons {info} {onsetup} />
 	{/if}
 	{#if setup}
 		<div class="setup" use:reveal>
@@ -290,55 +262,6 @@
 	.today {
 		color: var(--accent);
 		font-weight: 600;
-	}
-	.actions {
-		display: flex;
-		gap: 6px;
-		align-items: center;
-	}
-	.plus,
-	.play,
-	.pause {
-		padding: 0;
-	}
-	.plus,
-	.play {
-		width: 42px;
-		height: 42px;
-		border-radius: 50%;
-		cursor: pointer;
-		display: grid;
-		place-items: center;
-	}
-	.plus {
-		border: 0;
-		background: var(--accent);
-		color: var(--on-accent);
-		box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 35%, transparent);
-	}
-	.play {
-		border: 1px solid var(--line);
-		background: var(--surface);
-		color: var(--muted);
-	}
-	.play:hover {
-		color: var(--accent);
-		border-color: var(--accent);
-	}
-	.plus:active,
-	.play:active {
-		transform: scale(0.94);
-	}
-	.pause {
-		width: 30px;
-		height: 30px;
-		border-radius: 50%;
-		border: 1px solid var(--line);
-		background: var(--surface);
-		color: var(--muted);
-		cursor: pointer;
-		display: grid;
-		place-items: center;
 	}
 	.setup {
 		grid-column: 2 / -1;

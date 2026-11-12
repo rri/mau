@@ -1,11 +1,9 @@
 <script lang="ts">
 	// One book in the Reading view's grid: a clean cover, then the progress,
-	// a row with the progress, ⋯, and pause / up arrow (or play), then the title.
+	// the progress, the reading buttons, then the title.
 	import { progressShort, type BookInfo } from '../derive.ts';
-	import { pause, plusOne, resume } from '../actions.ts';
-	import BookMenu from './BookMenu.svelte';
 	import Cover from './Cover.svelte';
-	import Icon from './Icon.svelte';
+	import ReadingButtons from './ReadingButtons.svelte';
 
 	let { info, onsetup }: { info: BookInfo; onsetup: () => void } = $props();
 
@@ -20,31 +18,7 @@
 	<span class="mini" class:empty={!r}><span style="width:{pct}%"></span></span>
 	<div class="controls">
 		<span class="pages">{r ? progressShort(r) : 'Not started'}</span>
-		<BookMenu {info} {onsetup} size="sm" />
-		{#if info.state === 'active'}
-			<button
-				class="pause"
-				type="button"
-				onclick={() => pause(info)}
-				aria-label="Pause {info.title}"
-				title="Pause"><Icon name="pause" size={11} /></button
-			>
-			<button
-				class="plus"
-				type="button"
-				onclick={() => plusOne(info)}
-				aria-label="Add {r?.unit === 'percent' ? '1%' : '1 page'} to {info.title}"
-				title={r?.unit === 'percent' ? '+1%' : '+1 page'}><Icon name="step" size={16} /></button
-			>
-		{:else}
-			<button
-				class="play"
-				type="button"
-				onclick={() => (r ? resume(info) : onsetup())}
-				aria-label="{r ? 'Resume' : 'Start'} {info.title}"
-				title={r ? 'Resume' : 'Start'}><Icon name="play" size={14} /></button
-			>
-		{/if}
+		<ReadingButtons {info} {onsetup} size="sm" />
 	</div>
 	<a class="t" href="/catalog/{info.book.id}">{info.title}</a>
 </li>
@@ -91,11 +65,10 @@
 		background: var(--muted);
 		opacity: 0.6;
 	}
+	/* The progress, then the buttons on their own line (right-aligned). */
 	.controls {
-		display: flex;
-		align-items: center;
+		display: grid;
 		gap: 4px;
-		min-height: 32px;
 	}
 	.pages {
 		flex: 1;
@@ -106,46 +79,6 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-	}
-	.plus,
-	.play,
-	.pause {
-		flex: none;
-		display: grid;
-		place-items: center;
-		padding: 0;
-		border-radius: 50%;
-		cursor: pointer;
-	}
-	.plus {
-		width: 32px;
-		height: 32px;
-		border: 0;
-		background: var(--accent);
-		color: var(--on-accent);
-		box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 35%, transparent);
-	}
-	.play {
-		width: 32px;
-		height: 32px;
-		border: 1px solid var(--line);
-		background: var(--surface);
-		color: var(--muted);
-	}
-	.play:hover {
-		color: var(--accent);
-		border-color: var(--accent);
-	}
-	.pause {
-		width: 24px;
-		height: 24px;
-		border: 1px solid var(--line);
-		background: var(--surface);
-		color: var(--muted);
-	}
-	.plus:active,
-	.play:active {
-		transform: scale(0.94);
 	}
 	.t {
 		margin-top: -2px;

@@ -10,8 +10,9 @@ use maud::{DOCTYPE, Markup, PreEscaped, html};
 use crate::app::AppState;
 use crate::error::ApiResult;
 
-/// Rows shown per section on the profile before "See all".
-const PREVIEW: usize = 8;
+/// Books shown per section on the profile before "See all": two full rows
+/// of five (phones, three across, show nine when there are more).
+const PREVIEW: usize = 10;
 
 struct Owner {
     id: String,
@@ -141,7 +142,9 @@ a{color:var(--accent)}
 section{margin-top:32px;padding-top:20px;border-top:1px solid var(--line)}
 h2{margin:0 0 14px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:baseline}
 h2 a{font-size:14px;letter-spacing:0;text-transform:none;font-weight:500}
-.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:22px 16px;list-style:none;margin:0;padding:0}
+.shelf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px 16px;list-style:none;margin:0;padding:0}
+.shelf.cut .bk:nth-child(n+10){display:none}
+@media(min-width:560px){.shelf{grid-template-columns:repeat(5,minmax(0,1fr))}.shelf.cut .bk:nth-child(n+10){display:grid}}
 .bk{display:grid;align-content:start;gap:6px;font-size:13.5px}
 .cover{aspect-ratio:2/3;border-radius:5px;box-shadow:0 1px 2px rgb(0 0 0/.18),0 0 0 1px rgb(0 0 0/.06);overflow:hidden;display:grid;place-items:center;text-align:center;padding:8px;font-weight:700;font-size:12px;line-height:1.2;text-transform:uppercase;color:#f3f6f4}
 .cover img{width:100%;height:100%;object-fit:cover;display:block}
@@ -178,9 +181,11 @@ fn stars(n: i64) -> Markup {
     html! { @if n > 0 { " · " span.stars aria-label=(format!("{n} stars")) { ("★".repeat(n as usize)) } } }
 }
 
-fn shelf(list: &[Item]) -> Markup {
+/// Covers in full rows. `cut`: a profile preview with more to see, so a
+/// part row is left out on phones.
+fn shelf(list: &[Item], cut: bool) -> Markup {
     html! {
-        ul.shelf {
+        ul.shelf.cut[cut] {
             @for i in list {
                 li.bk {
                     (cover(i))
@@ -235,7 +240,7 @@ fn section(s: &ShareRow, list: &[Item], limit: Option<usize>, heading: bool) -> 
             } @else if s.kind == "active" {
                 (reading_list(shown))
             } @else {
-                (shelf(shown))
+                (shelf(shown, shown.len() < list.len()))
             }
         }
     }
@@ -485,6 +490,55 @@ mod tests {
         let page = get_html(&app, &format!("/s/{}", share["token"].as_str().unwrap())).await;
         assert!(page.contains("Piranesi"));
         assert!(!page.contains("Slow reader."));
+    }
+
+    #[tokio::test]
+    async fn profile_previews_fill_whole_rows_and_show_percent() {
+        let app = TestApp::new().await;
+        let (uid, cookie) = app.user("rri", false).await;
+        for kind in ["finished", "active"] {
+            let (status, _) = app
+                .post(
+                    "/api/shares",
+                    json!({ "kind": kind, "include_ratings": false }),
+                    Some(&cookie),
+                )
+                .await;
+            assert_eq!(status, 200);
+        }
+        let sql = |q: String| {
+            let db = app.state.db.clone();
+            async move {
+                // Test data written here, nothing from outside.
+                sqlx::query(sqlx::AssertSqlSafe(q))
+                    .execute(&db)
+                    .await
+                    .unwrap();
+            }
+        };
+        for i in 0..12 {
+            sql(format!(
+                "INSERT INTO works (id, title, created_at, seq) VALUES ('w{i}', 'Book {i}', 0, 0)"
+            ))
+            .await;
+            sql(format!("INSERT INTO books (id, user_id, work_id, rank, added_at, seq) VALUES ('b{i}', '{uid}', 'w{i}', 'V', 0, 0)")).await;
+            sql(format!("INSERT INTO readings (id, book_id, user_id, started_on, finished_on, total, pos, seq) VALUES ('r{i}', 'b{i}', '{uid}', '2026-10-01', '2026-10-20', 100, 100, 0)")).await;
+        }
+        sql(
+            "INSERT INTO works (id, title, created_at, seq) VALUES ('wp', 'Percent Book', 0, 0)"
+                .into(),
+        )
+        .await;
+        sql(format!("INSERT INTO books (id, user_id, work_id, rank, active, added_at, seq) VALUES ('bp', '{uid}', 'wp', 'V', 1, 0, 0)")).await;
+        sql(format!("INSERT INTO readings (id, book_id, user_id, started_on, unit, total, pos, seq) VALUES ('rp', 'bp', '{uid}', '2026-10-01', 'percent', 100, 42, 0)")).await;
+
+        let html = get_html(&app, "/u/rri").await;
+        // Ten covers (two rows of five), marked as cut short, and the link.
+        assert_eq!(html.matches("<li class=\"bk\"").count(), 10, "{html}");
+        assert!(html.contains("<ul class=\"shelf cut\""));
+        assert!(html.contains("See all 12"));
+        assert!(html.contains(" · 42%"));
+        assert!(!html.contains("page 42 of 100"));
     }
 
     async fn get_html(app: &TestApp, path: &str) -> String {

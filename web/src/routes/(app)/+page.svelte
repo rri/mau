@@ -4,13 +4,12 @@
 	import { auth } from '#lib/auth.svelte.ts';
 	import { library } from '#lib/library.svelte.ts';
 	import { liveBooks, progressText, readingList } from '#lib/derive.ts';
-	import { plusOne, today as todayFn } from '#lib/actions.ts';
+	import { today as todayFn } from '#lib/actions.ts';
 	import { fmtMonthDay } from '#lib/dates.ts';
 	import { daysLeft, lastDays, pagesPerDay, yearTotals } from '#lib/stats.ts';
 	import BarChart from '#lib/components/BarChart.svelte';
 	import Cover from '#lib/components/Cover.svelte';
-	import Icon from '#lib/components/Icon.svelte';
-	import BookMenu from '#lib/components/BookMenu.svelte';
+	import ReadingButtons from '#lib/components/ReadingButtons.svelte';
 
 	const day = $derived.by(() => {
 		void library.view;
@@ -95,18 +94,8 @@
 										{left === 1 ? 'day' : 'days'} left at your pace{/if}</span
 								>
 							</div>
-							<span class="actions">
-								<!-- Only active books are listed here, so there's nothing to set up. -->
-								<BookMenu info={b} onsetup={() => {}} />
-								<button
-									class="plus"
-									type="button"
-									onclick={() => plusOne(b)}
-									aria-label="Add {r.unit === 'percent' ? '1%' : '1 page'} to {b.title}"
-									title={r.unit === 'percent' ? '+1%' : '+1 page'}
-									><Icon name="step" size={18} /></button
-								>
-							</span>
+							<!-- Only active books are listed here, so there's nothing to set up. -->
+							<ReadingButtons info={b} onsetup={() => {}} />
 						</li>
 					{/if}
 				{/each}
@@ -261,27 +250,6 @@
 		font-size: 13px;
 		color: var(--muted);
 		font-variant-numeric: tabular-nums;
-	}
-	.actions {
-		display: flex;
-		gap: 4px;
-		align-items: center;
-	}
-	.plus {
-		width: 40px;
-		height: 40px;
-		border: 0;
-		border-radius: 50%;
-		background: var(--accent);
-		color: var(--on-accent);
-		display: grid;
-		place-items: center;
-		padding: 0;
-		cursor: pointer;
-		box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 35%, transparent);
-	}
-	.plus:active {
-		transform: scale(0.94);
 	}
 	/* Three across at any width. Numbers on top, all on one line (smaller on
 	   phones); labels underneath may wrap. */

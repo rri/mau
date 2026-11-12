@@ -113,22 +113,26 @@ describe('Book page: header', () => {
 });
 
 describe('Book page: status', () => {
-	it('BOOK-10 an active book shows its pill, progress, today’s pages, pause and +', async () => {
+	it('BOOK-10 an active book shows its pill, progress, today’s pages, and the reading buttons', async () => {
 		useLibrary();
 		open('lhod');
+		const T = 'The Left Hand of Darkness';
 		expect(screen.getByText('Active', { selector: '.pill' })).toBeInTheDocument();
 		expect(screen.getByText('+6 pages today')).toBeInTheDocument();
-		await userEvent.click(screen.getByRole('button', { name: 'Add 1 page' }));
+		await userEvent.click(screen.getByRole('button', { name: `Add 1 page to ${T}` }));
 		expect(screen.getByText('+7 pages today')).toBeInTheDocument();
-		await userEvent.click(screen.getByRole('button', { name: 'Pause' }));
+		await userEvent.click(screen.getByRole('button', { name: `Pause ${T}` }));
 		expect(screen.getByText('Inactive', { selector: '.pill' })).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Resume' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: `Resume ${T}` })).toBeInTheDocument();
+		await userEvent.click(screen.getByRole('button', { name: `Finish ${T}` }));
+		expect(screen.getByText('Finished', { selector: '.pill' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Re-read' })).toBeInTheDocument();
 	});
 
 	it('BOOK-11 one page today is singular', async () => {
 		useLibrary();
 		open('mm');
-		await userEvent.click(screen.getByRole('button', { name: 'Add 1 page' }));
+		await userEvent.click(screen.getByRole('button', { name: 'Add 1 page to Middlemarch' }));
 		expect(screen.getByText('+1 page today')).toBeInTheDocument();
 	});
 
@@ -147,7 +151,7 @@ describe('Book page: status', () => {
 		useLibrary();
 		open('se');
 		expect(screen.getByText('Not started')).toBeInTheDocument();
-		await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+		await userEvent.click(screen.getByRole('button', { name: 'Start Station Eleven' }));
 		await userEvent.click(screen.getByRole('button', { name: 'Start reading' }));
 		expect(
 			screen.getByText('Enter the number of pages in your copy, or track by percent.')
@@ -167,18 +171,7 @@ describe('Book page: status', () => {
 	});
 });
 
-describe('Book page: reading menu and percent', () => {
-	it('BOOK-15 the ⋯ beside the status has the same choices as elsewhere (no Open book here)', async () => {
-		useLibrary();
-		open('pir');
-		await userEvent.click(screen.getByRole('button', { name: 'More for Piranesi' }));
-		expect(
-			within(screen.getByRole('menu'))
-				.getAllByRole('menuitem')
-				.map((m) => m.textContent)
-		).toEqual(['Re-read']);
-	});
-
+describe('Book page: percent', () => {
 	it('BOOK-16 a percent reading shows percent, adds 1%, and its history reads in percent', async () => {
 		const d = sampleLibrary();
 		addBook(d, {
@@ -192,7 +185,7 @@ describe('Book page: reading menu and percent', () => {
 		useLibrary(d);
 		open('pc');
 		expect(screen.getByRole('button', { name: '40%' })).toBeInTheDocument();
-		await userEvent.click(screen.getByRole('button', { name: 'Add 1%' }));
+		await userEvent.click(screen.getByRole('button', { name: 'Add 1% to Percent Book' }));
 		expect(screen.getByText('+1% today')).toBeInTheDocument();
 		expect(screen.getByText('30% → 40%')).toBeInTheDocument();
 		const stats = document.querySelector('.stats')!;

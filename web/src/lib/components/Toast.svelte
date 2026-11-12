@@ -61,10 +61,18 @@
 			transform: scaleX(0);
 		}
 	}
+	/* Centered on the content column (see the app layout): beside the
+	   sidebar it's 100px right of the screen's center; from 1120px wide the
+	   content itself is centered. */
 	@media (min-width: 900px) {
 		.toast {
 			bottom: 24px;
 			left: calc(50% + 100px);
+		}
+	}
+	@media (min-width: 1120px) {
+		.toast {
+			left: 50%;
 		}
 	}
 </style>
