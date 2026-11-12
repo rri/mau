@@ -996,3 +996,14 @@ key gets its Google books by normal matching. Checked on the real export's
 17 Google books: 16 matched Open Library works, 1 needed checking. To keep
 Google links, add a Google Books key (Settings → Google Books) before
 importing.
+
+## Dependabot alert for deepmerge left open (2026-11-12)
+
+- **GHSA-gcqx-w48m-w2h4** (low, prototype poisoning in npm's `deepmerge`)
+  stays open until upstream fixes it. `deepmerge` has no fixed version, and
+  the newest `@sveltejs/vite-plugin-svelte` (7.3.1) still depends on it. The
+  plugin uses it only at build time, to merge mau's own Svelte and Vite
+  config, so no outside input reaches it and none of it ships in the binary.
+  Considered and not chosen: a local stand-in through npm `overrides`, and
+  dismissing the alert. Revisit when the plugin drops or updates
+  `deepmerge`.
