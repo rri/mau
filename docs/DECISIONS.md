@@ -953,3 +953,13 @@ Mine, details:
 - **Uploaded covers** aren't in the export, so they don't move.
 - Private rows still show under "Not found" with "Add as manual entry"
   preselected; the label is the import page's general one.
+
+## README header (2026-11-11)
+
+- **The README opens with the landing page's look** as one image,
+  `docs/readme-banner.svg`: the logo, "mau" in Pinyon Script, and the
+  tagline, on the logo's navy, linking to maubooks.org. GitHub doesn't load
+  web fonts in READMEs, so the title is outlines made from the bundled font
+  (the tagline is SVG text in the system sans, small caps). The image has its
+  own background, so it reads the same in GitHub's light and dark themes.
+- The README links the threat model next to the spec and decisions.

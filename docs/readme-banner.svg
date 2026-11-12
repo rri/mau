@@ -1,0 +1,240 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 520" width="720" height="520" role="img" aria-label="mau: your personal library and reading log">
+  <!-- The README header: the landing page's logo, name (Pinyon Script, as
+       outlines so it needs no font), and tagline. Made from web/static/logo.svg. -->
+  <defs>
+    <radialGradient id="bannerBg" cx="50%" cy="0%" r="95%" fx="50%" fy="0%">
+      <stop offset="0%" stop-color="#1E242B" />
+      <stop offset="60%" stop-color="#12161A" />
+    </radialGradient>
+    <filter id="badgeShadow" x="-40%" y="-30%" width="180%" height="190%">
+      <feDropShadow dx="0" dy="22" stdDeviation="26" flood-color="#000" flood-opacity="0.5" />
+    </filter>
+  </defs>
+  <rect width="720" height="520" rx="28" fill="url(#bannerBg)" />
+  <g filter="url(#badgeShadow)">
+    <rect x="260" y="44" width="200" height="200" rx="45" fill="#12161A" />
+  </g>
+  <svg x="260" y="44" width="200" height="200" viewBox="0 0 512 512">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E242B" />
+      <stop offset="100%" stop-color="#12161A" />
+    </linearGradient>
+
+    <!-- Snow/Silver Bengal Coat (Left Cat) -->
+    <linearGradient id="snowCoat" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#E6DFD5" />
+      <stop offset="100%" stop-color="#C7B9A8" />
+    </linearGradient>
+
+    <!-- Warm Brown Bengal Coat (Right Cat) -->
+    <linearGradient id="brownCoat" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#D89448" />
+      <stop offset="100%" stop-color="#A86826" />
+    </linearGradient>
+
+    <!-- Book Page Gradient -->
+    <linearGradient id="pageGradL" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#F7F3EB" />
+      <stop offset="85%" stop-color="#EFE9DC" />
+      <stop offset="100%" stop-color="#D5CBB8" />
+    </linearGradient>
+    <linearGradient id="pageGradR" x1="100%" y1="0%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#F7F3EB" />
+      <stop offset="85%" stop-color="#EFE9DC" />
+      <stop offset="100%" stop-color="#D5CBB8" />
+    </linearGradient>
+
+    <!-- Soft Drop Shadow -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000000" flood-opacity="0.45" />
+    </filter>
+    <filter id="pawShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#000000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Rounded Badge Background -->
+  <rect width="512" height="512" rx="115" fill="url(#bgGrad)" />
+  <rect x="12" y="12" width="488" height="488" rx="105" fill="none" stroke="#D89448" stroke-width="2" stroke-opacity="0.25" />
+
+  <!-- Decorative Intertwined Striped Tails (Top) -->
+  <g fill="none" stroke-linecap="round">
+    <!-- Snow Bengal Tail -->
+    <path d="M 135 160 C 95 95, 195 50, 255 85 C 295 108, 325 75, 305 45" stroke="#C7B9A8" stroke-width="18" />
+    <path d="M 118 118 C 126 112, 134 118, 138 124 M 155 83 C 162 82, 168 90, 168 97 M 205 71 C 210 74, 212 84, 208 90 M 305 45 C 312 52, 308 62, 298 64" stroke="#3A322D" stroke-width="8" />
+    <circle cx="305" cy="45" r="9" fill="#2A2421" />
+  </g>
+
+  <!-- ==================== LEFT CAT: SNOW / SILVER BENGAL ==================== -->
+  <!-- Inspired by the wide-eyed "airplane ears" pose -->
+  <g id="snow-bengal" filter="url(#shadow)">
+    <!-- Neck/Shoulders -->
+    <path d="M 105 235 Q 95 280 110 315 L 225 315 Q 235 280 225 235 Z" fill="url(#snowCoat)" />
+    <!-- Chest Necklace Stripes -->
+    <path d="M 115 268 Q 165 292 215 268" fill="none" stroke="#4A3F37" stroke-width="6" stroke-linecap="round" opacity="0.75" />
+    <path d="M 122 288 Q 165 308 208 288" fill="none" stroke="#4A3F37" stroke-width="5" stroke-linecap="round" opacity="0.65" />
+
+    <!-- Airplane Ears (Angled sharply outward) -->
+    <!-- Left Ear -->
+    <path d="M 112 182 L 52 136 C 58 175, 78 202, 102 212 Z" fill="url(#snowCoat)" stroke="#3A322D" stroke-width="4" stroke-linejoin="round" />
+    <path d="M 104 184 L 66 150 C 72 174, 85 192, 98 200 Z" fill="#C9968B" opacity="0.7" />
+    <!-- Right Ear -->
+    <path d="M 218 182 L 278 136 C 272 175, 252 202, 228 212 Z" fill="url(#snowCoat)" stroke="#3A322D" stroke-width="4" stroke-linejoin="round" />
+    <path d="M 226 184 L 264 150 C 258 174, 245 192, 232 200 Z" fill="#C9968B" opacity="0.7" />
+
+    <!-- Head -->
+    <ellipse cx="165" cy="205" rx="64" ry="54" fill="url(#snowCoat)" />
+
+    <!-- Classic Bengal "M" Forehead & Cheek Markings -->
+    <path d="M 138 176 L 148 156 L 165 174 L 182 156 L 192 176" fill="none" stroke="#3A322D" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M 152 154 L 156 138 M 178 154 L 174 138" fill="none" stroke="#3A322D" stroke-width="4" stroke-linecap="round" />
+    <!-- Cheek Stripes -->
+    <path d="M 104 205 Q 118 208 126 216 M 106 220 Q 120 222 130 228" fill="none" stroke="#3A322D" stroke-width="4" stroke-linecap="round" />
+    <path d="M 226 205 Q 212 208 204 216 M 224 220 Q 210 222 200 228" fill="none" stroke="#3A322D" stroke-width="4" stroke-linecap="round" />
+
+    <!-- Wide Owl-Like Dark Eyes -->
+    <circle cx="137" cy="200" r="17" fill="#4E594A" stroke="#221D1A" stroke-width="3.5" />
+    <circle cx="137" cy="200" r="13.5" fill="#14110F" />
+    <circle cx="132" cy="194" r="4.5" fill="#FFFFFF" />
+    <circle cx="143" cy="205" r="2" fill="#FFFFFF" opacity="0.8" />
+
+    <circle cx="193" cy="200" r="17" fill="#4E594A" stroke="#221D1A" stroke-width="3.5" />
+    <circle cx="193" cy="200" r="13.5" fill="#14110F" />
+    <circle cx="188" cy="194" r="4.5" fill="#FFFFFF" />
+    <circle cx="199" cy="205" r="2" fill="#FFFFFF" opacity="0.8" />
+
+    <!-- Nose Bridge Shading & Muzzle -->
+    <path d="M 156 190 Q 165 215 174 190" fill="#8C7765" opacity="0.45" />
+    <ellipse cx="153" cy="233" rx="16" ry="11" fill="#F5EFE6" />
+    <ellipse cx="177" cy="233" rx="16" ry="11" fill="#F5EFE6" />
+    <!-- Whisker Dots -->
+    <circle cx="144" cy="231" r="1.8" fill="#2A2421" />
+    <circle cx="139" cy="235" r="1.8" fill="#2A2421" />
+    <circle cx="147" cy="237" r="1.8" fill="#2A2421" />
+    <circle cx="186" cy="231" r="1.8" fill="#2A2421" />
+    <circle cx="191" cy="235" r="1.8" fill="#2A2421" />
+    <circle cx="183" cy="237" r="1.8" fill="#2A2421" />
+
+    <!-- Brick-Pink Nose & Mouth -->
+    <polygon points="155,220 175,220 165,231" fill="#C86D58" stroke="#2A2421" stroke-width="2.5" stroke-linejoin="round" />
+    <path d="M 165 231 L 165 237 M 165 237 Q 155 244 146 239 M 165 237 Q 175 244 184 239" fill="none" stroke="#2A2421" stroke-width="3" stroke-linecap="round" />
+  </g>
+
+  <!-- ==================== RIGHT CAT: WARM BROWN BENGAL ==================== -->
+  <!-- Inspired by the tall-eared head-tilt pose & rich rosettes -->
+  <g id="brown-bengal" filter="url(#shadow)" transform="rotate(-7, 345, 215)">
+    <!-- Neck/Shoulders with Rosettes -->
+    <path d="M 280 230 Q 270 280 285 320 L 405 320 Q 415 280 400 230 Z" fill="url(#brownCoat)" />
+    <!-- Bengal Rosettes & Stripes on Body -->
+    <circle cx="315" cy="275" r="9" fill="#6E3B10" stroke="#1E140C" stroke-width="4" stroke-dasharray="18 8" />
+    <circle cx="368" cy="280" r="10" fill="#6E3B10" stroke="#1E140C" stroke-width="4" stroke-dasharray="20 9" />
+    <circle cx="342" cy="298" r="8" fill="#6E3B10" stroke="#1E140C" stroke-width="3.5" stroke-dasharray="16 7" />
+    <path d="M 292 252 Q 340 275 388 252" fill="none" stroke="#1E140C" stroke-width="6" stroke-linecap="round" />
+
+    <!-- Tall Alert Rounded Ears -->
+    <!-- Left Ear -->
+    <path d="M 288 175 C 275 115, 292 88, 315 100 C 328 108, 335 135, 336 160 Z" fill="url(#brownCoat)" stroke="#1E140C" stroke-width="4" stroke-linejoin="round" />
+    <path d="M 296 166 C 287 125, 298 104, 313 112 C 322 118, 327 138, 328 158 Z" fill="#D98A7C" opacity="0.75" />
+    <!-- Right Ear -->
+    <path d="M 392 175 C 405 115, 388 88, 365 100 C 352 108, 345 135, 344 160 Z" fill="url(#brownCoat)" stroke="#1E140C" stroke-width="4" stroke-linejoin="round" />
+    <path d="M 384 166 C 393 125, 382 104, 367 112 C 358 118, 353 138, 352 158 Z" fill="#D98A7C" opacity="0.75" />
+
+    <!-- Head -->
+    <ellipse cx="340" cy="202" rx="62" ry="53" fill="url(#brownCoat)" />
+
+    <!-- Forehead Markings & Mascara Stripes -->
+    <path d="M 314 172 L 324 152 L 340 170 L 356 152 L 366 172" fill="none" stroke="#1E140C" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M 328 150 L 332 132 M 352 150 L 348 132" fill="none" stroke="#1E140C" stroke-width="4.5" stroke-linecap="round" />
+    <path d="M 280 202 Q 296 205 304 214 M 282 217 Q 298 220 308 226" fill="none" stroke="#1E140C" stroke-width="4.5" stroke-linecap="round" />
+    <path d="M 400 202 Q 384 205 376 214 M 398 217 Q 382 220 372 226" fill="none" stroke="#1E140C" stroke-width="4.5" stroke-linecap="round" />
+
+    <!-- Expressive Greenish-Gold Eyes -->
+    <ellipse cx="313" cy="198" rx="15.5" ry="14.5" fill="#6D8C49" stroke="#1E140C" stroke-width="3.5" />
+    <ellipse cx="313" cy="198" rx="9" ry="12" fill="#14110F" />
+    <circle cx="308" cy="192" r="4" fill="#FFFFFF" />
+
+    <ellipse cx="367" cy="198" rx="15.5" ry="14.5" fill="#6D8C49" stroke="#1E140C" stroke-width="3.5" />
+    <ellipse cx="367" cy="198" rx="9" ry="12" fill="#14110F" />
+    <circle cx="362" cy="192" r="4" fill="#FFFFFF" />
+
+    <!-- Cream Muzzle Pads -->
+    <ellipse cx="328" cy="230" rx="16" ry="11" fill="#F2DEC4" />
+    <ellipse cx="352" cy="230" rx="16" ry="11" fill="#F2DEC4" />
+    <circle cx="319" cy="228" r="1.8" fill="#1E140C" />
+    <circle cx="314" cy="232" r="1.8" fill="#1E140C" />
+    <circle cx="361" cy="228" r="1.8" fill="#1E140C" />
+    <circle cx="366" cy="232" r="1.8" fill="#1E140C" />
+
+    <!-- Terracotta Nose & Sweet Tilted Smile -->
+    <polygon points="330,217 350,217 340,228" fill="#B85642" stroke="#1E140C" stroke-width="2.5" stroke-linejoin="round" />
+    <path d="M 340 228 L 340 234 M 340 234 Q 330 241 321 236 M 340 234 Q 350 241 359 236" fill="none" stroke="#1E140C" stroke-width="3" stroke-linecap="round" />
+  </g>
+
+  <!-- ==================== OPEN BOOK ==================== -->
+  <g id="open-book" filter="url(#shadow)">
+    <!-- Hardcover Backing -->
+    <path d="M 48 312 Q 152 292 256 326 Q 360 292 464 312 L 476 436 Q 366 414 256 448 Q 146 414 36 436 Z" fill="#8C3B2B" stroke="#5E2317" stroke-width="4" stroke-linejoin="round" />
+    <!-- Gold Ribbon Bookmark -->
+    <path d="M 256 442 Q 248 472 232 490 L 250 486 L 260 496 Q 266 470 256 442 Z" fill="#E5A93C" />
+
+    <!-- Bottom Page Stack Accent -->
+    <path d="M 56 302 Q 156 280 256 318 Q 356 280 456 302 L 464 422 Q 360 398 256 434 Q 152 398 48 422 Z" fill="#D5CBB8" stroke="#AFA38E" stroke-width="2" />
+
+    <!-- Left Page -->
+    <path d="M 60 290 Q 158 266 256 308 L 256 426 Q 156 386 52 408 Z" fill="url(#pageGradL)" />
+    <!-- Right Page -->
+    <path d="M 452 290 Q 354 266 256 308 L 256 426 Q 356 386 460 408 Z" fill="url(#pageGradR)" />
+
+    <!-- Center Spine Crease -->
+    <line x1="256" y1="308" x2="256" y2="426" stroke="#B8AC97" stroke-width="3" stroke-linecap="round" />
+
+    <!-- Subtle Decorative Book Lines on Left Page -->
+    <path d="M 95 335 Q 155 322 215 342" fill="none" stroke="#C7BBA6" stroke-width="3" stroke-linecap="round" />
+    <path d="M 92 355 Q 155 342 215 362" fill="none" stroke="#C7BBA6" stroke-width="3" stroke-linecap="round" />
+    <path d="M 90 375 Q 135 366 180 378" fill="none" stroke="#C7BBA6" stroke-width="3" stroke-linecap="round" />
+
+    <!-- Subtle Decorative Book Lines on Right Page -->
+    <path d="M 297 342 Q 357 322 417 335" fill="none" stroke="#C7BBA6" stroke-width="3" stroke-linecap="round" />
+    <path d="M 297 362 Q 357 342 420 355" fill="none" stroke="#C7BBA6" stroke-width="3" stroke-linecap="round" />
+    <path d="M 297 382 Q 342 368 387 375" fill="none" stroke="#C7BBA6" stroke-width="3" stroke-linecap="round" />
+  </g>
+
+  <!-- ==================== STRIPED BENGAL PAWS DRAPED OVER BOOK ==================== -->
+  <!-- Inspired by the outstretched striped forelegs in Photos 1 & 3 -->
+  <g id="paws" filter="url(#pawShadow)">
+    <!-- Snow Bengal Left Paw -->
+    <g transform="translate(92, 272) rotate(12)">
+      <rect x="0" y="0" width="38" height="62" rx="19" fill="url(#snowCoat)" stroke="#3A322D" stroke-width="3" />
+      <!-- Leg Stripes -->
+      <path d="M 4 16 Q 19 22 34 16 M 3 29 Q 19 35 35 29 M 5 41 Q 19 46 33 41" fill="none" stroke="#3A322D" stroke-width="4.5" stroke-linecap="round" />
+      <!-- Toe Separations -->
+      <path d="M 13 50 L 13 60 M 25 50 L 25 60" stroke="#3A322D" stroke-width="2.5" stroke-linecap="round" />
+    </g>
+
+    <!-- Snow Bengal Right Paw -->
+    <g transform="translate(188, 278) rotate(-8)">
+      <rect x="0" y="0" width="38" height="64" rx="19" fill="url(#snowCoat)" stroke="#3A322D" stroke-width="3" />
+      <path d="M 4 16 Q 19 22 34 16 M 3 29 Q 19 35 35 29 M 5 42 Q 19 47 33 42" fill="none" stroke="#3A322D" stroke-width="4.5" stroke-linecap="round" />
+      <path d="M 13 52 L 13 62 M 25 52 L 25 62" stroke="#3A322D" stroke-width="2.5" stroke-linecap="round" />
+    </g>
+
+    <!-- Brown Bengal Left Paw -->
+    <g transform="translate(278, 278) rotate(8)">
+      <rect x="0" y="0" width="38" height="60" rx="19" fill="url(#brownCoat)" stroke="#1E140C" stroke-width="3" />
+      <path d="M 4 15 Q 19 21 34 15 M 3 28 Q 19 34 35 28 M 5 40 Q 19 45 33 40" fill="none" stroke="#1E140C" stroke-width="4.5" stroke-linecap="round" />
+      <path d="M 13 49 L 13 58 M 25 49 L 25 58" stroke="#1E140C" stroke-width="2.5" stroke-linecap="round" />
+    </g>
+
+    <!-- Brown Bengal Right Paw -->
+    <g transform="translate(385, 270) rotate(-14)">
+      <rect x="0" y="0" width="38" height="62" rx="19" fill="url(#brownCoat)" stroke="#1E140C" stroke-width="3" />
+      <path d="M 4 16 Q 19 22 34 16 M 3 29 Q 19 35 35 29 M 5 41 Q 19 46 33 41" fill="none" stroke="#1E140C" stroke-width="4.5" stroke-linecap="round" />
+      <path d="M 13 50 L 13 60 M 25 50 L 25 60" stroke="#1E140C" stroke-width="2.5" stroke-linecap="round" />
+    </g>
+  </g>
+</svg>
+  <path fill="#F7F3EB" d="M306.4 388.5L306.4 388.5Q301.4 388.5 297.7 386.5Q294.0 384.5 294.0 381.2L294.0 381.2Q294.0 378.7 295.2 375.3Q296.5 371.9 300.9 365.9Q305.2 359.9 314.3 349.7L314.3 349.7Q321.5 341.4 324.4 336.9Q327.3 332.3 327.3 330.1L327.3 330.1Q327.3 328.8 326.3 327.8Q325.3 326.8 322.6 326.8L322.6 326.8Q320.3 326.8 316.9 328.3Q313.5 329.9 307.4 334.5L307.4 334.5Q300.2 339.9 290.4 349.9Q280.6 359.9 268.8 374.9L268.8 374.9L260.1 386.2Q257.9 385.8 254.8 385.8L254.8 385.8Q251.6 385.8 249.3 386.1Q247.0 386.4 246.0 386.7L246.0 386.7Q251.5 380.0 254.5 376.3Q257.5 372.6 259.3 370.3Q261.1 368.1 262.8 365.9Q264.5 363.7 267.2 360.2Q269.9 356.6 274.8 350.1L274.8 350.1Q280.2 343.1 282.8 339.1Q285.5 335.0 286.4 332.9Q287.3 330.9 287.3 329.6L287.3 329.6Q287.3 326.8 282.8 326.8L282.8 326.8Q280.4 326.8 276.6 328.4Q272.7 330.0 266.9 334.6L266.9 334.6Q260.5 339.7 250.8 349.7Q241.1 359.7 228.7 374.9L228.7 374.9L220.1 386.2Q218.8 386.0 217.4 385.9Q216.1 385.8 214.8 385.8L214.8 385.8Q211.4 385.8 209.2 386.1Q206.9 386.4 205.9 386.7L205.9 386.7Q216.3 371.7 223.3 361.8Q230.3 351.9 234.5 346.0Q238.7 340.0 240.8 336.9Q242.9 333.8 243.6 332.5Q244.4 331.1 244.5 330.3L244.5 330.3Q244.6 327.6 242.4 327.6L242.4 327.6Q241.1 327.6 238.3 330.2Q235.5 332.8 232.1 336.7Q228.6 340.6 225.2 344.7Q221.9 348.8 219.4 351.9L219.4 351.9Q218.8 352.3 217.7 351.4L217.7 351.4Q217.2 350.6 217.5 350.3L217.5 350.3Q220.1 347.5 223.5 343.1Q226.9 338.8 230.6 334.5Q234.3 330.2 238.2 327.3Q242.1 324.5 245.7 324.5L245.7 324.5Q248.4 324.5 251.1 325.6Q253.7 326.8 253.3 331.1L253.3 331.1Q253.2 332.6 252.3 334.9Q251.5 337.2 249.0 340.7L249.0 340.7L229.5 367.8L230.0 368.8Q243.0 353.8 252.0 344.6Q261.0 335.5 266.6 331.5L266.6 331.5Q272.0 327.4 276.0 325.9Q280.1 324.5 283.8 324.5L283.8 324.5Q289.7 324.5 292.3 327.4Q294.8 330.3 294.6 333.8L294.6 333.8Q294.5 337.2 293.6 339.9Q292.8 342.5 289.7 347.3L289.7 347.3Q297.8 339.0 304.2 333.8L304.2 333.8Q311.2 328.2 315.6 326.3Q320.0 324.5 323.8 324.5L323.8 324.5Q329.8 324.5 332.3 327.4Q334.7 330.3 334.6 333.8L334.6 333.8Q334.5 337.5 332.2 342.7Q329.8 347.8 324.1 355.5Q318.4 363.1 308.1 374.4L308.1 374.4Q303.3 379.4 302.3 380.8Q301.4 382.2 301.4 383.5L301.4 383.5L300.8 383.5Q300.8 385.8 307.5 385.8L307.5 385.8Q312.1 385.8 317.5 382.5Q322.8 379.3 328.3 374.4Q333.7 369.4 338.4 364.3Q343.2 359.1 346.4 355.3Q349.7 351.4 350.6 350.3L350.6 350.3L352.5 351.9Q351.4 353.1 348.0 357.2Q344.6 361.2 339.7 366.4Q334.8 371.7 329.1 376.7Q323.3 381.8 317.5 385.1Q311.6 388.5 306.4 388.5ZM349.7 388.2L349.7 388.2Q343.8 388.2 341.1 384.9Q338.3 381.7 338.3 376.0L338.3 376.0Q338.3 369.8 341.0 362.8Q343.6 355.7 349.7 348.8L349.7 348.8Q362.3 334.2 373.2 329.3Q384.1 324.5 393.6 324.5L393.6 324.5Q398.5 324.5 401.8 326.5Q405.1 328.5 405.1 332.1L405.1 332.1Q405.1 334.7 404.0 337.5L404.0 337.5Q407.0 334.0 409.1 331.4Q411.2 328.7 413.1 326.3L413.1 326.3Q415.5 327.0 418.7 327.0L418.7 327.0Q420.0 327.0 422.2 327.0Q424.4 326.9 425.6 326.7L425.6 326.7L394.4 364.3Q388.4 371.4 385.8 375.8Q383.2 380.2 383.2 382.6L383.2 382.6Q383.2 385.6 386.1 385.6L386.1 385.6Q391.1 385.6 396.5 382.7Q401.9 379.7 407.1 375.2Q412.3 370.6 416.8 365.6Q421.4 360.6 424.8 356.4Q428.3 352.2 430.2 350.1L430.2 350.1L432.0 351.7Q430.0 354.0 426.3 358.4Q422.6 362.8 417.8 367.9Q413.0 373.0 407.5 377.6Q402.0 382.2 396.2 385.2Q390.4 388.2 384.7 388.2L384.7 388.2Q375.4 388.2 375.4 382.4L375.4 382.4Q375.4 380.3 376.2 378.1Q377.0 375.9 379.4 372.5Q381.8 369.0 386.7 363.1L386.7 363.1L385.7 362.8Q374.4 376.7 364.8 382.4Q355.2 388.2 349.7 388.2ZM350.1 385.4L350.1 385.4Q356.1 385.4 365.8 378.5Q375.5 371.6 389.2 355.4L389.2 355.4Q391.4 352.7 393.3 350.4Q395.2 348.1 397.0 346.1L397.0 346.1Q399.1 342.8 400.8 339.3Q402.5 335.8 402.5 332.9L402.5 332.9Q402.5 330.0 400.5 328.7Q398.5 327.3 396.0 327.3L396.0 327.3Q391.5 327.3 381.3 333.9Q371.2 340.4 359.0 354.8L359.0 354.8Q352.1 363.1 349.0 369.6Q345.9 376.1 345.9 380.6L345.9 380.6Q345.9 385.4 350.1 385.4ZM425.5 388.2L425.5 388.2Q419.4 388.2 416.8 385.2Q414.2 382.2 414.1 378.8L414.1 378.8Q413.8 372.0 419.3 363.9Q424.8 355.8 435.1 343.7L435.1 343.7Q438.7 339.5 442.7 334.6Q446.6 329.6 450.9 325.0L450.9 325.0Q454.0 325.6 458.3 325.6L458.3 325.6Q459.6 325.6 461.9 325.5Q464.2 325.4 465.0 325.3L465.0 325.3Q457.1 333.7 449.2 343.1Q441.3 352.5 435.1 360.1L435.1 360.1Q433.1 362.6 429.8 366.3Q426.6 370.1 424.1 374.3Q421.6 378.5 421.7 382.5L421.7 382.5Q421.7 383.8 422.7 384.8Q423.6 385.9 426.2 385.9L426.2 385.9Q428.0 385.9 432.0 384.7Q435.9 383.5 440.4 380.6L440.4 380.6Q446.6 376.4 454.5 369.1Q462.4 361.8 471.7 350.3L471.7 350.3Q473.7 347.8 475.0 346.3Q476.3 344.7 477.4 343.4L477.4 343.4Q480.7 339.4 484.5 334.8Q488.3 330.3 492.7 325.0L492.7 325.0Q495.7 325.3 496.9 325.4Q498.1 325.6 500.1 325.6L500.1 325.6Q504.5 325.6 506.8 325.3L506.8 325.3Q501.3 331.2 494.3 339.7Q487.3 348.1 480.5 356.6Q473.6 365.1 468.4 371.5L468.4 371.5Q464.0 376.7 462.8 378.6Q461.6 380.5 461.6 382.2L461.6 382.2Q461.7 383.4 462.4 384.5Q463.1 385.6 466.5 385.6L466.5 385.6Q471.4 385.6 477.2 382.3Q483.0 379.1 488.7 374.2Q494.4 369.4 499.3 364.3Q504.3 359.1 507.7 355.3Q511.2 351.4 512.2 350.3L512.2 350.3L514.1 351.9Q512.9 353.1 509.4 357.1Q505.8 361.1 500.6 366.3Q495.4 371.6 489.4 376.6Q483.4 381.6 477.3 384.9Q471.2 388.2 465.8 388.2L465.8 388.2Q462.1 388.2 459.6 386.1Q457.1 384.0 457.0 380.3L457.0 380.3Q456.9 377.0 458.0 373.3Q459.0 369.7 461.6 365.2L461.6 365.2Q450.0 377.7 440.9 383.3L440.9 383.3Q436.1 386.1 432.2 387.2Q428.3 388.2 425.5 388.2Z" />
+  <text x="360" y="452" text-anchor="middle" fill="#C3CCC7" font-family="'Instrument Sans', 'Helvetica Neue', Arial, sans-serif" font-size="22" letter-spacing="1.8" style="font-variant: small-caps">your personal library and reading log</text>
+</svg>

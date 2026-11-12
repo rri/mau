@@ -1,13 +1,18 @@
-# mau
+<p align="center">
+  <a href="https://maubooks.org"><img src="docs/readme-banner.svg" width="540" alt="mau: your personal library and reading log"></a>
+</p>
+
+<p align="center"><a href="https://maubooks.org">maubooks.org</a></p>
 
 A self-hosted personal library and reading tracker. Log a page with one tap,
 keep your books in your own order, track the copies you own, and publish the
-parts you want to share. Works offline; signs in with a password and, optionally, an authenticator
-app.
+parts you want to share. Works offline; signs in with a password and,
+optionally, an authenticator app.
 
 - What it does and why: [`docs/SPEC.md`](docs/SPEC.md)
 - Choices made while building it: [`docs/DECISIONS.md`](docs/DECISIONS.md)
 - The interactive design mocks: [`mocks/`](mocks/)
+- What it defends against: [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
 
 ## Building
 
