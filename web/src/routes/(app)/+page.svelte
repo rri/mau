@@ -271,25 +271,27 @@
 	.plus:active {
 		transform: scale(0.94);
 	}
-	/* Numbers on top, all on one line; labels underneath may wrap. */
+	/* Three across at any width. Numbers on top, all on one line (smaller on
+	   phones); labels underneath may wrap. */
 	.tiles {
 		margin: 0;
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-		gap: 10px;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 8px;
 	}
 	.tiles div {
 		display: grid;
 		align-content: start;
 		gap: 2px;
-		padding: 14px 16px;
+		padding: 12px;
 		border: 1px solid var(--line);
 		border-radius: 12px;
 	}
 	.tiles dd {
 		order: -1;
 		margin: 0;
-		font-size: 28px;
+		font-size: clamp(20px, 6vw, 28px);
+		white-space: nowrap;
 		font-weight: 600;
 		letter-spacing: -0.02em;
 		font-variant-numeric: tabular-nums;

@@ -20,7 +20,8 @@
 	.toast {
 		position: fixed;
 		left: 50%;
-		bottom: calc(76px + env(safe-area-inset-bottom));
+		/* Just above the floating tab bar (see the app layout). */
+		bottom: calc(72px + max(14px, env(safe-area-inset-bottom)));
 		transform: translateX(-50%);
 		width: min(560px, calc(100% - 24px));
 		z-index: 40;

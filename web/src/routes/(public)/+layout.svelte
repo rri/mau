@@ -14,7 +14,7 @@
 		min-height: 100%;
 		display: grid;
 		place-items: center;
-		padding: 24px 16px;
+		padding: 24px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
 	}
 	.card {
 		width: 100%;

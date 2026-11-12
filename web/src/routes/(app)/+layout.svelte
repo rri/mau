@@ -1,6 +1,8 @@
 <script lang="ts">
-	// Signed-in app shell: a bottom tab bar on phones; on wide screens a sidebar
-	// docked to the left of the content, with the content centered on screen.
+	// Signed-in app shell: a tab bar floating above the bottom edge on phones
+	// (clear of the home indicator and the browser's own bottom bar, with
+	// thumb-sized tabs); on wide screens a sidebar docked to the left of the
+	// content, with the content centered on screen.
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { auth } from '#lib/auth.svelte.ts';
@@ -117,42 +119,60 @@
 		min-height: 100%;
 		display: flex;
 		flex-direction: column;
+		/* Phones on their side: clear of the notch. */
+		padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+		--tabbar-h: 62px;
+		--tabbar-gap: max(14px, env(safe-area-inset-bottom));
 	}
 	.content {
 		flex: 1;
 		width: 100%;
 		max-width: 720px;
 		margin: 0 auto;
-		padding-bottom: 76px;
+		/* Room to scroll the last row above the tab bar. */
+		padding-bottom: calc(var(--tabbar-h) + var(--tabbar-gap) + 16px);
 		background: var(--surface);
 	}
 	.tabs {
 		position: fixed;
-		left: 0;
-		right: 0;
-		bottom: 0;
+		left: max(12px, env(safe-area-inset-left));
+		right: max(12px, env(safe-area-inset-right));
+		bottom: var(--tabbar-gap);
 		z-index: 20;
+		max-width: 480px;
+		height: var(--tabbar-h);
+		margin: 0 auto;
+		padding: 4px;
 		display: grid;
 		grid-template-columns: repeat(4, 1fr);
-		background: color-mix(in srgb, var(--surface) 92%, transparent);
-		backdrop-filter: blur(12px);
-		border-top: 1px solid var(--line);
-		padding-bottom: env(safe-area-inset-bottom);
+		gap: 2px;
+		background: color-mix(in srgb, var(--surface) 88%, transparent);
+		backdrop-filter: blur(16px);
+		border: 1px solid var(--line);
+		border-radius: 22px;
+		box-shadow: 0 6px 24px rgb(0 0 0 / 0.14);
 	}
 	.brand {
 		display: none;
 	}
 	.tab {
 		display: grid;
+		place-content: center;
 		justify-items: center;
 		gap: 3px;
-		padding: 8px 0 10px;
+		border-radius: 18px;
 		font-size: 12px;
 		font-weight: 500;
 		color: var(--muted);
 		text-decoration: none;
+		-webkit-tap-highlight-color: transparent;
+	}
+	.tab svg {
+		width: 22px;
+		height: 22px;
 	}
 	.tab[aria-current='page'] {
+		background: var(--accent-soft);
 		color: var(--accent);
 		font-weight: 600;
 	}
@@ -165,13 +185,17 @@
 		.tabs {
 			grid-column: 2;
 			position: sticky;
-			top: 0;
+			inset: 0 auto auto;
+			max-width: none;
 			height: 100vh;
+			margin: 0;
 			display: flex;
 			flex-direction: column;
 			gap: 2px;
 			padding: 24px 12px;
-			border-top: 0;
+			border: 0;
+			border-radius: 0;
+			box-shadow: none;
 			background: none;
 			backdrop-filter: none;
 		}
@@ -195,11 +219,16 @@
 		}
 		.tab {
 			display: flex;
+			place-content: normal;
 			gap: 10px;
 			align-items: center;
 			padding: 8px 12px;
 			border-radius: 10px;
 			font-size: 14.5px;
+		}
+		.tab svg {
+			width: 20px;
+			height: 20px;
 		}
 		.tab:hover {
 			color: var(--ink);

@@ -115,7 +115,7 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 12px 16px;
+		padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
 	}
 	.top button {
 		background: none;
@@ -144,7 +144,7 @@
 		box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.35);
 	}
 	.bottom {
-		padding: 16px 18px 26px;
+		padding: 16px 18px calc(26px + env(safe-area-inset-bottom));
 		display: grid;
 		gap: 10px;
 		justify-items: center;
