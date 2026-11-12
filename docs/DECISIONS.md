@@ -1071,3 +1071,70 @@ the app and the device copy), a search keystroke 10–25 ms.
   needs a check on a real iPhone.
 - **The year's tiles are always three across**; numbers shrink a little on
   narrow phones (20–28px) and stay on one line, and labels may wrap.
+
+## Reading controls, percent, finishing, and a new device's download (2026-11-12)
+
+Chosen by the user:
+
+- **The page button is an up arrow** (it read as "add a book" as a +). It
+  adds 1 page, or 1% for a reading tracked by percent; labels say which
+  ("Add 1 page to …", "Add 1%").
+- **Percent mode** for a copy whose page count isn't known or wanted: setup
+  offers **Don't know? Track by percent**. A percent reading can record the
+  copy's page count and still count in percent, and can switch to pages
+  (**Count pages instead**, once a count is entered); a pages reading can
+  switch to percent (**Track by percent instead**).
+- **Finish** from Active or Inactive (never-started too) sits in a **⋯ menu**,
+  the same on every book that has reading controls: Home rows, Reading rows
+  and tiles, the book page. It finishes **today, with no dialog**, and an
+  undo toast.
+- **Finished → Inactive was dropped.** Finished books offer Re-read only.
+- **A new device downloads in pages, usable from the first one.**
+
+Details decided along the way:
+
+- **Readings have a unit**, `pages` or `percent` (migration 0010). A percent
+  reading's total is 100 and its position is the percent, so the position
+  rule, finishing at the total, undo, and conflicts all work unchanged. The
+  copy's page count, while in percent, is a separate `pages` field.
+- **Progress events record their unit.** "Pages read" (Home, the book page)
+  counts page events only; days read, the calendar, and pace count both
+  (pace in the reading's current unit: "about N days left").
+- **Switching units is a position change** (`progress.unit`): it carries the
+  position in the new unit and takes part in the same chain rule as page
+  steps, so a switch and an offline step on another device resolve like any
+  two moves. A step made in the old unit after another device switched is
+  dropped (it would mean something else now). The switch logs no reading.
+  To percent: position = share read, rounded; the page count is kept. To
+  pages: the reader's page count is the total, and the position is the same
+  share of it (editable after).
+- **Finish leaves the position where it was** (e.g. page 140 of 304): marking
+  a book finished doesn't mean those pages were read today. The book page
+  shows a finished reading's bar full. A never-started book gets a reading
+  started and finished today, in pages when the catalog knows the count,
+  otherwise in percent.
+- **The ⋯ menu**: active Finish, Pause; inactive Start or Resume, Finish;
+  finished Re-read; Open book except on the book page. It opens upwards near
+  the bottom of the screen; focus moves into it, arrows move, Escape closes
+  and returns focus. The book page now has two ⋯ (book details at the top,
+  reading beside the status).
+- **The progress editor is shared** by Reading rows and the book page, with
+  Save and Cancel (phones have no Escape key). In a Reading row the row's
+  buttons hide while it's open, so it gets the full width.
+- **Setup is shared** by Reading rows, the grid's dialog, and the book page.
+- **Export version 3** adds each reading's `unit` and `pages` and each
+  event's `unit`; older exports import as pages. The CSV shows "42%" in
+  Current page and the copy's page count, if known, in Total pages. Public
+  pages show "42%".
+- **The download** (`POST /api/sync/download`): pages of 200 books with their
+  tags, copies, readings, events, and works, live rows only. Active books
+  come first (what Home and Reading show at the top), then every book by
+  ID; book IDs never change, so no book is missed while the library changes.
+  The download remembers the change number it started at; afterwards the
+  device syncs from there, which brings anything changed meanwhile. Each
+  page is saved with where the download stands, so a reload resumes. The
+  app is usable from the first page that has books, with "Downloading your
+  library · N of M books" and a progress line at the top of the content.
+  Changes made meanwhile wait and sync when it's done. Measured with the
+  1,028-book library on this machine: first books after about 0.4 s, all
+  after 0.75 s.
