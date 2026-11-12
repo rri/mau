@@ -132,4 +132,44 @@ describe('Library sync', () => {
 		await library.sync();
 		await vi.waitFor(() => expect(sent(fetch).map((b) => b.since)).toEqual([0, 10]));
 	});
+	it('SYNC-07 a new device shows its library once the first sync answers, not an empty one before', async () => {
+		let answer: (v: unknown) => void = () => {};
+		mockApi({
+			'POST /sync': () =>
+				new Promise((r) => (answer = r)).then(() => ({
+					dropped: [],
+					rejected: [],
+					changes: changes({ seq: 5, works: [W] })
+				}))
+		});
+		await library.open(ME.id);
+		expect(library.ready).toBe(false);
+		answer(null);
+		await vi.waitFor(() => expect(library.ready).toBe(true));
+		expect(library.view.works.size).toBe(1);
+
+		// Next time, this device's copy shows at once.
+		library.close();
+		mockApi({ 'POST /sync': () => new Promise(() => {}) });
+		await library.open(ME.id);
+		expect(library.ready).toBe(true);
+		expect(library.view.works.size).toBe(1);
+	});
+
+	it('SYNC-07 offline on a new device, it stops waiting when the first sync fails', async () => {
+		mockApi({ 'POST /sync': () => Promise.reject(new TypeError('offline')) });
+		await library.open(ME.id);
+		await vi.waitFor(() => expect(library.ready).toBe(true));
+		expect(library.online).toBe(false);
+	});
+
+	it('SYNC-08 a sync that brings nothing new keeps the same view (the screens don’t redraw)', async () => {
+		mockApi({ 'POST /sync': { dropped: [], rejected: [], changes: changes({ works: [W] }) } });
+		await library.open(ME.id);
+		await vi.waitFor(() => expect(library.view.works.size).toBe(1));
+		mockApi({ 'POST /sync': { dropped: [], rejected: [], changes: changes({ seq: 2 }) } });
+		const before = library.view;
+		await library.sync();
+		expect(library.view).toBe(before);
+	});
 });

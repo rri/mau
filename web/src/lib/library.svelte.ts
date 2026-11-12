@@ -21,6 +21,9 @@ const POLL_MS = 60_000;
 class Library {
 	/** What the screens show: server data with unsent operations applied. */
 	view = $state.raw<Data>(emptyData());
+	/** Whether `view` is the library: this device has synced before, or
+	 *  its first sync has finished (or failed, offline). Until then an empty
+	 *  view means "not here yet", not "no books". */
 	ready = $state(false);
 	pending = $state(0);
 	online = $state(typeof navigator === 'undefined' ? true : navigator.onLine);
@@ -46,12 +49,18 @@ class Library {
 		this.since = p.since;
 		for (const r of this.server.readings.values()) observe(r.pos_clock);
 		this.rebuild();
-		this.ready = true;
+		const synced = this.since > 0;
+		if (synced) this.ready = true;
 		window.addEventListener('online', this.onOnline);
 		window.addEventListener('offline', this.onOffline);
 		document.addEventListener('visibilitychange', this.onVisible);
 		this.pollTimer = setInterval(() => this.sync(), POLL_MS);
-		this.sync();
+		const store = this.store;
+		const first = this.sync();
+		if (!synced)
+			first.finally(() => {
+				if (this.store === store) this.ready = true;
+			});
 	}
 
 	close() {
@@ -65,6 +74,8 @@ class Library {
 		this.store?.close();
 		this.store = null;
 		this.userId = null;
+		this.syncing = false;
+		this.syncAgain = false;
 		this.server = emptyData();
 		this.outbox = [];
 		this.view = emptyData();
@@ -113,7 +124,10 @@ class Library {
 	}
 
 	async sync(): Promise<void> {
-		if (!this.store || !this.userId) return;
+		// The copy this sync belongs to: if it's closed meanwhile (signing
+		// out, another account), the answer is ignored.
+		const store = this.store;
+		if (!store || !this.userId) return;
 		if (this.syncing) {
 			this.syncAgain = true;
 			return;
@@ -124,17 +138,19 @@ class Library {
 				this.syncAgain = false;
 				const batch = this.outbox.slice(0, BATCH);
 				const res = await post<SyncResponse>('/sync', { since: this.since, ops: batch });
+				if (this.store !== store) return;
 				this.online = true;
 				const sent = new Set(batch.map((o) => o.id));
 				this.outbox = this.outbox.filter((o) => !sent.has(o.id));
-				await this.store.removeOps(sent);
+				await store.removeOps(sent);
 				this.merge(res);
 				if (res.rejected.length) {
 					toasts.show(`Some changes couldn't be saved: ${res.rejected[0].message}`);
 				}
 				if (this.outbox.length) this.syncAgain = true;
-			} while (this.syncAgain && this.store);
+			} while (this.syncAgain && this.store === store);
 		} catch (e) {
+			if (this.store !== store) return;
 			if (e instanceof ApiError && e.status === 401) {
 				// The session was revoked: this device's copy and unsent changes go.
 				await this.wipe();
@@ -144,11 +160,11 @@ class Library {
 			}
 			if (e instanceof ApiError && e.offline) this.online = false;
 		} finally {
-			this.syncing = false;
+			if (this.store === store) this.syncing = false;
 		}
 		// A sync asked for while this one ran (coming back online, say) still
 		// happens, even when this one failed.
-		if (this.syncAgain && this.store) {
+		if (this.syncAgain && this.store === store) {
 			this.syncAgain = false;
 			return this.sync();
 		}
@@ -168,7 +184,16 @@ class Library {
 		for (const w of c.works) s.works.set(w.id, w);
 		this.since = c.seq;
 		this.store?.saveChanges(c);
-		this.rebuild();
+		// Most syncs (the minutely check) bring nothing: keep the same view, so
+		// the screens don't redraw.
+		const rows =
+			c.books.length +
+			c.tags.length +
+			c.copies.length +
+			c.readings.length +
+			c.events.length +
+			c.works.length;
+		if (rows || this.pending !== this.outbox.length) this.rebuild();
 		if (c.books.length || c.works.length) this.prefetchCovers();
 	}
 
