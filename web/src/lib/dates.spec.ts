@@ -48,7 +48,7 @@ describe('dates', () => {
 		expect(readingSpan('2026-10-01', null)).toBe('Oct 1, 2026 – now');
 		expect(readingSpan(U, '2026-10-28')).toBe('Finished Oct 28, 2026');
 		expect(readingSpan('2026-10-01', U)).toBe('Started Oct 1, 2026');
-		expect(readingSpan(U, U)).toBe('Dates unknown');
+		expect(readingSpan(U, U)).toBe('Finished');
 		expect(readingSpan(U, null)).toBe('Started, date unknown');
 	});
 });

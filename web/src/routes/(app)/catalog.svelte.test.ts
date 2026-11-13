@@ -182,4 +182,13 @@ describe('Catalog', () => {
 			'Active · 42%'
 		);
 	});
+
+	it('CAT-01 a finished book without a known date just says Finished', () => {
+		const d = emptyData();
+		addBook(d, { id: 'u', title: 'Undated Book', author: 'U. Author', finished: ['0000-01-01'] });
+		useLibrary(d);
+		render(Catalog);
+		const row = screen.getByText('Undated Book', { selector: '.title' }).closest('a')!;
+		expect(row.querySelector('.st')).toHaveTextContent(/^\s*Finished\s*$/);
+	});
 });

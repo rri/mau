@@ -4,8 +4,15 @@
 	import { page } from '$app/state';
 	import { ApiError, post } from '#lib/api/client.ts';
 	import type { EditionRow } from '#lib/api/generated/EditionRow.ts';
-	import { resume, startLike, startReading, today } from '#lib/actions.ts';
-	import { fmtDate, fmtMonthDay, readingSpan } from '#lib/dates.ts';
+	import {
+		dateReading,
+		deleteReading,
+		resume,
+		startLike,
+		startReading,
+		today
+	} from '#lib/actions.ts';
+	import { fmtDate, fmtMonthDay, readingSpan, UNKNOWN_DATE } from '#lib/dates.ts';
 	import { bookInfo, eventsOf, liveBooks, pagesOn, progressText } from '#lib/derive.ts';
 	import { library } from '#lib/library.svelte.ts';
 	import { modal } from '#lib/modal.ts';
@@ -248,6 +255,20 @@
 	}
 	const at = (l: Line, n: number) => (l.percent ? `${n}%` : `page ${n}`);
 
+	// A finished reading without its date gets one inline; readings can be
+	// deleted (after asking: there's no undo).
+	let finishDates = $state<Record<string, string>>({});
+	function saveFinishDate(e: SubmitEvent, readingId: string) {
+		e.preventDefault();
+		const date = finishDates[readingId];
+		if (info && date) dateReading(info, readingId, date);
+	}
+	let deleting = $state<{ id: string; n: number; days: number } | null>(null);
+	function confirmDelete() {
+		if (info && deleting) deleteReading(info, deleting.id);
+		deleting = null;
+	}
+
 	// ---- Remove ------------------------------------------------------------------
 	let confirmRemove = $state(false);
 	function remove() {
@@ -374,8 +395,11 @@
 				<div class="meta">
 					{#if pagesEditing && r}
 						<ProgressEditor {info} ondone={() => (pagesEditing = false)} />
-					{:else if info.state === 'finished' && r?.finished_on}
-						<span>Finished · {fmtDate(r.finished_on)}</span>
+					{:else if info.state === 'finished'}
+						<!-- The pill already says Finished: only the date, when known. -->
+						{#if r?.finished_on && r.finished_on !== UNKNOWN_DATE}<span
+								>{fmtDate(r.finished_on)}</span
+							>{/if}
 					{:else if r}
 						<button class="pos" type="button" onclick={() => (pagesEditing = true)}
 							>{progressText(r)}</button
@@ -528,33 +552,59 @@
 							>{readingSpan(rd.started_on, rd.finished_on)}</span
 						></summary
 					>
-					<!-- Scrolls when long, so keyboard users need to reach it (WCAG 2.1.1). -->
-					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-					<div
-						class="days-scroll"
-						role="region"
-						tabindex="0"
-						aria-label="Days read in reading {info.readings.length - i}"
-					>
-						<ul class="days">
-							{#each lines as l, j (j)}
-								<li>
-									<span class="muted">{fmtMonthDay(l.date)}</span>
-									{#if l.rewind}<span class="rewind"
-											>moved back {at(l, l.from)} → {l.percent ? `${l.to}%` : l.to}</span
-										><span></span>
-									{:else}<span>{at(l, l.from)} → {l.percent ? `${l.to}%` : l.to}</span><span
-											class="delta">+{l.to - l.from}{l.percent ? '%' : ''}</span
-										>{/if}
-								</li>
-							{:else}
-								<li>
-									<span></span><span class="rewind"
-										>{rd.finished_on ? 'No pages logged' : 'No progress yet'}</span
-									><span></span>
-								</li>
-							{/each}
-						</ul>
+					{#if lines.length}
+						<!-- Scrolls when long, so keyboard users need to reach it (WCAG 2.1.1). -->
+						<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+						<div
+							class="days-scroll"
+							role="region"
+							tabindex="0"
+							aria-label="Days read in reading {info.readings.length - i}"
+						>
+							<ul class="days">
+								{#each lines as l, j (j)}
+									<li>
+										<span class="muted">{fmtMonthDay(l.date)}</span>
+										{#if l.rewind}<span class="rewind"
+												>moved back {at(l, l.from)} → {l.percent ? `${l.to}%` : l.to}</span
+											><span></span>
+										{:else}<span>{at(l, l.from)} → {l.percent ? `${l.to}%` : l.to}</span><span
+												class="delta">+{l.to - l.from}{l.percent ? '%' : ''}</span
+											>{/if}
+									</li>
+								{/each}
+							</ul>
+						</div>
+					{:else}
+						<p class="empty">{rd.finished_on ? 'No pages logged' : 'No progress yet'}</p>
+					{/if}
+					<div class="reading-foot">
+						{#if rd.finished_on === UNKNOWN_DATE}
+							<form class="when" onsubmit={(e) => saveFinishDate(e, rd.id)}>
+								<label
+									>Finished on <input
+										type="date"
+										min={rd.started_on === UNKNOWN_DATE ? undefined : rd.started_on}
+										max={day}
+										required
+										bind:value={finishDates[rd.id]}
+									/></label
+								>
+								<button class="btn sm" type="submit" disabled={!finishDates[rd.id]}
+									>Save date</button
+								>
+							</form>
+						{/if}
+						<button
+							class="link danger"
+							type="button"
+							onclick={() =>
+								(deleting = {
+									id: rd.id,
+									n: info.readings.length - i,
+									days: new Set(eventsOf(library.view, rd.id).map((e) => e.local_date)).size
+								})}>Delete reading</button
+						>
 					</div>
 				</details>
 			{/each}
@@ -562,6 +612,31 @@
 			<p class="help">No reading yet.</p>
 		{/if}
 	</section>
+
+	{#if deleting}
+		<div class="dialog-back" role="presentation">
+			<div
+				class="dialog"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="rd-h"
+				use:modal={() => (deleting = null)}
+			>
+				<h3 id="rd-h">Delete reading {deleting.n}?</h3>
+				<p>
+					This permanently deletes the reading{deleting.days
+						? ` with ${plural(deleting.days, 'day', 'days')} of activity`
+						: ''}.
+					{info.readings.length === 1 ? 'With no reading left, the book is Inactive again.' : ''} This
+					can't be undone.
+				</p>
+				<div class="row-end">
+					<button class="btn" type="button" onclick={() => (deleting = null)}>Cancel</button>
+					<button class="btn danger" type="button" onclick={confirmDelete}>Delete</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 
 	{#if confirmRemove}
 		<div class="dialog-back" role="presentation">
@@ -903,7 +978,7 @@
 	.days {
 		list-style: none;
 		margin: 0;
-		padding: 0 12px 10px 18px;
+		padding: 0 12px 10px;
 		display: grid;
 		gap: 2px;
 		font-size: 14px;
@@ -912,6 +987,47 @@
 	.days-scroll {
 		max-height: 260px;
 		overflow-y: auto;
+	}
+	.empty {
+		margin: 0;
+		padding: 0 12px 10px;
+		font-size: 14px;
+		color: var(--muted);
+		font-style: italic;
+	}
+	.reading-foot {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		align-items: center;
+		gap: 8px 12px;
+		padding: 2px 12px 10px;
+		border-top: 1px solid var(--line);
+		padding-top: 8px;
+		font-size: 14px;
+	}
+	.reading-foot .danger {
+		margin-left: auto;
+		color: var(--danger);
+	}
+	.when {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+	}
+	.when label {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		color: var(--muted);
+	}
+	.when input {
+		padding: 5px 8px;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: var(--surface);
+		color: var(--ink);
 	}
 	.days li {
 		display: grid;

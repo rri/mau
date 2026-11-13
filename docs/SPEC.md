@@ -216,7 +216,8 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
   Coming back from a book keeps the books drawn and the scroll position. The
   Reading view does the same.
 - List rows: cover, title, author, state ("Inactive" with pages if any
-  progress; "Finished · date" with only the latest date), up to two tags, and a
+  progress; "Finished · date" with only the latest date, or just "Finished"
+  when it isn't known), up to two tags, and a
   shelf icon if owned.
 - Grid tiles: cover with badges (active or finished top-left, owned
   top-right), progress bar if started and unfinished (its space is always
@@ -244,7 +245,9 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
   summaries grouped per reading, latest expanded, with rewinds as their own lines.
   Only what was logged shows: no "0 days read" or "0 pages", and no
   calendar (or legend) without reading days. Each reading's heading says
-  what's known of its dates (see BOOK-17).
+  what's known of its dates (see BOOK-17). A finished reading without its
+  finish date takes one inline (BOOK-18); any reading can be deleted
+  (BOOK-19).
 
 ## 7. Adding books
 
@@ -539,7 +542,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 
 | ID | Element | Behavior | Tests |
 |---|---|---|---|
-| CAT-01 | List | Every book, recently added first: cover, title, authors, state ("Active · page X of Y" or "Active · 42%", "Inactive" with progress if started, "Finished · date"), up to two #tags, a shelf icon "You own a copy". | C, E |
+| CAT-01 | List | Every book, recently added first: cover, title, authors, state ("Active · page X of Y" or "Active · 42%", "Inactive" with progress if started, "Finished · date", or "Finished" when the date isn't known), up to two #tags, a shelf icon "You own a copy". | C, E |
 | CAT-02 | Filters | State chips (all on), **Owned?**, tag chips (all chosen tags must match), search; they combine. The count reads "N books" or "n of N books"; **Clear filters** appears while filtering. | C, E |
 | CAT-03 | Tag chips | Alphabetical; shown only when there are tags. | C |
 | CAT-04 | Search | Title or any author, ignoring case. | C, B |
@@ -562,14 +565,16 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | BOOK-10 | Status | Pill (Active, Inactive, Finished), progress bar, "page X of Y" (or "42%") button, "+N page(s) today" (or "+N% today"); the reading buttons (READ-16), or Re-read. | C |
 | BOOK-12 | Page editor | Current and total page with Save and Cancel. | C |
 | BOOK-13 | Start | Asks for the pages like READ-05. | C |
-| BOOK-14 | Finished | "Finished · *date*" ("Finished · date unknown"), as in the Catalog; Re-read starts a new reading at page 0 with the same total. | C, U |
+| BOOK-14 | Finished | The pill says Finished; the status line only the date (nothing when it isn't known); Re-read starts a new reading at page 0 with the same total. | C, U |
 | BOOK-16 | Percent | "42%", +1 adds 1%, history lines "30% → 40%"; percent adds days read but no pages; the calendar shades percent-only days by percent. | C |
 | BOOK-20 | Rating | Five stars (a radio group); choosing the current rating again clears it. | C, B |
 | BOOK-21 | Notes | "Private notes about this book"; saved 0.7 seconds after typing stops, then "Saved" by the heading. | C, B |
 | BOOK-22 | Tags | Chips with ×; "+ add tag" suggests existing tags (§14.12) or creates one. | C, B |
 | BOOK-23 | Copies | Heading "Copies · owned" when there are copies; each: format, location (or "No location"), edition line, ×. Without copies: "You don't own a copy…". **+ Add copy**: format, edition (the work's editions or "Unknown edition", the default), location. Removing toasts "Copy removed". | C, B |
 | BOOK-30 | Reading activity | "N day(s) read · N page(s) · N reading(s)" (days and pages only when some were logged), the calendar when there are reading days (one row per year with reading, plus this year while reading; shaded 1–9 / 10–24 / 25–49 / 50+; "Less … More"; hover shows the day), then each reading newest first ("Reading N" and its dates, BOOK-17; the newest open) with its days newest first ("page a → b +n", rewinds as "moved back page a → b"). | C |
-| BOOK-17 | Reading dates | A reading's heading: "Oct 1, 2026 – Oct 28, 2026", "Oct 1, 2026 – now", "Finished Oct 28, 2026" (start unknown), "Started Oct 1, 2026" (finished, date unknown), "Dates unknown". A finished reading with nothing logged says "No pages logged" (unfinished: "No progress yet"). | U, C |
+| BOOK-17 | Reading dates | A reading's heading: "Oct 1, 2026 – Oct 28, 2026", "Oct 1, 2026 – now", "Finished Oct 28, 2026" (start unknown), "Started Oct 1, 2026" (finished, date unknown), "Finished" (neither known). A finished reading with nothing logged says "No pages logged" (unfinished: "No progress yet"), left-aligned with the heading. | U, C |
+| BOOK-18 | Finish date | A finished reading whose finish date isn't known shows "Finished on [date] Save date" under its days (no later than today, nor before its start). Saving sets the date and logs the whole book read that day: to 100%, or to the last page (from the start when nothing was logged). Undo toast. | C |
+| BOOK-19 | Delete reading | Each reading has "Delete reading"; a dialog asks first ("…with N days of activity", and "the book is Inactive again" for the only reading), since there's no undo. Deleting an active book's current reading makes it inactive; a finished book whose readings are all deleted is Inactive. | C |
 | BOOK-31 | No progress | "No progress yet" in a reading; "No reading yet." for a never-started book. | C |
 | BOOK-33 | Remove | A dialog "Remove *title*?" listing what's deleted (readings, rating, notes, copies, tags); Remove deletes, toasts "Removed *title* from your list", and returns to the catalog. | C, B |
 

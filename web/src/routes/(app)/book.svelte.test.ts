@@ -1,10 +1,11 @@
 // A book's page (spec §6): header, status, rating and notes, tags, copies,
 // activity, editing, and removal.
+import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import Book from './catalog/[id]/+page.svelte';
-import { bookInfo } from '#lib/derive.ts';
+import { bookInfo, eventsOf } from '#lib/derive.ts';
 import { library } from '#lib/library.svelte.ts';
 import { origin } from '#lib/origin.svelte.ts';
 import { toasts } from '#lib/toast.svelte.ts';
@@ -164,7 +165,9 @@ describe('Book page: status', () => {
 	it('BOOK-14 a finished book shows its date and offers a re-read', async () => {
 		useLibrary();
 		open('pir');
-		expect(screen.getByText('Finished · Oct 28, 2026')).toBeInTheDocument();
+		// The pill says Finished; the status line just the date.
+		expect(screen.getAllByText('Finished', { exact: false })).toHaveLength(1);
+		expect(document.querySelector('.meta')).toHaveTextContent(/^\s*Oct 28, 2026\s*$/);
 		await userEvent.click(screen.getByRole('button', { name: 'Re-read' }));
 		expect(info('pir').state).toBe('active');
 		expect(info('pir').readings).toHaveLength(2);
@@ -208,13 +211,99 @@ describe('Book page: readings without dates', () => {
 		d.readings.set(r.id, { ...r, started_on: '0000-01-01' });
 		useLibrary(d);
 		open('imp');
-		expect(screen.getByText('Finished · date unknown')).toBeInTheDocument();
+		expect(document.body).not.toHaveTextContent(/date unknown/i);
+		expect(document.querySelector('.meta')).toHaveTextContent(/^\s*$/);
 		const stats = document.querySelector('.stats')!;
 		expect(stats).toHaveTextContent(/^\s*1 reading\s*$/);
 		expect(document.querySelector('.legend')).toBeNull();
 		expect(screen.getByText('Reading 1')).toBeInTheDocument();
-		expect(screen.getByText('Dates unknown')).toBeInTheDocument();
+		expect(document.querySelector('summary')).toHaveTextContent(/Reading 1\s*Finished/);
+		expect(screen.getByText('No pages logged')).toHaveClass('empty');
+	});
+
+	it('BOOK-18 a finished reading without its date takes one inline, logging the whole book that day', async () => {
+		const d = sampleLibrary();
+		addBook(d, {
+			id: 'imp',
+			title: 'Imported Book',
+			author: 'I. Author',
+			pages: 300,
+			finished: ['0000-01-01']
+		});
+		useLibrary(d);
+		open('imp');
+		const save = screen.getByRole('button', { name: 'Save date' });
+		expect(save).toBeDisabled();
+		await userEvent.type(screen.getByLabelText('Finished on'), '2026-09-14');
+		await userEvent.click(save);
+		const r = info('imp').reading!;
+		expect(r.finished_on).toBe('2026-09-14');
+		expect(r.pos).toBe(300);
+		expect(screen.getByText('page 0 → 300')).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Save date' })).toBeNull();
+		expect(document.querySelector('.meta')).toHaveTextContent('Sep 14, 2026');
+		// Undo puts it back as it was.
+		toasts.current?.action?.run();
+		expect(info('imp').reading!.finished_on).toBe('0000-01-01');
+		expect(eventsOf(library.view, info('imp').reading!.id)).toHaveLength(0);
+		flushSync();
 		expect(screen.getByText('No pages logged')).toBeInTheDocument();
+	});
+
+	it('BOOK-18 a percent reading is logged to 100%', async () => {
+		const d = sampleLibrary();
+		addBook(d, {
+			id: 'imp',
+			title: 'Imported Book',
+			author: 'I. Author',
+			finished: ['0000-01-01']
+		});
+		const r = [...d.readings.values()].find((x) => x.book_id === 'imp')!;
+		d.readings.set(r.id, { ...r, unit: 'percent', total: 100, pos: 100 });
+		useLibrary(d);
+		open('imp');
+		await userEvent.type(screen.getByLabelText('Finished on'), '2026-09-14');
+		await userEvent.click(screen.getByRole('button', { name: 'Save date' }));
+		expect(screen.getByText('0% → 100%')).toBeInTheDocument();
+	});
+});
+
+describe('Book page: deleting readings', () => {
+	it('BOOK-19 deleting the only reading of a finished book makes it Inactive, after asking', async () => {
+		useLibrary();
+		open('pir');
+		await userEvent.click(screen.getByRole('button', { name: 'Delete reading' }));
+		const dialog = screen.getByRole('dialog', { name: 'Delete reading 1?' });
+		expect(dialog).toHaveTextContent('the book is Inactive again');
+		await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+		expect(info('pir').readings).toHaveLength(1);
+		await userEvent.click(screen.getByRole('button', { name: 'Delete reading' }));
+		await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+		expect(info('pir').readings).toHaveLength(0);
+		expect(info('pir').state).toBe('inactive');
+		expect(screen.getByText('No reading yet.')).toBeInTheDocument();
+	});
+
+	it('BOOK-19 deleting the current reading of an active book leaves the earlier one', async () => {
+		const d = sampleLibrary();
+		addBook(d, {
+			id: 'rr',
+			title: 'Reread Book',
+			author: 'R. Author',
+			active: true,
+			finished: ['2026-05-01'],
+			reading: { pos: 40, total: 300, started: '2026-11-01' },
+			events: [['2026-11-10', 0, 40]]
+		});
+		useLibrary(d);
+		open('rr');
+		await userEvent.click(screen.getAllByRole('button', { name: 'Delete reading' })[0]);
+		const dialog = screen.getByRole('dialog', { name: 'Delete reading 2?' });
+		expect(dialog).toHaveTextContent('with 1 day of activity');
+		await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+		expect(info('rr').readings).toHaveLength(1);
+		expect(info('rr').state).toBe('finished');
+		expect(info('rr').book.active).toBe(false);
 	});
 });
 

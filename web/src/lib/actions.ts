@@ -4,8 +4,8 @@
 
 import type { OpKind } from './api/generated/OpKind.ts';
 import { auth } from './auth.svelte.ts';
-import { todayIn } from './dates.ts';
-import { bookInfo, readingList, type BookInfo } from './derive.ts';
+import { fmtDate, todayIn, UNKNOWN_DATE } from './dates.ts';
+import { bookInfo, eventsOf, readingList, type BookInfo } from './derive.ts';
 import { library } from './library.svelte.ts';
 import { between } from './sync/rank.ts';
 import { uuidv7 } from './sync/ids.ts';
@@ -316,4 +316,61 @@ export function moveBook(info: BookInfo, index: number, onNeedsSetup: (rank: str
 	toasts.undo(`Moved ${info.title}`, () =>
 		library.commit([{ type: 'book.set', id: info.book.id, fields: { rank: before } }])
 	);
+}
+
+/** Gives a finished reading whose finish date is unknown the date it was
+ *  finished, and logs the whole book as read that day (to 100%, or to the
+ *  last page) unless the reading already got there with pages logged. Shows
+ *  an undo toast. */
+export function dateReading(info: BookInfo, readingId: string, date: string) {
+	const r = info.readings.find((x) => x.id === readingId);
+	if (!r || r.finished_on !== UNKNOWN_DATE || !date) return;
+	const full = r.unit === 'percent' ? 100 : r.total;
+	// Imports record a finished read at its end without any pages logged:
+	// the read then counts from the start.
+	const from = eventsOf(library.view, r.id).length ? r.pos : 0;
+	const eventId = uuidv7();
+	const ops: OpKind[] = [{ type: 'reading.set', id: r.id, fields: { finished_on: date } }];
+	const logs = from < full;
+	if (logs)
+		ops.push({
+			type: 'progress',
+			event_id: eventId,
+			reading_id: r.id,
+			base: r.pos_clock,
+			from,
+			to: full,
+			local_date: date,
+			unit: r.unit
+		});
+	library.commit(ops);
+	toasts.undo(`Finished ${info.title} on ${fmtDate(date)}`, () => {
+		const nr = fresh(info.book.id)?.readings.find((x) => x.id === r.id);
+		if (!nr) return;
+		const back: OpKind[] = [
+			{ type: 'reading.set', id: r.id, fields: { finished_on: UNKNOWN_DATE } }
+		];
+		if (logs)
+			back.push({
+				type: 'progress.undo',
+				reading_id: r.id,
+				event_id: eventId,
+				base: nr.pos_clock,
+				to: r.pos,
+				unit: r.unit
+			});
+		library.commit(back);
+	});
+}
+
+/** Deletes a reading and its logged pages, for good (there's no undo: ask
+ *  first). Without its current reading an active book stops being active,
+ *  so a book whose only reading goes is Inactive again. */
+export function deleteReading(info: BookInfo, readingId: string) {
+	if (!info.readings.some((x) => x.id === readingId)) return;
+	const ops: OpKind[] = [{ type: 'reading.delete', id: readingId }];
+	if (info.book.active && info.reading?.id === readingId)
+		ops.push({ type: 'book.set', id: info.book.id, fields: { active: false } });
+	library.commit(ops);
+	toasts.show('Reading deleted');
 }

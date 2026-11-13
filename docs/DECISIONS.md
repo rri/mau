@@ -1225,3 +1225,24 @@ progress yet" under a finished book. Now:
   had become the Catalog's grid limited to unfinished books. The layout
   switch goes from the Reading header; a device's old `mau.reading.layout`
   setting is simply ignored. The Catalog keeps list and grid.
+
+## Undated readings, and deleting readings (2026-11-12)
+
+From the bug reports on GitHub (#1, #2, #3):
+
+- **No more "date unknown" next to Finished.** The Catalog says just
+  "Finished"; the book page's status line, under a pill that already says
+  Finished, shows only the date (and nothing without one). A reading's
+  heading with neither date known says "Finished" instead of "Dates unknown".
+- **A finished reading without its finish date takes one inline**, a date
+  field and "Save date" at the foot of the reading. Saving logs the whole
+  book as read that day (to 100%, or to the last page; from the start when
+  nothing was logged, as with imports), so the day shows in the calendar.
+  It has an undo toast.
+- **"No pages logged" lines up with the heading**; it sat in the history's
+  second column.
+- **Readings can be deleted**, from the reading's foot, after a dialog:
+  `reading.delete` can't be undone (a new reading would lose its history).
+  Deleting an active book's current reading also makes the book inactive,
+  so a book with no readings left is Inactive, and a finished one goes back
+  to Inactive.
