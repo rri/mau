@@ -21,6 +21,7 @@ maud = "0.27"
 hmac = "0.13"
 data-encoding = "2"
 mime_guess = "2"
+pulldown-cmark = { version = "0.13", default-features = false }
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 rand = "0.9"
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "query", "http2"] }

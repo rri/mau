@@ -81,6 +81,9 @@
 		>Short bio (shown on your public profile)<textarea bind:value={bio} rows="3" maxlength="280"
 		></textarea></label
 	>
+	<p class="help">
+		Line breaks are kept. Markdown works: *italic*, **bold**, `code`, [links](https://…) and lists.
+	</p>
 	<label class="field"
 		>Username<input bind:value={username} autocapitalize="none" spellcheck="false" /></label
 	>

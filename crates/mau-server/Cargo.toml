@@ -24,6 +24,7 @@ image.workspace = true
 csv.workspace = true
 maud.workspace = true
 mime_guess.workspace = true
+pulldown-cmark.workspace = true
 qrcode.workspace = true
 rand.workspace = true
 reqwest.workspace = true

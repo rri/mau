@@ -136,9 +136,16 @@ const STYLE: &str = r#"
 body{background:var(--bg);color:var(--ink);font:15px/1.5 'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 main{max-width:720px;min-height:100vh;margin:0 auto;padding:36px 24px 0;display:flex;flex-direction:column;background:var(--surface);border-left:1px solid var(--line);border-right:1px solid var(--line)}
 a{color:var(--accent)}
-.head h1{margin:0;font-size:28px;font-weight:600;letter-spacing:-.015em;line-height:1.15}
-.user{color:var(--muted)}
-.bio{margin:10px 0 0;max-width:60ch}
+.head h1{margin:0;font-size:30px;font-weight:600;letter-spacing:-.02em;line-height:1.1;text-wrap:balance}
+.user{margin-top:5px;font-size:14px;color:var(--muted);letter-spacing:.01em}
+.bio{position:relative;margin:20px 0 0;padding-top:18px;max-width:62ch;font-size:15.5px;line-height:1.6;text-align:justify;-webkit-hyphens:auto;hyphens:auto;hyphenate-limit-chars:6 3 2;overflow-wrap:break-word;text-wrap:pretty}
+.bio::before{content:"";position:absolute;top:0;left:0;width:28px;height:2px;border-radius:2px;background:var(--accent)}
+.bio>*{margin:0}.bio>*+*{margin-top:.65em}
+.bio ul,.bio ol{padding-left:1.3em;text-align:left}
+.bio li+li{margin-top:.2em}
+.bio blockquote{padding-left:12px;border-left:2px solid var(--line);color:var(--muted)}
+.bio code{font:.88em/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:.15em .35em;border-radius:4px;background:var(--bg);border:1px solid var(--line);-webkit-hyphens:none;hyphens:none}
+.bio a{text-underline-offset:2px;text-decoration-thickness:1px}
 section{margin-top:32px;padding-top:20px;border-top:1px solid var(--line)}
 h2{margin:0 0 14px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:baseline}
 h2 a{font-size:14px;letter-spacing:0;text-transform:none;font-weight:500}
@@ -343,12 +350,111 @@ async fn shares_of(state: &AppState, user_id: &str) -> sqlx::Result<Vec<ShareRow
         .collect())
 }
 
+fn escape(s: &str, out: &mut String) {
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            _ => out.push(c),
+        }
+    }
+}
+
+fn bio_parser(bio: &str) -> pulldown_cmark::Parser<'_> {
+    pulldown_cmark::Parser::new_ext(bio, pulldown_cmark::Options::ENABLE_STRIKETHROUGH)
+}
+
+/// A bio written in Markdown, as HTML. Bios are short and typed into a
+/// plain text box, so every line break is kept. Only the safe parts of
+/// Markdown come through: emphasis, links (web and mail only), code, lists
+/// and quotes. Raw HTML is shown as text, headings read as bold paragraphs
+/// and images as their description.
+fn bio_html(bio: &str) -> Markup {
+    use pulldown_cmark::{Event, Tag};
+    let mut out = String::new();
+    // What closes each open element.
+    let mut close: Vec<&'static str> = Vec::new();
+    for ev in bio_parser(bio) {
+        match ev {
+            Event::Start(tag) => {
+                let (open, end): (String, &'static str) = match tag {
+                    Tag::Paragraph | Tag::HtmlBlock => ("<p>".into(), "</p>"),
+                    Tag::Heading { .. } => ("<p><strong>".into(), "</strong></p>"),
+                    Tag::BlockQuote(_) => ("<blockquote>".into(), "</blockquote>"),
+                    Tag::CodeBlock(_) => ("<p><code>".into(), "</code></p>"),
+                    Tag::List(Some(1)) => ("<ol>".into(), "</ol>"),
+                    Tag::List(Some(n)) => (format!("<ol start=\"{n}\">"), "</ol>"),
+                    Tag::List(None) => ("<ul>".into(), "</ul>"),
+                    Tag::Item => ("<li>".into(), "</li>"),
+                    Tag::Emphasis => ("<em>".into(), "</em>"),
+                    Tag::Strong => ("<strong>".into(), "</strong>"),
+                    Tag::Strikethrough => ("<del>".into(), "</del>"),
+                    Tag::Link { dest_url, .. } => {
+                        let lower = dest_url.to_ascii_lowercase();
+                        if ["https://", "http://", "mailto:"]
+                            .iter()
+                            .any(|p| lower.starts_with(p))
+                        {
+                            let mut a = String::from("<a href=\"");
+                            escape(&dest_url, &mut a);
+                            a.push_str("\" rel=\"nofollow ugc noopener\">");
+                            (a, "</a>")
+                        } else {
+                            (String::new(), "")
+                        }
+                    }
+                    _ => (String::new(), ""),
+                };
+                out.push_str(&open);
+                close.push(end);
+            }
+            Event::End(_) => out.push_str(close.pop().unwrap_or("")),
+            Event::Text(t) | Event::Html(t) | Event::InlineHtml(t) => {
+                // In a code block, line ends become breaks like everywhere else.
+                let mut lines = t.split('\n').peekable();
+                while let Some(l) = lines.next() {
+                    escape(l, &mut out);
+                    if lines.peek().is_some_and(|n| !n.is_empty()) {
+                        out.push_str("<br>");
+                    }
+                }
+            }
+            Event::Code(t) => {
+                out.push_str("<code>");
+                escape(&t, &mut out);
+                out.push_str("</code>");
+            }
+            Event::SoftBreak | Event::HardBreak => out.push_str("<br>"),
+            _ => {}
+        }
+    }
+    PreEscaped(out)
+}
+
+/// A bio as one line of plain text, for the page description.
+fn bio_text(bio: &str) -> String {
+    use pulldown_cmark::Event;
+    let mut out = String::new();
+    for ev in bio_parser(bio) {
+        match ev {
+            Event::Text(t) | Event::Code(t) | Event::Html(t) | Event::InlineHtml(t) => {
+                out.push_str(&t)
+            }
+            Event::SoftBreak | Event::HardBreak | Event::End(_) => out.push(' '),
+            _ => {}
+        }
+    }
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 fn header(o: &Owner) -> Markup {
     html! {
         div.head {
             h1 { (o.display_name) }
             div.user { "@" (o.username) }
-            @if !o.bio.is_empty() { p.bio { (o.bio) } }
+            @if !o.bio.trim().is_empty() { div.bio { (bio_html(&o.bio)) } }
         }
     }
 }
@@ -377,10 +483,9 @@ pub async fn profile(
         (header(&owner))
         @for s in sections { (s) }
     };
-    let description = if owner.bio.is_empty() {
-        format!("{}'s books on mau", owner.display_name)
-    } else {
-        owner.bio.clone()
+    let description = match bio_text(&owner.bio) {
+        t if t.is_empty() => format!("{}'s books on mau", owner.display_name),
+        t => t,
     };
     Ok(html_response(
         StatusCode::OK,
@@ -549,6 +654,23 @@ mod tests {
         assert!(html.contains("See all 12"));
         assert!(html.contains(" · 42%"));
         assert!(!html.contains("page 42 of 100"));
+    }
+
+    #[test]
+    fn bio_markdown_is_safe_and_keeps_line_breaks() {
+        let html = super::bio_html(
+            "Slow *reader*\nof **long** novels.\n\nSee [my site](https://example.com) or [this](javascript:alert(1)).\n<script>x</script>",
+        )
+        .into_string();
+        assert_eq!(
+            html,
+            "<p>Slow <em>reader</em><br>of <strong>long</strong> novels.</p>\
+             <p>See <a href=\"https://example.com\" rel=\"nofollow ugc noopener\">my site</a> or this.</p><p>&lt;script&gt;x&lt;/script&gt;</p>"
+        );
+        assert_eq!(
+            super::bio_text("Slow *reader*\nof novels.\n\n# Hi"),
+            "Slow reader of novels. Hi"
+        );
     }
 
     async fn get_html(app: &TestApp, path: &str) -> String {
