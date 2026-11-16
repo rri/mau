@@ -6,6 +6,7 @@
 	import { get } from '../api/client.ts';
 	import type { Quote } from '../api/generated/Quote.ts';
 	import { auth } from '../auth.svelte.ts';
+	import Footer from './Footer.svelte';
 
 	let quote = $state<Quote | null>(null);
 
@@ -51,11 +52,7 @@
 		</div>
 	</main>
 
-	<footer>
-		<a href="https://github.com/rri/mau" rel="noopener">github.com/rri/mau</a>
-		<span aria-hidden="true">·</span>
-		<span>Source code licensed under AGPL-3.0</span>
-	</footer>
+	<Footer />
 </div>
 
 <style>
@@ -68,6 +65,10 @@
 		--dim: #9aa59f;
 		--amber: #d89448;
 		--ring: #2c343b;
+		--footer-ink: var(--dim);
+		--footer-link: var(--soft);
+		--footer-link-hover: var(--paper);
+		--footer-focus: var(--amber);
 		min-height: 100vh;
 		display: flex;
 		flex-direction: column;
@@ -188,35 +189,8 @@
 		}
 	}
 	.actions a:focus-visible,
-	figcaption a:focus-visible,
-	footer a:focus-visible {
+	figcaption a:focus-visible {
 		outline: 2px solid var(--amber);
 		outline-offset: 3px;
-	}
-	footer {
-		display: flex;
-		flex-wrap: nowrap;
-		justify-content: center;
-		align-items: center;
-		gap: 4px 12px;
-		padding: 20px max(20px, env(safe-area-inset-left, 0px))
-			calc(28px + env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-right, 0px));
-		/* Small enough on phones that both parts and the dot share one line. */
-		font-size: clamp(12px, 3.2vw, 13.5px);
-		white-space: nowrap;
-		color: var(--dim);
-	}
-	@media (max-width: 359px) {
-		footer {
-			flex-direction: column;
-			white-space: normal;
-		}
-		footer span[aria-hidden] {
-			display: none;
-		}
-	}
-	footer a {
-		color: var(--soft);
-		text-underline-offset: 3px;
 	}
 </style>

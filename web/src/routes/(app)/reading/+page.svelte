@@ -111,7 +111,7 @@
 	}
 </script>
 
-<header class="head">
+<header class="top-head">
 	<div class="title">
 		<h1>Reading</h1>
 		{#if !library.online}
@@ -198,13 +198,6 @@
 {/if}
 
 <style>
-	.head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 10px;
-		padding: 22px 20px 12px;
-	}
 	.title {
 		display: flex;
 		align-items: baseline;
@@ -240,11 +233,6 @@
 		justify-content: space-between;
 		font-size: 14px;
 		color: var(--muted);
-	}
-	h1 {
-		margin: 0;
-		font-size: 24px;
-		font-weight: 600;
 	}
 	.status {
 		font-size: 13px;

@@ -134,7 +134,7 @@ const STYLE: &str = r#"
 @media (prefers-color-scheme:dark){:root{--bg:#0a0f0d;--surface:#131a17;--ink:#e9f0ec;--muted:#95a59e;--line:#25302b;--accent:#34d399;color-scheme:dark}}
 *{box-sizing:border-box}html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-main{max-width:720px;min-height:100vh;margin:0 auto;padding:36px 24px 48px;background:var(--surface);border-left:1px solid var(--line);border-right:1px solid var(--line)}
+main{max-width:720px;min-height:100vh;margin:0 auto;padding:36px 24px 0;display:flex;flex-direction:column;background:var(--surface);border-left:1px solid var(--line);border-right:1px solid var(--line)}
 a{color:var(--accent)}
 .head h1{margin:0;font-size:28px;font-weight:600;letter-spacing:-.015em;line-height:1.15}
 .user{color:var(--muted)}
@@ -156,7 +156,11 @@ h2 a{font-size:14px;letter-spacing:0;text-transform:none;font-weight:500}
 .bar{height:4px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:7px}
 .bar span{display:block;height:100%;border-radius:99px;background:var(--accent)}
 .empty{color:var(--muted);padding:30px 0}
-footer{margin-top:48px;font-size:13.5px;color:var(--muted)}
+.shared{margin:48px 0 0;font-size:13.5px;color:var(--muted)}
+.site-footer{display:flex;justify-content:center;align-items:center;gap:4px 12px;margin:auto -24px 0;padding:52px 16px 20px;font-size:clamp(12px,3.2vw,13.5px);white-space:nowrap;color:var(--muted)}
+.site-footer a{color:var(--muted);text-underline-offset:3px}
+@media (hover:hover){.site-footer a:hover{color:var(--ink)}}
+@media (max-width:359px){.site-footer{flex-direction:column;white-space:normal}.site-footer span[aria-hidden]{display:none}}
 @media (max-width:760px){main{border:0}}
 "#;
 
@@ -268,7 +272,13 @@ fn page(title: &str, description: &str, body: Markup, public_url: &str) -> Marku
             body {
                 main {
                     (body)
-                    footer { "Shared from " a href=(format!("{public_url}/signin")) { "mau" } }
+                    p.shared { "Shared from " a href=(format!("{public_url}/signin")) { "mau" } }
+                    // The same footer as every page of the app (web/src/lib/components/Footer.svelte).
+                    footer.site-footer {
+                        a href="https://github.com/rri/mau" rel="noopener" { "github.com/rri/mau" }
+                        span aria-hidden="true" { "·" }
+                        span { "Source code licensed under AGPL-3.0" }
+                    }
                 }
             }
         }

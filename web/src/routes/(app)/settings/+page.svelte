@@ -75,7 +75,7 @@
 	];
 </script>
 
-<header class="page-head"><h1>Settings</h1></header>
+<header class="top-head"><h1>Settings</h1></header>
 
 <ul class="list">
 	{#each items as it (it.href)}

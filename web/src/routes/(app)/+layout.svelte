@@ -10,6 +10,7 @@
 	import Toast from '#lib/components/Toast.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import Landing from '#lib/components/Landing.svelte';
+	import Footer from '#lib/components/Footer.svelte';
 	import { origin } from '#lib/origin.svelte.ts';
 
 	let { children } = $props();
@@ -131,6 +132,7 @@
 				</p>
 			{/if}
 			{@render children()}
+			<Footer />
 		</main>
 	</div>
 	<Toast />
@@ -147,14 +149,21 @@
 		--tabbar-h: 62px;
 		--tabbar-gap: max(14px, env(safe-area-inset-bottom));
 	}
+	/* The footer sits at the foot of the content, however short the page. */
 	.content {
 		flex: 1;
+		display: flex;
+		flex-direction: column;
 		width: 100%;
 		max-width: 720px;
 		margin: 0 auto;
 		/* Room to scroll the last row above the tab bar. */
 		padding-bottom: calc(var(--tabbar-h) + var(--tabbar-gap) + 16px);
 		background: var(--surface);
+	}
+	.content > :global(.site-footer) {
+		margin-top: auto;
+		padding-top: 32px;
 	}
 	/* A new device's first download (the app works meanwhile). */
 	.downloading {
@@ -317,7 +326,8 @@
 			max-width: none;
 			margin: 0;
 			min-height: 100vh;
-			padding: 8px 0 48px;
+			/* The footer is the bottom margin. */
+			padding: 8px 0 0;
 			border-left: 1px solid var(--line);
 			border-right: 1px solid var(--line);
 		}

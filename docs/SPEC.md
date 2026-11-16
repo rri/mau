@@ -116,8 +116,7 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
   fiction (authors and translators who died by 1955), a new one on each load,
   shown with author, title (linked to its free Project Gutenberg page) and
   year where known. Source and selection: `crates/mau-server/data/README.md`.
-- Footer: a link to github.com/rri/mau · "Source code licensed under
-  AGPL-3.0".
+- Footer: the site footer (§10), in the landing page's colours.
 - The logo on the sign-in and other public pages links back to it.
 
 ## 3b. Home (signed in)
@@ -346,7 +345,7 @@ A list of sections, each its own page, then **Sign out**.
   across, so 9 when there are more; with "See all N" when there are more) for
   finished books, tags, and the whole library;
   progress bars for currently active. Finish month and year; ratings if the
-  user chose; pages (or percent) only on active books. Footer links to the instance.
+  user chose; pages (or percent) only on active books. A "Shared from mau" line links to the instance, above the site footer (§10).
 - Each published item also has its own link (`/s/token`), titled with the
   item's name ("Finished", "Currently reading", "Library", "#tag") and the
   owner, with no second heading above the list. A suspended owner's pages show
@@ -378,6 +377,14 @@ A list of sections, each its own page, then **Sign out**.
 - Covers: real covers everywhere. Without one, a generated image that looks
   like a book cover with the title and author, lettered in Instrument Sans.
 - Public pages use the same font and colors.
+- **Site footer**, the same on every page (the app's sections and pages,
+  landing, sign-in and the other public pages, the error page, public
+  profiles and shares): a link to github.com/rri/mau · "Source code licensed
+  under AGPL-3.0", centered in small muted text, at the foot of the page
+  however short it is (above the phone tab bar's space).
+- Section titles (Reading, Catalog, Settings) sit at exactly the same height:
+  their title row is always as tall as a row of 38px header buttons, whether
+  it has buttons or not.
 - Breadcrumbs above page titles: earlier steps are accent links with a soft
   hover, chevrons between, the current page plain and bold; on phones only
   "‹ parent". A book and Add a book start from the section you came from

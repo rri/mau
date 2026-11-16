@@ -1,17 +1,28 @@
 <script lang="ts">
+	import Footer from '#lib/components/Footer.svelte';
+
 	let { children } = $props();
 </script>
 
-<main class="public">
-	<div class="card">
-		<a class="logo" href="/"><img src="/logo.svg" alt="mau" width="112" height="112" /></a>
-		{@render children()}
-	</div>
-</main>
+<!-- The card centred in the screen, the footer along its foot. -->
+<div class="page">
+	<main class="public">
+		<div class="card">
+			<a class="logo" href="/"><img src="/logo.svg" alt="mau" width="112" height="112" /></a>
+			{@render children()}
+		</div>
+	</main>
+	<Footer />
+</div>
 
 <style>
-	.public {
+	.page {
 		min-height: 100%;
+		display: flex;
+		flex-direction: column;
+	}
+	.public {
+		flex: 1;
 		display: grid;
 		place-items: center;
 		padding: 24px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));

@@ -96,7 +96,7 @@
 	}
 </script>
 
-<header class="head">
+<header class="top-head">
 	<h1>Catalog</h1>
 	<div class="head-actions">
 		<LayoutToggle bind:layout />
@@ -253,17 +253,6 @@
 {/if}
 
 <style>
-	.head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 22px 20px 12px;
-	}
-	h1 {
-		margin: 0;
-		font-size: 24px;
-		font-weight: 600;
-	}
 	.head-actions {
 		display: flex;
 		gap: 6px;

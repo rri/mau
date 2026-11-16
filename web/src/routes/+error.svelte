@@ -3,28 +3,38 @@
 	// way back, in the style of the sign-in pages.
 	import { page } from '$app/state';
 	import { auth } from '#lib/auth.svelte.ts';
+	import Footer from '#lib/components/Footer.svelte';
 
 	const missing = $derived(page.status === 404);
 </script>
 
-<main class="public">
-	<div class="card">
-		<a class="logo" href="/"><img src="/logo.svg" alt="mau" width="112" height="112" /></a>
-		<h1>{missing ? 'Page not found' : 'Something went wrong'}</h1>
-		<p>
-			{missing
-				? "There's nothing at this address. The link may be mistyped, or the page has moved."
-				: (page.error?.message ?? 'The page could not be shown.')}
-		</p>
-		<div class="links">
-			<a class="btn primary" href="/">{auth.me ? 'Go to Home' : 'Go to the front page'}</a>
+<!-- The card centred in the screen, the footer along its foot. -->
+<div class="page">
+	<main class="public">
+		<div class="card">
+			<a class="logo" href="/"><img src="/logo.svg" alt="mau" width="112" height="112" /></a>
+			<h1>{missing ? 'Page not found' : 'Something went wrong'}</h1>
+			<p>
+				{missing
+					? "There's nothing at this address. The link may be mistyped, or the page has moved."
+					: (page.error?.message ?? 'The page could not be shown.')}
+			</p>
+			<div class="links">
+				<a class="btn primary" href="/">{auth.me ? 'Go to Home' : 'Go to the front page'}</a>
+			</div>
 		</div>
-	</div>
-</main>
+	</main>
+	<Footer />
+</div>
 
 <style>
-	.public {
+	.page {
 		min-height: 100%;
+		display: flex;
+		flex-direction: column;
+	}
+	.public {
+		flex: 1;
 		display: grid;
 		place-items: center;
 		padding: 24px 16px;
