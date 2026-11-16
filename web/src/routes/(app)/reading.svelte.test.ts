@@ -7,7 +7,7 @@ import { bookInfo } from '#lib/derive.ts';
 import { library } from '#lib/library.svelte.ts';
 import { toasts } from '#lib/toast.svelte.ts';
 import { emptyData } from '#lib/sync/apply.ts';
-import { addBook, freezeTime, signIn, useLibrary } from '../../test/fixtures.ts';
+import { addBook, freezeTime, signIn, slide, useLibrary } from '../../test/fixtures.ts';
 
 const info = (id: string) => bookInfo(library.view, library.view.books.get(id)!);
 const rows = () => screen.getAllByRole('listitem').filter((li) => li.classList.contains('row'));
@@ -75,10 +75,10 @@ describe('Reading list', () => {
 		return screen.findByText('+1 page today');
 	});
 
-	it('READ-03 + adds a page; pause moves the book down; play resumes it', async () => {
+	it('READ-03 the slider moves a book on; pause moves it down; play resumes it', async () => {
 		useLibrary();
 		render(Reading);
-		await userEvent.click(screen.getByRole('button', { name: 'Add 1 page to Middlemarch' }));
+		await slide('Middlemarch');
 		expect(info('mm').reading!.pos).toBe(300);
 		await userEvent.click(screen.getByRole('button', { name: 'Pause Middlemarch' }));
 		expect(info('mm').state).toBe('inactive');
@@ -226,20 +226,17 @@ describe('Reading list', () => {
 		expect(rows()).toHaveLength(75);
 	});
 
-	it('READ-15 the up arrow adds a step; a book can start by percent and switch to pages later', async () => {
+	it('READ-15 the slider steps by 1% for percent books; a book can start by percent and switch to pages later', async () => {
 		useLibrary();
 		render(Reading);
 		await userEvent.click(screen.getByRole('button', { name: 'Start Station Eleven' }));
 		await userEvent.click(screen.getByRole('button', { name: "Don't know? Track by percent" }));
 		expect(info('se').reading).toMatchObject({ unit: 'percent', pos: 0 });
-		const step = screen.getByRole('button', { name: 'Add 1% to Station Eleven' });
-		expect(step.querySelector('svg')).not.toBeNull();
-		expect(step).toHaveAttribute('title', '+1 percent');
-		expect(screen.getByRole('button', { name: 'Add 1 page to Middlemarch' })).toHaveAttribute(
-			'title',
-			'+1 page'
+		expect(screen.getByRole('slider', { name: 'Progress in Station Eleven' })).toHaveAttribute(
+			'aria-valuemax',
+			'100'
 		);
-		await userEvent.click(step);
+		await slide('Station Eleven');
 		expect(row('Station Eleven')).toHaveTextContent('1%');
 		expect(row('Station Eleven')).toHaveTextContent('+1% today');
 
@@ -252,7 +249,7 @@ describe('Reading list', () => {
 		expect(row('Station Eleven')).toHaveTextContent('page 4 of 400');
 	});
 
-	it('READ-16 the same buttons on every row, right-aligned: active step, finish, pause; inactive finish, start', async () => {
+	it('READ-16 the same buttons on every row, right-aligned: active finish, pause; inactive finish, start', async () => {
 		useLibrary();
 		render(Reading);
 		const labels = (title: string) =>
@@ -260,11 +257,7 @@ describe('Reading list', () => {
 				.getAllByRole('button')
 				.map((b) => b.getAttribute('aria-label'))
 				.filter((l) => !l?.startsWith('Drag') && !l?.startsWith('Edit'));
-		expect(labels('Middlemarch')).toEqual([
-			'Add 1 page to Middlemarch',
-			'Finish Middlemarch',
-			'Pause Middlemarch'
-		]);
+		expect(labels('Middlemarch')).toEqual(['Finish Middlemarch', 'Pause Middlemarch']);
 		expect(labels('Station Eleven')).toEqual(['Finish Station Eleven', 'Start Station Eleven']);
 		expect(labels('The Brothers Karamazov')).toEqual([
 			'Finish The Brothers Karamazov',

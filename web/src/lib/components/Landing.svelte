@@ -145,8 +145,10 @@
 		text-decoration-color: rgb(195 204 199 / 0.4);
 		text-underline-offset: 3px;
 	}
-	figcaption a:hover {
-		color: var(--paper);
+	@media (hover: hover) {
+		figcaption a:hover {
+			color: var(--paper);
+		}
 	}
 	cite {
 		font-style: italic;
@@ -171,15 +173,19 @@
 		background: var(--amber);
 		color: #1e140c;
 	}
-	.primary:hover {
-		filter: brightness(1.08);
+	@media (hover: hover) {
+		.primary:hover {
+			filter: brightness(1.08);
+		}
 	}
 	.secondary {
 		border: 1px solid #3a444c;
 		color: var(--paper);
 	}
-	.secondary:hover {
-		border-color: var(--soft);
+	@media (hover: hover) {
+		.secondary:hover {
+			border-color: var(--soft);
+		}
 	}
 	.actions a:focus-visible,
 	figcaption a:focus-visible,

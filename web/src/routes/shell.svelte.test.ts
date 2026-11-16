@@ -8,7 +8,7 @@ import RootLayout from './+layout.svelte';
 import ErrorPage from './+error.svelte';
 import { auth } from '#lib/auth.svelte.ts';
 import { origin } from '#lib/origin.svelte.ts';
-import { at, nav, page } from '../test/app-mocks.ts';
+import { at, nav, navigating, page } from '../test/app-mocks.ts';
 import { mockApi, signIn, signOut, useLibrary } from '../test/fixtures.ts';
 
 const content = createRawSnippet(() => ({ render: () => '<p>page content</p>' }));
@@ -75,6 +75,22 @@ describe('App shell', () => {
 			'page'
 		);
 		expect(within(navEl).getByRole('link', { name: 'Catalog' })).not.toHaveAttribute(
+			'aria-current'
+		);
+	});
+
+	it('SHELL-04b a tapped tab lights up at once, while its page is on the way', () => {
+		signIn();
+		useLibrary();
+		at('/reading');
+		navigating.to = { url: new URL('http://localhost/catalog') };
+		render(AppLayout, { children: content });
+		const navEl = screen.getByRole('navigation', { name: 'Main' });
+		expect(within(navEl).getByRole('link', { name: 'Catalog' })).toHaveAttribute(
+			'aria-current',
+			'page'
+		);
+		expect(within(navEl).getByRole('link', { name: 'Reading' })).not.toHaveAttribute(
 			'aria-current'
 		);
 	});

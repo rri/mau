@@ -669,8 +669,14 @@
 		text-align: left;
 		cursor: pointer;
 	}
-	.result:hover {
+	@media (hover: hover) {
+		.result:hover {
+			background: var(--surface);
+		}
+	}
+	.result:active {
 		background: var(--surface);
+		opacity: 1;
 	}
 	.cov {
 		width: 40px;

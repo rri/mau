@@ -109,6 +109,41 @@ img[src='/logo.svg'] {
 ::selection {
 	background: var(--accent-soft);
 }
+
+/* ---- Touch feedback ----------------------------------------------------
+   Everything tappable answers the moment it's pressed: it dims (buttons
+   also dip slightly) and recovers when released. Taps go through without
+   waiting to see if they're a double-tap zoom, and the browser's grey tap
+   flash gives way to these. Hover styles elsewhere apply only on devices
+   that really hover, so a tapped item doesn't stay lit afterwards. */
+html {
+	-webkit-tap-highlight-color: transparent;
+	touch-action: manipulation;
+}
+:where(
+	a[href],
+	button,
+	summary,
+	[role='button'],
+	label:has(input[type='checkbox'], input[type='radio']),
+	select
+) {
+	transition-property: opacity, transform, background-color, border-color, color, filter;
+	transition-duration: 0.18s;
+}
+:where(
+		a[href],
+		button,
+		summary,
+		[role='button'],
+		label:has(input[type='checkbox'], input[type='radio'])
+	):not(:disabled):active {
+	opacity: 0.6;
+	transition-duration: 0s;
+}
+:where(button, summary, [role='button'], .btn):not(:disabled):active {
+	transform: scale(0.96);
+}
 @media (prefers-reduced-motion: reduce) {
 	* {
 		transition: none !important;
@@ -132,23 +167,25 @@ img[src='/logo.svg'] {
 	font-weight: 550;
 	cursor: pointer;
 	text-decoration: none;
-	transition:
-		border-color 0.15s,
-		background 0.15s,
-		filter 0.15s;
 }
-.btn:hover {
-	border-color: color-mix(in srgb, var(--ink) 28%, var(--line));
+@media (hover: hover) {
+	.btn:hover {
+		border-color: color-mix(in srgb, var(--ink) 28%, var(--line));
+	}
+	.btn.primary:hover,
+	.btn.danger:hover {
+		filter: brightness(1.08);
+	}
+}
+.btn:not(:disabled):active {
+	opacity: 1;
+	filter: brightness(0.92);
 }
 .btn.primary {
 	background: var(--accent);
 	border-color: var(--accent);
 	color: var(--on-accent);
 	box-shadow: var(--shadow);
-}
-.btn.primary:hover,
-.btn.danger:hover {
-	filter: brightness(1.08);
 }
 .btn.danger {
 	background: var(--danger);
@@ -339,6 +376,9 @@ img[src='/logo.svg'] {
 	border-radius: 10px;
 	cursor: pointer;
 	background: var(--surface);
+}
+.radio:has(input:checked) {
+	border-color: var(--accent);
 }
 .radio input {
 	margin-top: 4px;

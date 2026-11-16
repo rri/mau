@@ -12,7 +12,8 @@ import {
 	sampleLibrary,
 	signIn,
 	TODAY,
-	useLibrary
+	useLibrary,
+	slide
 } from '../../test/fixtures.ts';
 
 beforeEach(() => signIn());
@@ -124,13 +125,16 @@ describe('Home', () => {
 		expect(screen.getByRole('link', { name: 'Choose a book' })).toHaveAttribute('href', '/reading');
 	});
 
-	it('HOME-08 + adds a page to that book, with an undo toast', async () => {
+	it('HOME-08 each book has a progress slider; moving it saves, with an undo toast', async () => {
 		freezeTime();
 		useLibrary();
 		render(Home);
-		await userEvent.click(screen.getByRole('button', { name: 'Add 1 page to Middlemarch' }));
-		expect(await screen.findByText(/page 300 of 880/)).toBeInTheDocument();
-		expect(toasts.current?.message).toBe('+1 page on Middlemarch');
+		expect(screen.queryByRole('button', { name: /^Add 1/ })).toBeNull();
+		const s = screen.getByRole('slider', { name: 'Progress in Middlemarch' });
+		expect(s).toHaveAttribute('aria-valuetext', 'page 299 of 880');
+		await slide('Middlemarch', '{ArrowRight}{ArrowRight}');
+		expect(await screen.findByText(/page 301 of 880/)).toBeInTheDocument();
+		expect(toasts.current?.message).toBe('Moved to page 301');
 	});
 
 	it('HOME-09 the covers and titles link to the book', () => {

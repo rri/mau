@@ -21,7 +21,11 @@ export const page: {
 	error: null
 };
 
+/** A navigation under way (`$app/state`'s `navigating`); null when none. */
+export const navigating: { to: { url: URL } | null } = { to: null };
+
 export function at(path: string, params: Record<string, string> = {}) {
 	page.url = new URL('http://localhost' + path);
+	navigating.to = null;
 	page.params = params;
 }

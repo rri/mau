@@ -7,6 +7,7 @@
 	import type { Start } from '../actions.ts';
 	import Cover from './Cover.svelte';
 	import ProgressEditor from './ProgressEditor.svelte';
+	import ProgressSlider from './ProgressSlider.svelte';
 	import ReadingButtons from './ReadingButtons.svelte';
 	import StartForm from './StartForm.svelte';
 
@@ -43,7 +44,8 @@
 	} = $props();
 
 	const r = $derived(info.reading);
-	const pct = $derived(r ? Math.round((100 * r.pos) / r.total) : 0);
+	// Where the slider is while it's being moved, shown in the text below.
+	let preview = $state<number | null>(null);
 	const todayPages = $derived(r ? pagesOn(library.view, r, today) : 0);
 	const lastRead = $derived(r ? lastReadDate(library.view, r.id) : null);
 	const addedOn = $derived(dateOfMs(info.book.added_at, auth.me?.time_zone ?? 'UTC'));
@@ -98,7 +100,11 @@
 	<div class="main">
 		<a class="title" href="/catalog/{info.book.id}">{info.title}</a>
 		<div class="author">{info.authors.join(', ')}</div>
-		<div class="bar" class:empty={!r}><span style="width:{pct}%"></span></div>
+		{#if r}
+			<ProgressSlider {info} bind:preview muted={info.state !== 'active'} />
+		{:else}
+			<div class="bar empty"></div>
+		{/if}
 		<div class="meta">
 			{#if !r}
 				<span>Not started</span>
@@ -108,9 +114,11 @@
 			{:else}
 				<button
 					class="pos"
+					class:moving={preview !== null}
 					type="button"
 					onclick={onedit}
-					aria-label="Edit progress, now {progressText(r)}">{progressText(r)}</button
+					aria-label="Edit progress, now {progressText(r)}"
+					>{progressText(preview === null ? r : { ...r, pos: preview })}</button
 				>
 				{#if todayPages > 0}
 					<span class="today"
@@ -193,8 +201,10 @@
 		padding: 0;
 		border-radius: 6px;
 	}
-	.handle:hover {
-		opacity: 1;
+	@media (hover: hover) {
+		.handle:hover {
+			opacity: 1;
+		}
 	}
 	.cover {
 		width: 36px;
@@ -213,25 +223,11 @@
 		color: var(--muted);
 		line-height: 1.3;
 	}
-	.bar {
-		height: 4px;
-		background: var(--line);
-		margin: 7px 0 4px;
-		border-radius: 99px;
-		overflow: hidden;
-	}
-	.bar span {
-		display: block;
-		height: 100%;
-		border-radius: 99px;
-		background: var(--accent);
-		transition: width 0.3s;
-	}
-	.row.idle .bar span {
-		background: var(--muted);
-		opacity: 0.6;
-	}
+	/* Not started: a dashed line where the slider will be, same footprint. */
 	.bar.empty {
+		height: 4px;
+		margin: 10px 0;
+		border-radius: 99px;
 		background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 10px);
 	}
 	.meta {
@@ -256,8 +252,17 @@
 		text-decoration-thickness: 1px;
 		text-underline-offset: 4px;
 	}
-	.pos:hover {
+	@media (hover: hover) {
+		.pos:hover {
+			background: var(--accent-soft);
+		}
+	}
+	.pos:active {
 		background: var(--accent-soft);
+		opacity: 1;
+	}
+	.pos.moving {
+		color: var(--accent);
 	}
 	.today {
 		color: var(--accent);

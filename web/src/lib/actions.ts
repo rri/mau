@@ -103,14 +103,6 @@ export function setPages(info: BookInfo, to: number, total?: number, message?: s
 	toasts.undo(text, undo);
 }
 
-/** One step up: a page, or 1% for a reading tracked by percent. */
-export function plusOne(info: BookInfo) {
-	const r = info.reading;
-	if (!r) return;
-	const step = r.unit === 'percent' ? '1%' : '1 page';
-	setPages(info, r.pos + 1, undefined, `+${step} on ${info.title}`);
-}
-
 /** Switches the current reading between pages and percent. To percent, the
  *  position becomes the share read (the page count is kept); to pages, it's
  *  `page` of `total`. Logs no reading. Shows an undo toast. */

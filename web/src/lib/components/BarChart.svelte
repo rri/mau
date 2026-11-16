@@ -101,8 +101,10 @@
 		border-radius: 2px;
 		background: var(--line);
 	}
-	.col:hover .bar:not(.zero) {
-		background: var(--accent);
+	@media (hover: hover) {
+		.col:hover .bar:not(.zero) {
+			background: var(--accent);
+		}
 	}
 	.tip {
 		position: absolute;

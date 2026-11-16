@@ -2,11 +2,11 @@
 	// A book's reading buttons, the same wherever they appear (Home, Reading
 	// list rows, the book page): all one size, right-aligned so they line up
 	// from row to row.
-	//   Active:   +1 (a page, or 1%), finish, pause
+	//   Active:   finish, pause (progress is the slider beside them)
 	//   Inactive: finish, start (or resume)
 	// Finished books have Re-read on their book page instead.
 	import type { BookInfo } from '../derive.ts';
-	import { finish, pause, plusOne, resume } from '../actions.ts';
+	import { finish, pause, resume } from '../actions.ts';
 	import Icon from './Icon.svelte';
 
 	let {
@@ -19,21 +19,11 @@
 	} = $props();
 
 	const r = $derived(info.reading);
-	const percent = $derived(r?.unit === 'percent');
 	const icon = 18;
 </script>
 
 {#if info.state !== 'finished'}
 	<div class="buttons">
-		{#if info.state === 'active'}
-			<button
-				class="step"
-				type="button"
-				onclick={() => plusOne(info)}
-				aria-label="Add {percent ? '1%' : '1 page'} to {info.title}"
-				title={percent ? '+1 percent' : '+1 page'}><Icon name="plusone" size={20} /></button
-			>
-		{/if}
 		<button
 			type="button"
 			onclick={() => finish(info)}
@@ -77,21 +67,13 @@
 		color: var(--muted);
 		cursor: pointer;
 	}
-	button:hover {
-		color: var(--accent);
-		border-color: var(--accent);
+	@media (hover: hover) {
+		button:hover {
+			color: var(--accent);
+			border-color: var(--accent);
+		}
 	}
 	button:active {
 		transform: scale(0.94);
-	}
-	/* +1 is the button used most: filled. */
-	.step {
-		border-color: var(--accent);
-		background: var(--accent);
-		color: var(--on-accent);
-		box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 35%, transparent);
-	}
-	.step:hover {
-		color: var(--on-accent);
 	}
 </style>

@@ -401,8 +401,14 @@
 		text-decoration: none;
 		min-height: 64px;
 	}
-	.item:hover {
+	@media (hover: hover) {
+		.item:hover {
+			background: var(--bg);
+		}
+	}
+	.item:active {
 		background: var(--bg);
+		opacity: 1;
 	}
 	.cov {
 		width: 36px;

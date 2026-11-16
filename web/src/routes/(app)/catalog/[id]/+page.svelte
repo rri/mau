@@ -26,6 +26,7 @@
 	import Breadcrumbs from '#lib/components/Breadcrumbs.svelte';
 	import ReadingButtons from '#lib/components/ReadingButtons.svelte';
 	import ProgressEditor from '#lib/components/ProgressEditor.svelte';
+	import ProgressSlider from '#lib/components/ProgressSlider.svelte';
 	import StartForm from '#lib/components/StartForm.svelte';
 	import { origin } from '#lib/origin.svelte.ts';
 
@@ -138,6 +139,8 @@
 
 	// ---- Status ------------------------------------------------------------
 	let pagesEditing = $state(false);
+	// Where the progress slider is while it's being moved.
+	let sliding = $state<number | null>(null);
 	let setupOpen = $state(false);
 
 	function play() {
@@ -387,11 +390,12 @@
 							? 'Finished'
 							: 'Inactive'}</span
 				>
-				{#if r}<div class="bar {info.state}">
-						<span
-							style="width:{info.state === 'finished' ? 100 : Math.round((100 * r.pos) / r.total)}%"
-						></span>
-					</div>{/if}
+				{#if r && info.state === 'finished'}<div class="bar"><span></span></div>
+				{:else if r}<ProgressSlider
+						{info}
+						bind:preview={sliding}
+						muted={info.state !== 'active'}
+					/>{/if}
 				<div class="meta">
 					{#if pagesEditing && r}
 						<ProgressEditor {info} ondone={() => (pagesEditing = false)} />
@@ -401,8 +405,12 @@
 								>{fmtDate(r.finished_on)}</span
 							>{/if}
 					{:else if r}
-						<button class="pos" type="button" onclick={() => (pagesEditing = true)}
-							>{progressText(r)}</button
+						<button
+							class="pos"
+							class:moving={sliding !== null}
+							type="button"
+							onclick={() => (pagesEditing = true)}
+							>{progressText(sliding === null ? r : { ...r, pos: sliding })}</button
 						>
 						{#if todayPages > 0}<span class="today"
 								>+{r.unit === 'percent' ? `${todayPages}%` : plural(todayPages, 'page', 'pages')} today</span
@@ -710,8 +718,14 @@
 		border-radius: 8px;
 		cursor: pointer;
 	}
-	.menu button:hover {
+	@media (hover: hover) {
+		.menu button:hover {
+			background: var(--bg);
+		}
+	}
+	.menu button:active {
 		background: var(--bg);
+		opacity: 1;
 	}
 	.menu .danger {
 		color: var(--danger);
@@ -806,16 +820,17 @@
 		height: 4px;
 		border-radius: 2px;
 		background: var(--line);
-		margin: 8px 0 6px;
+		margin: 10px 0 8px;
 		overflow: hidden;
 	}
+	/* Finished: a full bar, nothing to move. */
 	.bar span {
 		display: block;
 		height: 100%;
 		background: var(--accent);
 	}
-	.bar.inactive span {
-		background: var(--muted);
+	.pos.moving {
+		color: var(--accent);
 	}
 	.meta {
 		display: flex;
@@ -861,8 +876,10 @@
 		color: var(--accent);
 		font-weight: 550;
 	}
-	.play:hover {
-		border-color: var(--accent);
+	@media (hover: hover) {
+		.play:hover {
+			border-color: var(--accent);
+		}
 	}
 	.play:active {
 		transform: scale(0.94);

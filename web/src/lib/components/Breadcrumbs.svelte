@@ -101,9 +101,16 @@
 		cursor: pointer;
 		white-space: nowrap;
 	}
-	a:hover,
-	button:hover {
+	@media (hover: hover) {
+		a:hover,
+		button:hover {
+			background: var(--accent-soft);
+		}
+	}
+	a:active,
+	button:active {
 		background: var(--accent-soft);
+		opacity: 1;
 	}
 	li:first-child a,
 	li:first-child button {

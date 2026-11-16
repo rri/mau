@@ -4,7 +4,7 @@
 	// thumb-sized tabs); on wide screens a sidebar docked to the left of the
 	// content, with the content centered on screen.
 	import { goto } from '$app/navigation';
-	import { page } from '$app/state';
+	import { navigating, page } from '$app/state';
 	import { auth } from '#lib/auth.svelte.ts';
 	import { library } from '#lib/library.svelte.ts';
 	import Toast from '#lib/components/Toast.svelte';
@@ -27,12 +27,23 @@
 	});
 
 	// A book or Add a book belongs to the section the reader came from, so
-	// that tab stays highlighted (matching the breadcrumb trail).
+	// that tab stays highlighted (matching the breadcrumb trail). A tapped
+	// tab lights up at once, while its page is still on the way.
 	const section = $derived.by(() => {
-		const p = page.url.pathname;
+		const p = navigating.to?.url.pathname ?? page.url.pathname;
 		if (p.startsWith('/catalog/') || p.startsWith('/add')) return origin.section.href;
 		return p;
 	});
+
+	// A navigation that takes a moment shows a thin bar along the top, so a
+	// tap never looks ignored. Quick ones (most) finish before it appears.
+	let slow = $state(false);
+	$effect(() => {
+		if (!navigating.to) return void (slow = false);
+		const t = setTimeout(() => (slow = true), 120);
+		return () => clearTimeout(t);
+	});
+
 	const tabs = [
 		// Phones only: on wide screens the logo is the way home.
 		{ href: '/', label: 'Home', match: (p: string) => p === '/', phoneOnly: true },
@@ -45,8 +56,10 @@
 {#if landing}
 	<Landing />
 {:else if auth.me}
+	{#if slow}<div class="loading-bar" aria-hidden="true"></div>{/if}
 	<div class="shell">
-		<nav class="tabs" aria-label="Main">
+		<!-- The sections' code loads up front, so the first tap on each is quick. -->
+		<nav class="tabs" aria-label="Main" data-sveltekit-preload-code="eager">
 			<a
 				class="brand"
 				href="/"
@@ -202,11 +215,40 @@
 	.tab svg {
 		width: 22px;
 		height: 22px;
+		transition: transform 0.15s;
 	}
 	.tab[aria-current='page'] {
 		background: var(--accent-soft);
 		color: var(--accent);
 		font-weight: 600;
+	}
+	/* Pressed: tinted and the icon dips, before the finger lifts. */
+	.tab:active {
+		background: color-mix(in srgb, var(--accent-soft) 70%, var(--line));
+		color: var(--accent);
+		opacity: 1;
+	}
+	.tab:active svg {
+		transform: scale(0.88);
+		transition-duration: 0s;
+	}
+	.loading-bar {
+		position: fixed;
+		inset: 0 0 auto;
+		z-index: 60;
+		height: 3px;
+		background: linear-gradient(90deg, transparent, var(--accent), transparent);
+		background-size: 50% 100%;
+		background-repeat: no-repeat;
+		animation: loading 0.9s ease-in-out infinite;
+	}
+	@keyframes loading {
+		from {
+			background-position: -50% 0;
+		}
+		to {
+			background-position: 150% 0;
+		}
 	}
 	@media (min-width: 900px) {
 		/* The sidebar and content side by side, centered as a pair. */
@@ -264,6 +306,7 @@
 		}
 		.tab:hover {
 			color: var(--ink);
+			background: var(--bg);
 		}
 		.tab[aria-current='page'] {
 			background: var(--accent-soft);

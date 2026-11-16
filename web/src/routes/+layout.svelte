@@ -24,6 +24,10 @@
 	});
 </script>
 
+<!-- Safari shows :active (the pressed look) on touch only when the page
+     listens for touches. -->
+<svelte:document ontouchstart={() => {}} />
+
 <svelte:head>
 	<title>{title}</title>
 </svelte:head>

@@ -146,8 +146,14 @@
 		color: var(--ink);
 		text-decoration: none;
 	}
-	.item:hover {
+	@media (hover: hover) {
+		.item:hover {
+			background: var(--surface);
+		}
+	}
+	.item:active {
 		background: var(--surface);
+		opacity: 1;
 	}
 	small {
 		display: block;

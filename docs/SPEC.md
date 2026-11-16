@@ -144,7 +144,7 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
 - One continuous list of all unfinished books: active books first, then
   inactive. No section headers. Finished books are hidden.
 - **Ordering:** the whole list is one manual order (a drag handle on every
-  row). Nothing reorders on its own: +1, page edits, and edits on inactive
+  row). Nothing reorders on its own: moving progress, page edits, and edits on inactive
   books never move a row.
   - Play moves a book to the end of the active books. Pause moves it to the top
     of the inactive books. A newly added book goes to the top of the inactive
@@ -162,9 +162,18 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
   pages once a page count is entered); the position converts and the switch
   logs no reading. Percent readings count toward days read and pace, never
   toward pages read.
-- **+1** (a filled round button with "+1" drawn like the other icons; tooltip "+1 page" or "+1
-  percent") appears only on active rows and adds 1 page (1% in percent). Each change shows an undo
-  toast for 10 seconds.
+- **Progress slider:** a book's progress is a slim bar with a round thumb
+  (on Home, Reading rows and the book page, for any started, unfinished
+  book; grey on inactive books). Dragging it moves the thumb and the "page X
+  of Y" text along live; letting go saves the new position (pages counted
+  read today, as any progress change) with an undo toast for 10 seconds. On
+  touch it moves only on a sideways drag, so scrolling past it or a stray
+  tap changes nothing; with a mouse a click on the bar jumps there. Arrow
+  keys step one page (1% in percent), Page Up/Down ten, Home/End to the
+  ends; the change saves once the keys pause or focus leaves. Dragging to
+  the end finishes the book (below). It sits between the author line and
+  the progress text with room for the thumb on either side, so it never
+  touches them. Never-started books show a dashed line in its place.
 - Tapping the progress opens inline fields: current page and total pages
   (or percent and the copy's page count), with Save and Cancel; the row's
   buttons hide meanwhile.
@@ -177,12 +186,12 @@ two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
   the book (with undo).
 - Reaching the total finishes the book automatically (undo toast) and the row
   leaves the list.
-- Rows show cover thumbnail, title, author, thin progress bar, "page X of Y",
-  and "+N pages today" or "last read …". Active rows have a teal edge, a pause
-  button, and the solid round +1. Inactive rows are dimmed and have a play button.
+- Rows show cover thumbnail, title, author, the progress slider, "page X of Y",
+  and "+N pages today" or "last read …". Active rows have a teal edge and a pause
+  button. Inactive rows are dimmed and have a play button.
 - **Reading buttons**, the same wherever a book has them (Home, Reading list
   rows, the book page): round, all one size, right-aligned so they line
-  up from row to row. Active: +1, finish (check mark),
+  up from row to row. Active: finish (check mark),
   pause. Inactive: finish, start (play; resume if started). Finished books
   have **Re-read** on their book page. The cover or title opens the book.
   Finish sets today's date at once, with an undo toast, and leaves the
@@ -479,11 +488,11 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | HOME-01 | Header | Eyebrow: today's date in the reader's time zone ("Wednesday 11 November"). Heading: "Good night" (before 5), "Good morning" (before 12), "Good afternoon" (before 18), "Good evening", then ", *display name*!", by the device's clock. | C |
 | HOME-02 | Loading | "Loading your library…" until the device copy is open, and on a device that has never synced until the first sync answers (SYNC-07). | C |
 | HOME-03 | Empty library | Heading "Welcome, *name*!", the text "Your books and reading trends will appear here once you add a book.", **Add your first book** (`/add`) and **Import from Goodreads, StoryGraph…** (`/settings/import`). No sections. | C |
-| HOME-04 | Pick up where you left off | Section heading, and "All N books" (N = unfinished books) linking to `/reading`. Each active book in Reading order: cover and title linking to the book, a progress bar, "page X of Y · about N days left at your pace". | C, B |
+| HOME-04 | Pick up where you left off | Section heading, and "All N books" (N = unfinished books) linking to `/reading`. Each active book in Reading order: cover and title linking to the book, the progress slider, "page X of Y · about N days left at your pace". | C, B |
 | HOME-05 | Pace | Days left = pages left ÷ (pages read in this reading in the last 28 days ÷ 28), rounded up, at least 1. Hidden when nothing was read in those 28 days. | U, C |
 | HOME-06 | Limit | At most five books. | C |
 | HOME-07 | Nothing active | "Nothing in progress right now. Choose a book." (link to Reading). | C |
-| HOME-08 | Reading buttons | As READ-16: +1 adds one page (1% for percent) to that book, with an undo toast "+1 page on *title*". | C |
+| HOME-08 | Progress slider | As READ-03: moving a book's slider saves its new position, with an undo toast "Moved to page *N*". | C |
 | HOME-09 | Links | Cover (hidden from screen readers, not a tab stop) and title open the book. | C |
 | HOME-10 | Last 14 days | Subheading, 14 bars oldest first; labels every other day plus "today" under the last bar; hover shows "Nov 9: 20 pages" (or "no reading"); a hidden table lists every day for screen readers. | C |
 | HOME-11 | *Year* (so far) | Three tiles, side by side at every width: books finished this year (unknown dates don't count), pages read this year, days with reading this year. Pages count forward moves only. | U, C |
@@ -521,8 +530,8 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | ID | Element | Behavior | Tests |
 |---|---|---|---|
 | READ-01 | List | Unfinished books: active (tinted, accent edge) by the reader's order, then inactive (dimmed covers, grey titles). | C, U, E |
-| READ-02 | Row | Drag handle, cover and title (link), authors, a thin progress bar, then "page X of Y" (a button) with "+N page(s) today", "last read *ago*", or "no progress yet"; never-started: "Not started" and "added *ago*". | C |
-| READ-03 | Controls | Active: +1 (one page, or 1%), finish, pause (to the top of the inactive books). Inactive: finish, play (resume at the end of the active books). Each shows an undo toast. | C, U, B, E |
+| READ-02 | Row | Drag handle, cover and title (link), authors, the progress slider, then "page X of Y" (a button) with "+N page(s) today", "last read *ago*", or "no progress yet"; never-started: "Not started" and "added *ago*". | C |
+| READ-03 | Controls | The progress slider (drag, or arrow keys: one page or 1%) moves a started book on or back, saving on release with an undo toast. Active: finish, pause (to the top of the inactive books). Inactive: finish, play (resume at the end of the active books). Each shows an undo toast. | C, U, B, E |
 | READ-04 | Page editor | The page button opens "page [ ] of [ ]" with Save, focused and selected; Enter or leaving the fields saves, Escape cancels. Saving moves forward or back ("Moved back to page N"), changes the total, and finishes the book at the total. | C, U, B |
 | READ-05 | First start | Play on a never-started book opens inline "How many pages does your copy have?" (empty, focused), "Catalog lists N pages" fills it, an invalid number says "Enter the number of pages in your copy.", **Start reading** starts at page 0. | C, B |
 | READ-06 | Search | "Search title or author"; while typed, "N of M books" and **Clear search**; drag handles hide (their column stays). Starts empty each visit. | C, B |
@@ -534,7 +543,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | READ-13 | Keyboard reorder | ↑ and ↓ on a drag handle move the book one place within its group; never across groups. | C |
 | READ-14 | Long lists | 60 books are drawn, then 60 more near the end (or **Show N more**); search covers every book and starts again from the top; dragging works among the books drawn. Back from a book keeps the books drawn and the scroll position. | C |
 | READ-15 | Percent | Setup offers **Don't know? Track by percent**; the row shows "N%" and "+N% today"; the editor has percent and the copy's page count, **Count pages instead** (once a count is entered) and, for pages, **Track by percent instead**. | C, U, A |
-| READ-16 | Reading buttons | The same round, same-size buttons wherever a book has them (§4), right-aligned: active +1, finish, pause; inactive finish, start (or resume). Finish: today, undo toast, no reading logged. | C, U |
+| READ-16 | Reading buttons | The same round, same-size buttons wherever a book has them (§4), right-aligned: active finish, pause; inactive finish, start (or resume). Finish: today, undo toast, no reading logged. | C, U |
 | READ-ACT-01…13 | Actions | Up arrow, set pages (clamped 0…total), finishing and its undo, pause, resume, start, re-read, Finish (READ-ACT-10, 11), percent (12), switching units (13): the exact changes and toasts. | U |
 | READ-DRAG-01…05 | Drag rules | §4 ordering rules for every drop position; a never-started book dropped among active books asks for its pages first. A drop label shows "Move here", "Activate here", "Start here", or "Stays active: goes to end of active". | U (rules); the pointer gesture: — |
 
@@ -562,11 +571,11 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | BOOK-04 | Private entry | "Only you can see this entry" (or "Suggested for the shared catalog"); ⋯ › **Suggest for shared catalog** toasts that an admin will review it. | C |
 | BOOK-05 | ⋯ menu | Edit details, (Suggest), Remove from list; closes on any click outside. | C |
 | BOOK-06 | Edit details | Title, "Authors, separated by commas", cover image; saved only for this reader. "You've edited these details. Reset to catalog" undoes all three. | C |
-| BOOK-10 | Status | Pill (Active, Inactive, Finished), progress bar, "page X of Y" (or "42%") button, "+N page(s) today" (or "+N% today"); the reading buttons (READ-16), or Re-read. | C |
+| BOOK-10 | Status | Pill (Active, Inactive, Finished), the progress slider (a full, fixed bar once finished), "page X of Y" (or "42%") button, "+N page(s) today" (or "+N% today"); the reading buttons (READ-16), or Re-read. | C |
 | BOOK-12 | Page editor | Current and total page with Save and Cancel. | C |
 | BOOK-13 | Start | Asks for the pages like READ-05. | C |
 | BOOK-14 | Finished | The pill says Finished; the status line only the date (nothing when it isn't known); Re-read starts a new reading at page 0 with the same total. | C, U |
-| BOOK-16 | Percent | "42%", +1 adds 1%, history lines "30% → 40%"; percent adds days read but no pages; the calendar shades percent-only days by percent. | C |
+| BOOK-16 | Percent | "42%", the slider steps by 1%, history lines "30% → 40%"; percent adds days read but no pages; the calendar shades percent-only days by percent. | C |
 | BOOK-20 | Rating | Five stars (a radio group); choosing the current rating again clears it. | C, B |
 | BOOK-21 | Notes | "Private notes about this book"; saved 0.7 seconds after typing stops, then "Saved" by the heading. | C, B |
 | BOOK-22 | Tags | Chips with ×; "+ add tag" suggests existing tags (§14.12) or creates one. | C, B |
@@ -698,7 +707,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | U: unit | `web/src/lib/*.spec.ts`, `*.svelte.test.ts` for runes modules; Rust `#[test]` | `npx vitest run`, `cargo test` | part of the counts below |
 | C: page and component | `web/src/**/*.svelte.test.ts` (jsdom, Testing Library, mock library in `web/src/test/fixtures.ts`, mock API by route) | `npx vitest run --project client` | 207 web tests in all |
 | A: API | `crates/mau-server/src/**` tests against a temporary SQLite database (`app_tests.rs`, `access_tests.rs`, and per module) | `cargo test` | 198 Rust tests |
-| B: Firefox | `web/browser-tests/` (headless Firefox via puppeteer-core, throwaway seeded servers on free ports; axe-core for WCAG 2.1 AA) | `just browser-test` | 29 steps (+1 with `MAU_BROWSER_NETWORK=1`) |
+| B: Firefox | `web/browser-tests/` (headless Firefox via puppeteer-core, throwaway seeded servers on free ports; axe-core for WCAG 2.1 AA) | `just browser-test` | 30 steps (+1 with `MAU_BROWSER_NETWORK=1`) |
 | E: Playwright | `web/e2e/` (Chromium) | `just e2e`, and in CI | 5 |
 
 `just test` runs the unit, page, and API tests with type checks. Every

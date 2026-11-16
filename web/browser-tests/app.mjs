@@ -46,13 +46,42 @@ export async function run() {
 			await page.waitForSelector('button[aria-label="Pause Middlemarch"]', { timeout: 3000 });
 		});
 
-		await step('Reading: the last page finishes the book and it leaves the list', async () => {
-			await click('button[aria-label="Add 1 page to A Wizard of Earthsea"]');
-			await until('Finished A Wizard of Earthsea');
+		await step('Reading: dragging the progress slider moves the book on', async () => {
+			const sel = '[role=slider][aria-label="Progress in Middlemarch"]';
+			const before = Number(await page.$eval(sel, (e) => e.getAttribute('aria-valuenow')));
+			const box = await (await page.$(sel)).boundingBox();
+			const y = box.y + box.height / 2;
+			await page.mouse.move(box.x + box.width * 0.1, y);
+			await page.mouse.down();
+			await page.mouse.move(box.x + box.width * 0.4, y, { steps: 5 });
+			await page.mouse.move(box.x + box.width * 0.6, y, { steps: 5 });
+			// While dragging, the page number follows and nothing is saved yet.
+			// The thumb's centre runs from 7px in to 7px short of the ends.
+			const want = Math.round((880 * (box.width * 0.6 - 7)) / (box.width - 14));
+			const live = await page.$eval(sel, (e) => e.closest('li').textContent);
+			const shown = Number(/page (\d+) of 880/.exec(live)?.[1]);
+			if (Math.abs(shown - want) > 2) throw new Error(`live page ${shown}, wanted ~${want}`);
+			if (await page.$('.toast')) throw new Error('saved before release');
+			await page.mouse.up();
+			await until(`Moved to page ${shown}`);
+			const after = Number(await page.$eval(sel, (e) => e.getAttribute('aria-valuenow')));
+			if (after <= before) throw new Error(`${before} → ${after}`);
+			await click('.toast button', 'Undo');
 			await sleep(300);
-			if (await page.$('button[aria-label="Add 1 page to A Wizard of Earthsea"]'))
-				throw new Error('still listed');
 		});
+
+		await step(
+			'Reading: the slider’s End key finishes the book and it leaves the list',
+			async () => {
+				const sel = '[role=slider][aria-label="Progress in A Wizard of Earthsea"]';
+				await page.focus(sel);
+				await page.keyboard.press('End');
+				await page.$eval(sel, (e) => e.blur());
+				await until('Finished A Wizard of Earthsea');
+				await sleep(300);
+				if (await page.$(sel)) throw new Error('still listed');
+			}
+		);
 
 		await step('Reading: search', async () => {
 			await type('input[type=search]', 'eliot');
@@ -119,6 +148,8 @@ export async function run() {
 			await click('[role=menuitem]', 'Remove from list');
 			await click('.dialog button', 'Remove');
 			await until('Removed Piranesi from your list');
+			// The toast shows as the navigation starts; give it a moment to land.
+			for (let i = 0; i < 30 && new URL(page.url()).pathname !== '/catalog'; i++) await sleep(100);
 			if (new URL(page.url()).pathname !== '/catalog') throw new Error(page.url());
 		});
 

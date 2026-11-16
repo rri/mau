@@ -7,7 +7,7 @@ import '@testing-library/jest-dom/vitest';
 import 'fake-indexeddb/auto';
 import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/svelte';
-import { nav, page } from './app-mocks.ts';
+import { nav, navigating, page } from './app-mocks.ts';
 
 // Node 26 has its own (experimental, unconfigured) localStorage, which hides
 // jsdom's; the app reads the bare globals, so point them at jsdom's.
@@ -22,7 +22,7 @@ const files = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'files
 Object.defineProperty(HTMLInputElement.prototype, 'files', { ...files, set() {} });
 
 vi.mock('$app/navigation', () => nav);
-vi.mock('$app/state', () => ({ page }));
+vi.mock('$app/state', () => ({ page, navigating }));
 
 // Each test starts signed out with an empty library and no toast.
 const { auth } = await import('#lib/auth.svelte.ts');

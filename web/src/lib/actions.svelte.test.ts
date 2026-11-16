@@ -5,7 +5,6 @@ import {
 	finish,
 	moveBook,
 	pause,
-	plusOne,
 	resume,
 	setPages,
 	startLike,
@@ -32,10 +31,10 @@ afterEach(() => {
 });
 
 describe('READ-ACT: reading actions', () => {
-	it('READ-ACT-01 + adds one page today, with an undo toast', () => {
-		plusOne(info('lhod'));
+	it('READ-ACT-01 moving forward a page logs it today, with an undo toast', () => {
+		setPages(info('lhod'), 141);
 		expect(info('lhod').reading!.pos).toBe(141);
-		expect(toasts.current?.message).toBe('+1 page on The Left Hand of Darkness');
+		expect(toasts.current?.message).toBe('Moved to page 141');
 		expect(toasts.current?.action?.label).toBe('Undo');
 		const ev = [...library.view.events.values()].filter((e) => e.reading_id === '00r-lhod').at(-1)!;
 		expect(ev).toMatchObject({ local_date: TODAY, from_page: 140, to_page: 141 });
@@ -178,12 +177,12 @@ describe('READ-DRAG: drag to reorder', () => {
 		expect(info('se').reading).toMatchObject({ unit: 'percent', total: 100, finished_on: TODAY });
 	});
 
-	it('READ-ACT-12 percent: the up arrow adds 1%, and 100% finishes the book', () => {
+	it('READ-ACT-12 percent: moving up 1% logs it in percent, and 100% finishes the book', () => {
 		startReading(info('se'), { unit: 'percent' });
 		expect(info('se').reading).toMatchObject({ unit: 'percent', total: 100, pos: 0, pages: null });
-		plusOne(info('se'));
+		setPages(info('se'), 1);
 		expect(info('se').reading!.pos).toBe(1);
-		expect(toasts.current?.message).toBe('+1% on Station Eleven');
+		expect(toasts.current?.message).toBe('Moved to 1%');
 		const ev = [...library.view.events.values()].find(
 			(e) => e.reading_id === info('se').reading!.id
 		)!;

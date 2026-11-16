@@ -16,7 +16,8 @@ import {
 	mockApi,
 	sampleLibrary,
 	signIn,
-	useLibrary
+	useLibrary,
+	slide
 } from '../../test/fixtures.ts';
 
 const info = (id: string) => bookInfo(library.view, library.view.books.get(id)!);
@@ -120,7 +121,7 @@ describe('Book page: status', () => {
 		const T = 'The Left Hand of Darkness';
 		expect(screen.getByText('Active', { selector: '.pill' })).toBeInTheDocument();
 		expect(screen.getByText('+6 pages today')).toBeInTheDocument();
-		await userEvent.click(screen.getByRole('button', { name: `Add 1 page to ${T}` }));
+		await slide(T);
 		expect(screen.getByText('+7 pages today')).toBeInTheDocument();
 		await userEvent.click(screen.getByRole('button', { name: `Pause ${T}` }));
 		expect(screen.getByText('Inactive', { selector: '.pill' })).toBeInTheDocument();
@@ -133,7 +134,7 @@ describe('Book page: status', () => {
 	it('BOOK-11 one page today is singular', async () => {
 		useLibrary();
 		open('mm');
-		await userEvent.click(screen.getByRole('button', { name: 'Add 1 page to Middlemarch' }));
+		await slide('Middlemarch');
 		expect(screen.getByText('+1 page today')).toBeInTheDocument();
 	});
 
@@ -188,7 +189,7 @@ describe('Book page: percent', () => {
 		useLibrary(d);
 		open('pc');
 		expect(screen.getByRole('button', { name: '40%' })).toBeInTheDocument();
-		await userEvent.click(screen.getByRole('button', { name: 'Add 1% to Percent Book' }));
+		await slide('Percent Book');
 		expect(screen.getByText('+1% today')).toBeInTheDocument();
 		expect(screen.getByText('30% → 40%')).toBeInTheDocument();
 		const stats = document.querySelector('.stats')!;

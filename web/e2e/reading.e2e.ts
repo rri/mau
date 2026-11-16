@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { AUTH_FILE, seed } from './helpers.ts';
 
 // Runs after auth.e2e.ts, which creates the admin account "rri".
@@ -6,18 +6,24 @@ test.use({ storageState: AUTH_FILE });
 
 test.beforeAll(() => seed('rri'));
 
-const PLUS = 'Add 1 page to The Left Hand of Darkness';
+const SLIDER = 'Progress in The Left Hand of Darkness';
 
-test('+ logs one page and Undo takes it back', async ({ page }) => {
+/** One page on with the progress slider's arrow key; leaving it saves. */
+async function step(page: Page) {
+	const slider = page.getByRole('slider', { name: SLIDER });
+	await slider.focus();
+	await slider.press('ArrowRight');
+	await slider.blur();
+}
+
+test('the slider logs one page and Undo takes it back', async ({ page }) => {
 	await page.goto('/reading');
 	const row = page.getByRole('listitem').filter({ hasText: 'The Left Hand of Darkness' });
 	await expect(row.getByText('page 140 of 304')).toBeVisible();
-	await page.getByRole('button', { name: PLUS }).click();
+	await step(page);
 	await expect(row.getByText('page 141 of 304')).toBeVisible();
 	// A new device may still be downloading (its line is a status too).
-	await expect(
-		page.getByRole('status').filter({ hasText: '+1 page on The Left Hand of Darkness' })
-	).toBeVisible();
+	await expect(page.getByRole('status').filter({ hasText: 'Moved to page 141' })).toBeVisible();
 	await page.getByRole('button', { name: 'Undo' }).click();
 	await expect(row.getByText('page 140 of 304')).toBeVisible();
 });
@@ -27,8 +33,8 @@ test('taps made offline sync when the connection returns', async ({ page, contex
 	const row = page.getByRole('listitem').filter({ hasText: 'The Left Hand of Darkness' });
 	await expect(row.getByText('page 140 of 304')).toBeVisible();
 	await context.setOffline(true);
-	await page.getByRole('button', { name: PLUS }).click();
-	await page.getByRole('button', { name: PLUS }).click();
+	await step(page);
+	await step(page);
 	await expect(row.getByText('page 142 of 304')).toBeVisible();
 	await expect(page.getByText(/Offline · 2 unsynced/)).toBeVisible();
 	await context.setOffline(false);

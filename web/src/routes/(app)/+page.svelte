@@ -9,6 +9,7 @@
 	import { daysLeft, lastDays, pagesPerDay, yearTotals } from '#lib/stats.ts';
 	import BarChart from '#lib/components/BarChart.svelte';
 	import Cover from '#lib/components/Cover.svelte';
+	import ProgressSlider from '#lib/components/ProgressSlider.svelte';
 	import ReadingButtons from '#lib/components/ReadingButtons.svelte';
 
 	const day = $derived.by(() => {
@@ -42,6 +43,8 @@
 			timeZone: 'UTC'
 		}).format(new Date(day + 'T00:00:00Z'))
 	);
+	// The book whose slider is being moved, and where it is.
+	let moving = $state<{ id: string; pos: number } | null>(null);
 	const pages = (n: number) => `${n.toLocaleString()} ${n === 1 ? 'page' : 'pages'}`;
 	const nf = (n: number) => n.toLocaleString();
 </script>
@@ -86,11 +89,17 @@
 							>
 							<div class="info">
 								<a class="t" href="/catalog/{b.book.id}">{b.title}</a>
-								<span class="bar"
-									><span style="width:{Math.round((100 * r.pos) / r.total)}%"></span></span
-								>
-								<span class="meta"
-									>{progressText(r)}{#if left !== null}{' · '}about {left}
+								<ProgressSlider
+									info={b}
+									bind:preview={
+										() => (moving?.id === b.book.id ? moving.pos : null),
+										(v) => (moving = v === null ? null : { id: b.book.id, pos: v })
+									}
+								/>
+								<span class="meta" class:moving={moving?.id === b.book.id}
+									>{progressText(
+										moving?.id === b.book.id ? { ...r, pos: moving.pos } : r
+									)}{#if left !== null}{' · '}about {left}
 										{left === 1 ? 'day' : 'days'} left at your pace{/if}</span
 								>
 							</div>
@@ -234,22 +243,13 @@
 		color: var(--ink);
 		text-decoration: none;
 	}
-	.bar {
-		height: 4px;
-		border-radius: 99px;
-		background: var(--line);
-		overflow: hidden;
-	}
-	.bar span {
-		display: block;
-		height: 100%;
-		border-radius: 99px;
-		background: var(--accent);
-	}
 	.meta {
 		font-size: 13px;
 		color: var(--muted);
 		font-variant-numeric: tabular-nums;
+	}
+	.meta.moving {
+		color: var(--accent);
 	}
 	/* Three across at any width. Numbers on top, all on one line (smaller on
 	   phones); labels underneath may wrap. */

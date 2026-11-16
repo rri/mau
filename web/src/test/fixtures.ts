@@ -3,6 +3,8 @@
 // dates), a signed-in reader, and a fixed "today".
 
 import { vi } from 'vitest';
+import { screen } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
 import type { Me } from '#lib/api/generated/Me.ts';
 import type { WorkRow } from '#lib/api/generated/WorkRow.ts';
 import { auth } from '#lib/auth.svelte.ts';
@@ -11,6 +13,15 @@ import { cloneData, emptyData, tagKey, type Data } from '#lib/sync/apply.ts';
 
 /** Today in the tests: Wednesday 11 November 2026, 09:00 in Berlin. */
 export const TODAY = '2026-11-11';
+
+/** Moves a book's progress slider with the keyboard (the arrow keys step
+ *  a page, or 1%), then leaves it, which saves. */
+export async function slide(title: string, keys = '{ArrowRight}') {
+	const s = screen.getByRole('slider', { name: `Progress in ${title}` });
+	s.focus();
+	await userEvent.keyboard(keys);
+	s.blur();
+}
 
 export function freezeTime(iso = '2026-11-11T08:00:00Z') {
 	vi.useFakeTimers({ toFake: ['Date'] });
