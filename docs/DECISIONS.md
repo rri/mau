@@ -1246,3 +1246,28 @@ From the bug reports on GitHub (#1, #2, #3):
   Deleting an active book's current reading also makes the book inactive,
   so a book with no readings left is Inactive, and a finished one goes back
   to Inactive.
+
+## Build, test, and deploy pass (2026-11-18)
+
+- **The web app's files have ETags** (weak, from the content hash rust-embed
+  records). The shell, service worker, and manifest are `no-cache`, and had
+  no validator, so every revalidation downloaded them again; an unchanged
+  shell is now a 304. Weak, because the compression layer may send the same
+  content as different bytes. Release builds also send the embedded bytes
+  without copying them.
+- **`/api/health` names the commit** the binary was built from (`MAU_COMMIT`,
+  set only by CI). After a deploy, CI checks https://maubooks.org answers
+  with that commit, not just that something answers.
+- **The deploy upload is compressed** (`ssh -o Compression=yes`): the
+  19 MB binary is about 8 MB on the wire.
+- **Playwright installs only Chromium's headless shell**, which is all the tests
+  use, and CI caches it per Playwright version; the system libraries are
+  still installed each run.
+- **A new push to a pull request cancels its older CI run.** Pushes to `main`
+  aren't grouped, so they never wait on each other.
+- **Precompressing assets measured again, left alone:** brotli 11 saves
+  92 KB over the on-the-fly brotli 4 across the whole app (476 KB against
+  569 KB; the scanner module 321 KB against 389 KB), once per device per
+  deploy, and about 20 ms of CPU per scanner download, for 1.1 MB more
+  binary. Splitting the CI test job and debug info in CI stay as decided
+  above.

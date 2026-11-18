@@ -17,6 +17,12 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request cancels its older run. Pushes to main each get
+# their own run (the deploy job keeps them in order).
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   # Pinned so a new Rust release's lints don't fail a deploy unannounced.
@@ -71,11 +77,30 @@ jobs:
       - name: Web tests
         run: npx vitest --run
         working-directory: web
+      - name: Build the server for end-to-end tests
+        run: cargo build -p mau-server --locked
+      # Headless tests need only Chromium's headless shell. The browser is
+      # cached per Playwright version; its system libraries are installed
+      # every run (they're not in the cache).
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+        working-directory: web
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium-shell
+      - name: Install the browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps --only-shell chromium
+        working-directory: web
+      - name: Install the browser's system libraries
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+        working-directory: web
       - name: End-to-end tests
-        run: |
-          cargo build -p mau-server --locked
-          npx playwright install --with-deps chromium
-          npx playwright test --reporter=github,list
+        run: npx playwright test --reporter=github,list
         working-directory: web
 
   audit:
@@ -119,6 +144,9 @@ jobs:
         working-directory: web
       - name: Build the static binary
         run: cargo build --release --locked --target "$TARGET" -p mau-server
+        env:
+          # Reported by /api/health, so the deploy can check what's live.
+          MAU_COMMIT: ${{ github.sha }}
       - name: Check that it's static and runs
         run: |
           bin=target/$TARGET/release/mau
@@ -176,8 +204,13 @@ jobs:
           chmod 600 ~/.ssh/deploy
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           sha=$(sha256sum mau | cut -d' ' -f1)
+          # Compressed in transit: the binary shrinks to under half.
           ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            -o ConnectTimeout=30 "deploy@$DEPLOY_HOST" "$sha $GITHUB_SHA" < mau
+            -o ConnectTimeout=30 -o Compression=yes "deploy@$DEPLOY_HOST" "$sha $GITHUB_SHA" < mau
+      # Through the proxy, from outside, and answering as the new commit.
       - name: Check https://maubooks.org
         if: steps.newest.outputs.deploy
-        run: curl -fsS --retry 5 --retry-all-errors https://maubooks.org/api/health
+        run: |
+          health=$(curl -fsS --retry 5 --retry-all-errors https://maubooks.org/api/health)
+          echo "$health"
+          echo "$health" | jq -e --arg c "$GITHUB_SHA" '.status == "ok" and .commit == $c' >/dev/null

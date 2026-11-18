@@ -677,3 +677,44 @@ async fn responses_carry_a_content_security_policy() {
     // The test instance's public_url is http://localhost: no HSTS.
     assert!(res.headers().get("strict-transport-security").is_none());
 }
+
+#[tokio::test]
+async fn web_files_revalidate_with_etags() {
+    // Needs a web build (`just web-build`), as CI does before the tests.
+    let built = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/build/200.html");
+    if !built.exists() {
+        return;
+    }
+    let app = TestApp::new().await;
+    let get = |etag: Option<&str>| {
+        let mut req = Request::get("/library").header(header::ACCEPT_ENCODING, "br");
+        if let Some(etag) = etag {
+            req = req.header(header::IF_NONE_MATCH, etag);
+        }
+        router(app.state.clone()).oneshot(req.body(Body::empty()).unwrap())
+    };
+
+    let res = get(None).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.headers()[header::CACHE_CONTROL], "no-cache");
+    assert_eq!(res.headers()[header::CONTENT_ENCODING], "br");
+    let etag = res.headers()[header::ETAG].to_str().unwrap().to_owned();
+    assert!(etag.starts_with("W/\""));
+
+    // Unchanged: a 304 with no body, still naming the version.
+    let res = get(Some(&etag)).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_MODIFIED);
+    assert_eq!(res.headers()[header::ETAG], etag.as_str());
+    assert!(
+        res.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .is_empty()
+    );
+
+    // Some other version: the whole file.
+    let res = get(Some("W/\"0\"")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+}

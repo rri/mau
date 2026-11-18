@@ -28,6 +28,9 @@ workflow is `.github/workflows/ci.yml`.
    runs as root (its `--version` check runs as `mau`), and the script prints
    only its own steps: they end up in the public Actions log, so mau's log
    stays in the journal.
+5. CI then fetches https://maubooks.org/api/health from outside, through
+   Caddy, and fails unless it answers with the commit just deployed (CI
+   builds it in as `MAU_COMMIT`).
 
 mau is down for a few seconds during each deploy; the app keeps working
 offline and syncs when it's back.

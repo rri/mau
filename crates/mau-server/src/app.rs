@@ -292,12 +292,17 @@ async fn security_headers(State(state): State<AppState>, req: Request, next: Nex
 struct Health {
     status: &'static str,
     version: &'static str,
+    /// The commit CI built this binary from (`MAU_COMMIT`), so a deploy can
+    /// check the new version is the one answering.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    commit: Option<&'static str>,
 }
 
 async fn health() -> Json<Health> {
     Json(Health {
         status: "ok",
         version: mau_core::VERSION,
+        commit: option_env!("MAU_COMMIT"),
     })
 }
 

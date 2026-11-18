@@ -3,11 +3,14 @@
 //! Files from `web/build` are compiled in (in debug builds rust-embed reads
 //! them from disk instead, so `just web-build` is enough to see changes).
 //! Unknown paths get the SPA shell (`200.html`) so client-side routes work.
+//!
+//! Every file has an ETag, so revalidating a `no-cache` file that hasn't
+//! changed (the shell, on every page load) is a 304 instead of the file.
 
 use axum::body::Body;
-use axum::http::{HeaderValue, StatusCode, Uri, header};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, Uri, header};
 use axum::response::{IntoResponse, Response};
-use rust_embed::RustEmbed;
+use rust_embed::{EmbeddedFile, RustEmbed};
 use std::sync::LazyLock;
 
 #[derive(RustEmbed)]
@@ -16,7 +19,7 @@ struct Assets;
 
 const SPA_SHELL: &str = "200.html";
 
-pub async fn serve(uri: Uri) -> Response {
+pub async fn serve(uri: Uri, req_headers: HeaderMap) -> Response {
     let path = uri.path().trim_start_matches('/');
     if let Some(file) = (!path.is_empty()).then(|| Assets::get(path)).flatten() {
         let mime = mime_guess::from_path(path).first_or_octet_stream();
@@ -26,14 +29,10 @@ pub async fn serve(uri: Uri) -> Response {
         } else {
             "no-cache"
         };
-        return response(file.data.into_owned(), mime.as_ref(), cache);
+        return response(file, mime.as_ref(), cache, &req_headers);
     }
     match Assets::get(SPA_SHELL) {
-        Some(file) => response(
-            file.data.into_owned(),
-            "text/html; charset=utf-8",
-            "no-cache",
-        ),
+        Some(file) => response(file, "text/html; charset=utf-8", "no-cache", &req_headers),
         None => (
             StatusCode::SERVICE_UNAVAILABLE,
             "The web app isn't built. Run `just web-build`.",
@@ -42,14 +41,57 @@ pub async fn serve(uri: Uri) -> Response {
     }
 }
 
-fn response(body: Vec<u8>, content_type: &str, cache: &'static str) -> Response {
-    let mut res = Response::new(Body::from(body));
+fn response(
+    file: EmbeddedFile,
+    content_type: &str,
+    cache: &'static str,
+    req_headers: &HeaderMap,
+) -> Response {
+    let etag = etag(&file);
+    let unchanged = req_headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| etag_matches(v, &etag));
+    let mut res = if unchanged {
+        let mut res = Response::new(Body::empty());
+        *res.status_mut() = StatusCode::NOT_MODIFIED;
+        res
+    } else {
+        // Release builds embed the files: Cow::Borrowed, sent without a copy.
+        Response::new(Body::from(file.data))
+    };
     let headers = res.headers_mut();
     if let Ok(v) = HeaderValue::from_str(content_type) {
         headers.insert(header::CONTENT_TYPE, v);
     }
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static(cache));
+    if let Ok(v) = HeaderValue::from_str(&etag) {
+        headers.insert(header::ETAG, v);
+    }
     res
+}
+
+/// A weak ETag from the content hash rust-embed records for each file. Weak,
+/// because the compression layer may send it gzipped or brotli-compressed:
+/// the same content, but not the same bytes.
+fn etag(file: &EmbeddedFile) -> String {
+    let hex: String = file.metadata.sha256_hash()[..16]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    format!("W/\"{hex}\"")
+}
+
+/// Whether an If-None-Match header names `etag`, by weak comparison (as
+/// RFC 9110 asks for If-None-Match).
+fn etag_matches(if_none_match: &str, etag: &str) -> bool {
+    fn opaque(t: &str) -> &str {
+        t.trim().trim_start_matches("W/")
+    }
+    let want = opaque(etag);
+    if_none_match
+        .split(',')
+        .any(|t| t.trim() == "*" || opaque(t) == want)
 }
 
 /// The served path of a built asset whose file name starts with `prefix`
@@ -133,6 +175,14 @@ mod tests {
             inline_script_hashes(html),
             vec!["5KYv+PUboo5h+0+YAtGRPbwv5d/QxzHslP4YGnUaxRw=".to_string()]
         );
+    }
+
+    #[test]
+    fn matches_etags_weakly() {
+        assert!(etag_matches(r#""a", W/"b""#, r#"W/"b""#));
+        assert!(etag_matches(r#""b""#, r#"W/"b""#));
+        assert!(etag_matches("*", r#"W/"b""#));
+        assert!(!etag_matches(r#"W/"a""#, r#"W/"b""#));
     }
 
     #[test]
