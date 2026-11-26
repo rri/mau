@@ -157,6 +157,21 @@ describe('Sign in', () => {
 		expect(screen.queryByRole('link', { name: 'Create an account' })).toBeNull();
 	});
 
+	it('AUTH-08 a sign-in asked for by another page goes back there, never off the site', async () => {
+		mockApi({ 'POST /auth/login': { code_ticket: null }, 'GET /auth/status': status() });
+		at('/signin?next=%2Fauthorize%2Fr1');
+		render(SignIn);
+		await userEvent.type(screen.getByLabelText('Username'), 'rri');
+		await userEvent.type(screen.getByLabelText('Password'), PW);
+		await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+		expect(nav.goto).toHaveBeenCalledWith('/authorize/r1', { replaceState: true });
+		at('/signin?next=%2F%2Fevil.example%2F');
+		auth.me = ME;
+		render(SignIn);
+		expect(nav.goto).toHaveBeenLastCalledWith('/', { replaceState: true });
+		at('/');
+	});
+
 	it('AUTH-07 someone already signed in goes home', () => {
 		auth.me = ME;
 		render(SignIn);

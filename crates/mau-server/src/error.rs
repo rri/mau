@@ -11,6 +11,8 @@ pub struct ApiError {
     pub status: StatusCode,
     pub code: &'static str,
     pub message: String,
+    /// For bearer-token requests: the `WWW-Authenticate` challenge (RFC 6750).
+    pub www_authenticate: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -27,6 +29,7 @@ impl ApiError {
             status,
             code,
             message: message.into(),
+            www_authenticate: None,
         }
     }
     pub fn bad_request(code: &'static str, message: impl Into<String>) -> Self {
@@ -71,14 +74,23 @@ impl ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        (
+        let mut res = (
             self.status,
             Json(Body {
                 error: self.code,
                 message: &self.message,
             }),
         )
-            .into_response()
+            .into_response();
+        if let Some(v) = self
+            .www_authenticate
+            .as_deref()
+            .and_then(|v| axum::http::HeaderValue::from_str(v).ok())
+        {
+            res.headers_mut()
+                .insert(axum::http::header::WWW_AUTHENTICATE, v);
+        }
+        res
     }
 }
 

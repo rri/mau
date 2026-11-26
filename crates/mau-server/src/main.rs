@@ -7,6 +7,7 @@
 #[cfg(test)]
 mod access_tests;
 mod admin;
+mod api;
 mod app;
 #[cfg(test)]
 mod app_tests;
@@ -143,6 +144,7 @@ async fn serve(config: config::Config) -> Result<()> {
     let state = app::AppState::new(db.clone(), config)?;
     announce_setup_link(&state).await?;
     backup::schedule(state.config.clone(), db.clone());
+    api::token::schedule_cleanup(db.clone());
     axum::serve(
         listener,
         app::router(state).into_make_service_with_connect_info::<std::net::SocketAddr>(),

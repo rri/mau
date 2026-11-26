@@ -269,7 +269,7 @@ pub struct EditionsQuery {
     source_id: String,
 }
 
-async fn cached_candidate(
+pub(crate) async fn cached_candidate(
     state: &AppState,
     provider: &str,
     source_id: &str,

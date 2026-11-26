@@ -2,10 +2,11 @@
 import { OUT } from './harness.mjs';
 import * as app from './app.mjs';
 import * as auth from './auth.mjs';
+import * as api from './api.mjs';
 
 const only = process.argv[2];
 let failed = 0;
-for (const [name, suite] of Object.entries({ app, auth }))
+for (const [name, suite] of Object.entries({ app, auth, api }))
 	if (!only || only === name) failed += await suite.run();
 if (failed) console.log(`Screenshots of failures: ${OUT}`);
 process.exit(failed ? 1 : 0);

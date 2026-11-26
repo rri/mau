@@ -57,6 +57,7 @@ describe('Settings index', () => {
 		expect(row('Google Books')).toHaveTextContent('Off');
 		expect(await screen.findByText('7 of 10 left')).toBeInTheDocument();
 		expect(screen.getByText('2 shared')).toBeInTheDocument();
+		expect(row('Apps & API access')).toHaveAttribute('href', '/settings/api');
 		expect(screen.getByText('Admin')).toHaveAttribute('id', 'admin');
 		for (const l of [
 			'Users',
@@ -64,6 +65,7 @@ describe('Settings index', () => {
 			'Catalog providers',
 			'Review queue',
 			'Shared catalog',
+			'Apps',
 			'Audit log',
 			'Instance stats'
 		])

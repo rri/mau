@@ -45,8 +45,9 @@ sw.addEventListener('fetch', (event) => {
 	if (req.method !== 'GET') return;
 	const url = new URL(req.url);
 	if (url.origin !== location.origin || url.pathname.startsWith('/api/')) return;
-	// Public profile and share pages are server-rendered; let them through.
-	if (url.pathname.startsWith('/u/') || url.pathname.startsWith('/s/')) return;
+	// Public profile and share pages, and OAuth's server pages, are the
+	// server's; let them through (never the cached shell in their place).
+	if (['/u/', '/s/', '/oauth/', '/.well-known/'].some((p) => url.pathname.startsWith(p))) return;
 
 	if (url.pathname.startsWith('/covers/')) {
 		event.respondWith(

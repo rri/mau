@@ -1,6 +1,6 @@
 # mau threat model
 
-Version 2, 2026-11-11 (version 1: 2026-11-09). Method: STRIDE per element of
+Version 3, 2026-11-25 (version 2: 2026-11-11; version 1: 2026-11-09). Method: STRIDE per element of
 the data-flow diagram, with risks rated by the OWASP Risk Rating Methodology
 (likelihood × impact, each Low / Medium / High). Controls are cross-referenced
 to OWASP ASVS 4.0 chapters where it helps. Review this document when a trust
@@ -12,6 +12,12 @@ Tailscale, the deploy key and script, the shared Hetzner host), and re-rates
 every threat against what changed since version 1: the landing page and its
 quote endpoint, the signed-in home page, password confirmation for admin
 actions, and moving a library between instances (export version 2).
+
+Version 3 adds access for other programs: personal API tokens, "Sign in with
+mau" (OAuth 2.1 with PKCE, apps known by their address, no registration), the
+public API at `/api/v1`, CORS for it, the server fetching apps' metadata
+documents, and Admin › Apps. New rows are S10–S13, T10–T13, R4, I11–I14,
+D8–D10 and E8–E11; the review behind them is Appendix C.
 
 ## 1. System overview
 
@@ -56,6 +62,7 @@ depends on it (§7).
 | A7 | Backups in `data_dir/backups`: daily snapshots and pre-deploy copies (copies of A1 to A5) | Same as the live database |
 | A8 | Deployment credentials: the GitHub account and `production` environment secrets (Tailscale OAuth client, deploy SSH key, host key), the Tailscale admin account | Whoever holds them can run code on the server |
 | A9 | The server itself (root), shared with oxo-lang.org and Forgejo | Everything above, and the other sites |
+| A10 | API access: personal tokens, apps' access and refresh tokens (hashes), app connections (grants), OAuth requests and codes (server memory) | Whoever holds a token acts as the reader within its scopes, without a password or two-factor |
 
 ## 3. Actors
 
@@ -68,6 +75,8 @@ depends on it (§7).
 | Catalog providers (Open Library, Google Books, Hardcover, ISBNdb) | Partial: data is used, never executed | Supply titles, people, editions, cover URLs |
 | GitHub Actions (runners, third-party actions) | Trusted to build what was pushed | Read the repo; the deploy job holds the `production` secrets |
 | Anyone on GitHub | None | Read the source, open pull requests (their workflows run without secrets) |
+| Third-party app (any website or program) | None until a reader allows it, then that reader's scopes | Send readers to `/oauth/authorize` with any address as `client_id`; exchange codes; call `/api/v1` from any origin; serve a metadata document mau fetches |
+| Holder of a token (a script, an app, or whoever copied it) | The token's scopes, for its owner | `/api/v1` only; never the account, tokens, imports, invites or admin |
 | Other local accounts and services on the host (Forgejo, its runner's jobs, oxo-lang.org) | None | Whatever file permissions allow |
 
 ## 4. Data flow and trust boundaries
@@ -109,6 +118,14 @@ depends on it (§7).
 - **TB5** source → server: what lands on `main` runs as `mau` within
   minutes. The deploy path must not give more than that (in particular, not
   root), and must not leak server data back into public CI logs.
+- **TB6** other programs ↔ server: apps and scripts on any origin, holding
+  bearer tokens. They reach only `/api/v1` and the OAuth token and revoke
+  endpoints, which never read cookies; the cookie API sends no CORS headers.
+  What an app says about itself (its name, extra redirect addresses) is
+  untrusted; only its address (origin) identifies it.
+- **TB7** server → apps' addresses: fetching a metadata document is an
+  outbound request to an address anyone can choose, so it must not reach the
+  server's own network.
 
 ## 5. Entry points
 
@@ -123,6 +140,12 @@ depends on it (§7).
 | `/api/admin/*` | Admin | Reset links, deleting users, and granting admin need a recent password confirmation |
 | `GET /u/{name}`, `/s/{token}` | None | Server-rendered, escaped by maud |
 | `GET /covers/{name}` | None | Names are content hashes; strict pattern |
+| `GET /oauth/authorize` | None | Validates the app's address and return address before anything else (bad ones: an error page, never a redirect); may fetch the app's metadata (TB7); 60 a minute per address |
+| `/api/oauth/requests/{id}` (view, approve, deny) | Session | Same-origin cookie API with the `Origin` check; approving needs a recent password confirmation |
+| `POST /oauth/token`, `POST /oauth/revoke` | PKCE verifier, refresh token | Any origin (CORS `*`, no credentials); form bodies; 60 a minute per address |
+| `GET /.well-known/oauth-authorization-server` | None | Static discovery document |
+| `/api/v1/*` | Bearer token | Bearer only (cookies ignored); scopes per endpoint and field; 120 a minute per token; writes go through `library::apply` |
+| `/api/api-access*`, `/api/admin/apps*` | Session / admin | Making tokens needs a recent confirmation; no token reaches these |
 | Config file and environment | Operator | `public_url` must be https (or localhost) |
 | SSH as `deploy` (tailnet only) | Deploy key | `restrict` plus a forced command: only `mau-deploy SHA256 COMMIT` with the binary on stdin |
 | Pushes to `main`, `workflow_dispatch` | GitHub write access | Deploy after CI passes |
@@ -131,7 +154,7 @@ depends on it (§7).
 
 Risk is the rating *after* the listed controls. Status: ✅ in place,
 ⚠️ accepted residual risk, 🔭 recommended for later, ❗ open finding (§8).
-**Bold** marks what changed in version 2.
+**Bold** marks what changed in version 2; rows new in version 3 are listed in the header.
 
 ### Spoofing
 
@@ -146,6 +169,10 @@ Risk is the rating *after* the listed controls. Status: ✅ in place,
 | S7 | Spoofed client IP to dodge rate limits | `X-Forwarded-For` honored only from `trusted_proxies`, right-most untrusted entry ✅; **Caddy replaces a client's own header: on maubooks.org, 22 failed sign-ins with a different forged `X-Forwarded-For` each were still limited by the real address (2026-11-11)** ✅ | Low |
 | **S8** | **Stolen deploy key** | **Usable only from the tailnet (port 22 is closed to the internet); `restrict` (no shell, forwarding, or pty) and a forced command, tested 2026-11-11; the script accepts only a checksum and a commit hash ✅. Whoever has it and tailnet access can still install any binary (see E6)** | Low |
 | **S9** | **Stolen Tailscale OAuth client** | **It can only make `tag:ci` nodes, and the tailnet policy lets `tag:ci` reach only the server's SSH port, which still needs the deploy key ✅. Depends on the default allow-all rule having been narrowed (§7) ⚠️** | Low |
+| S10 | A phishing app: a link to mau's real consent screen for an app that isn't what it claims | The screen names the app by its host, which is where the code goes (redirects only to the app's own origin, or loopback and app schemes its own address lists); the app's self-chosen name only appears beside it as "calls itself"; hosts are shown in punycode (url crate), so look-alike Unicode domains look different; an app on the reader's computer is called out; admins can block an address ✅. A reader who allows a lookalike domain gives it access, as with any "Sign in with…" screen ⚠️ | Medium |
+| S11 | Apps sharing one origin (e.g. `https://host.example/~alice/` and `/~bob/`) impersonating each other | Identity is the origin by design: two apps on one origin can't be told apart, and blocking blocks the origin ⚠️ (documented in docs/API.md) | Low |
+| S12 | Stolen or leaked bearer token | 256-bit random, SHA-256 at rest, recognizable prefixes (`mau_pat_`, `mau_at_`, `mau_rt_`) for secret scanning, shown once; access tokens last an hour; refresh tokens work once and a reused one ends the grant; anyone can revoke a found token at `/oauth/revoke`; listed with last use in Settings ✅. Personal tokens may never expire (user's choice, 2026-11-25) and survive a Settings password change (decision) ⚠️ | Medium |
+| S13 | Intercepted authorization code | PKCE S256 required for every app; codes last 60 seconds, bound to app, return address and challenge, and work once (a reused code ends the grant); `iss` returned against mix-ups between instances; `response_mode=fragment` keeps codes out of a static host's logs ✅ | Low |
 
 ### Tampering
 
@@ -160,6 +187,10 @@ Risk is the rating *after* the listed controls. Status: ✅ in place,
 | T7 | Tampering with files on disk by other local users | Data directory forced to mode 700 on every start ✅; **on maubooks.org the other services (Forgejo as `git`, its runner as `runner`, Caddy as `caddy`) are separate users, and the runner's jobs run in containers** ✅ | Low |
 | **T8** | **Malicious code reaching `main` (a stolen GitHub session or token, or a mistake)** | **CI must pass first; the `production` secrets reach only jobs on `main`; pull requests from forks run without secrets, and their caches can't be read by `main` ✅. A push runs as `mau` within minutes, with no review step ⚠️ (the chosen trade-off for deploying on every push). GitHub two-factor and branch protection against force-pushes are the operator's 🔭** | Medium |
 | **T9** | **Compromised build dependency or GitHub action** | **Lock files committed and used (`npm ci`, `--locked`); third-party actions pinned to commits; Rust pinned to 1.96.0; `cargo audit` and `npm audit --omit=dev` on every run, and a weekly run of `main` catches advisories published between pushes ✅** | Medium |
+| T10 | Cross-site requests riding the reader's session to allow an app or make a token | Both are cookie-API POSTs: SameSite=Lax, the exact `Origin` check, a recent password confirmation, and `X-Frame-Options: DENY` / `frame-ancestors 'none'` against clickjacking the consent screen ✅ | Low |
+| T11 | Open redirect through `/oauth/authorize` or sign-in's `next` | Error redirects go only to an already-validated return address; `next` accepts only a path on this site (`//host`, `/\host`, schemes go Home) ✅ | Low |
+| T12 | Writing beyond a token's scopes, or to another reader's rows, through `/api/v1` | Scopes checked per endpoint and per field (a `PATCH` with `notes` needs `notes:write`); writes are sync operations checked for ownership by `library::apply`; other readers' rows answer 404 (tested for every book endpoint) ✅ | Low |
+| T13 | An app adding made-up works to the shared catalog | `POST /api/v1/books` with `catalog` uses only cached provider results, like the app; `manual` works stay private ✅ (same as T4) | Low |
 
 ### Repudiation
 
@@ -168,6 +199,7 @@ Risk is the rating *after* the listed controls. Status: ✅ in place,
 | R1 | An admin denies an action | Audit log of admin and account-level actions, kept forever ✅. The log lives in the same database an admin can't edit through the app, but the operator can ⚠️ | Low |
 | R2 | A user doesn't notice account misuse | Recovery activity lists recovery-code use, reset links, and code lockouts; Sessions lists devices and last use ✅. No email or push notifications ⚠️ | Medium |
 | **R3** | **Not knowing what was deployed when** | **Each deploy is logged with its commit (`journalctl -t mau-deploy`), and GitHub keeps the run, its tests, and its artifact for 30 days ✅** | Low |
+| R4 | A reader not noticing what has access | Settings lists every connected app and personal token with what it may do and when it was last used, with Disconnect and Revoke ✅. The audit log records only admins blocking apps, not who connected what (deliberate, see I13); no notification when a token is made ⚠️ | Low |
 
 ### Information disclosure
 
@@ -183,6 +215,10 @@ Risk is the rating *after* the listed controls. Status: ✅ in place,
 | I8 | SQLite stale-memory bug (RUSTSEC-2026-0459, CVE-2026-119375) in the bundled SQLite | Needs a crafted `.db` + `-wal` pair placed where mau opens it; blocked by the private data directory ⚠️. Upgrade when sqlx allows `libsqlite3-sys` ≥ 0.39 🔭. **Ignored by name in CI's `cargo audit`, so any other advisory still fails the build** | Low |
 | **I9** | **Server log lines in public CI logs** | **What `mau-deploy` prints over SSH ends up in the public Actions log, so it prints only its own steps; mau's log (which on an instance without an admin holds the setup link) stays in the journal (finding V2-3, fixed)** ✅ | Low |
 | **I10** | **Deployment details in the public repository** | **`deploy/` and the workflow name the tailnet address, host key, paths, and users. Reaching any of them needs the tailnet and the deploy key ⚠️** | Low |
+| I11 | Reading data beyond what was allowed | `rating`, `notes`, `copies` and the current reading appear only with their read scopes; notes are marked Private on the consent screen; no scope reaches the account, the Google Books key, sessions or exports ✅ | Low |
+| I12 | Cross-origin reads of cookie-authenticated data | The cookie API sends no CORS headers; the CORS-open endpoints never read cookies; `Access-Control-Allow-Credentials` is never sent ✅ (tested) | Low |
+| I13 | Admins learning which apps a reader uses | Admin › Apps shows each app's number of people, never who; the audit log doesn't record connections or tokens ✅ (finding V3-4, fixed) | Low |
+| I14 | Tokens in a static app's browser storage | The app's responsibility; refresh rotation with reuse detection limits a stolen copy ⚠️ (docs/API.md says to keep only the newest) | Low |
 
 ### Denial of service
 
@@ -195,6 +231,9 @@ Risk is the rating *after* the listed controls. Status: ✅ in place,
 | D5 | Large sync batches | 500 operations per request, default 2 MB request bodies elsewhere ✅ | Low |
 | **D6** | **Losing the data volume (failure, deletion, or a mistake)** | **Daily snapshots (7) and pre-deploy copies (5) protect against bad deploys and bad edits ✅, but they sit on the same volume as the database, with no off-server copy and no Hetzner backups ⚠️ (operator's decision, 2026-11-11)** | **Medium** |
 | **D7** | **A bad deploy taking the site down** | **CI runs every test layer first; `mau-deploy` copies the database, checks `/api/health` for 30 seconds, and otherwise restores the previous binary and the database copy (tested); a run whose commit is no longer the newest on `main` doesn't deploy ✅. A few seconds of downtime per deploy ⚠️** | Low |
+| D8 | Filling server memory with authorization requests | Requests last 10 minutes, at most 10,000 (oldest dropped), 60 a minute per address ✅. A flood from many addresses can push out a reader's pending request; they start again ⚠️ | Low |
+| D9 | An app piling up token rows | At most 20 live access tokens and 50 spent refresh tokens per reader and app; expired tokens deleted hourly; 50 personal tokens per reader ✅ (finding V3-3, fixed) | Low |
+| D10 | Using `/api/v1` to load the server or provider quotas | 120 requests a minute per token; catalog search shares the reader's 30 a minute; adding catalog books needs a cached search result ✅ | Low |
 
 ### Elevation of privilege
 
@@ -207,6 +246,10 @@ Risk is the rating *after* the listed controls. Status: ✅ in place,
 | E5 | Supply-chain compromise of dependencies | See T9: **`cargo audit` and `npm audit --omit=dev` run in CI on every push and weekly** ✅; npm has 4 low dev-only advisories, all one Dependabot alert (GHSA-gcqx-w48m-w2h4, deepmerge, used by `@sveltejs/vite-plugin-svelte` at build time on mau's own config; none at runtime; no fixed version yet), left open by decision 2026-11-12 ⚠️ | Medium |
 | **E6** | **The deploy path giving more than `mau`'s rights** | **Nothing uploaded runs as root: the binary runs as `mau` under systemd hardening, and `mau-deploy` runs both its `--version` check and the database copy as `mau` (finding V2-2, fixed) ✅. The script itself runs as root, and takes only a checksum, a commit hash, and the binary** | Low |
 | **E7** | **Another service on the shared host reaching mau** | **Separate users, mau's data directory 700, systemd's `ProtectSystem=strict`/`ProtectHome`, Forgejo registration closed, runner jobs in containers ✅. A local privilege escalation in any of them reaches everything ⚠️. Forgejo listens on all addresses (shielded only by the Hetzner firewall) and sshd allows passwords for non-root users 🔭** | Low |
+| E8 | A token reaching admin powers, account settings, or making more tokens | `/api/v1` is a separate router; the cookie API's `Authed` and `Admin` extractors read only the session cookie; the scope list has nothing for the account, tokens, imports, invites or admin; tested by calling every cookie and admin endpoint with an admin's all-scopes token (all 401/403) ✅ | Low |
+| E9 | A token passing a password confirmation | Handlers reused for the API run as a session that has never confirmed (`reauth_at` empty), so anything needing a confirmation refuses ✅ | Low |
+| E10 | Server-side request forgery through an app's metadata address | `client_id` must be an https domain name (no IP literals, no `*.localhost`); local addresses are never fetched; fetches use a resolver that returns public addresses only (no loopback, private, link-local, CGNAT, NAT64/6to4-embedded or reserved ranges), no proxies, no redirects, https on port 443 only, 5 seconds, 16 KB ✅ (finding V3-2, fixed) | Low |
+| E11 | A blocked or suspended account's app keeping access | Blocking deletes the address's connections and is checked at authorize, approve and token time; suspended accounts' tokens are refused and their refreshes fail; recovery and reset links end every token ✅ (tested) | Low |
 
 ## 7. Assumptions and operator responsibilities
 
@@ -242,6 +285,49 @@ The 2026-11-11 review's findings V2-1 to V2-5 are fixed (Appendix A).
 4. Consider encrypting TOTP secrets and API keys with a key kept outside the
    database, if backups are stored where others can read them (I3).
 5. Queue a server sign-out when signing out offline (I5).
+6. Consider a notice to the reader when a personal token is made or an app
+   is connected (R4), and an optional maximum lifetime for personal tokens
+   that an admin can set (S12).
+7. Signing up from the consent screen should return to it, as signing in
+   does.
+
+## Appendix C: review of 2026-11-25 (API access)
+
+Reviewed: everything added for API access: `api/token.rs` (lookup,
+extractor, revocation), `api/scope.rs`, `api/client.rs` (client IDs, redirect
+rules, metadata fetching and its resolver), `api/oauth.rs` (authorize,
+consent, token, revoke, discovery), `api/v1.rs`, `api/manage.rs`, the router
+and CORS layers, the changes to password reset, the sign-in `next`
+parameter, the consent page, Settings › Apps & API access, Admin › Apps and
+the service worker. Checks: 226 server tests (27 new for API access,
+including every cookie and admin endpoint called with an admin's token,
+cross-user access on every book endpoint, code and refresh-token reuse,
+blocking, suspension and reset links), 246 web tests, `cargo clippy`, and a
+headless Firefox run of the whole flow (consent, allow, return with a code,
+making a token, blocking) at 390 and 1440 px in light and dark, with axe
+(no violations) and no console errors.
+
+| # | Finding | Severity | Outcome |
+|---|---|---|---|
+| V3-1 | A blocked app's metadata was fetched before the block was checked | Low | Fixed: the block is checked first |
+| V3-2 | Metadata fetches went to any port of a public host (probing other services from the server) | Low | Fixed: port 443 only; private addresses were already refused |
+| V3-3 | An app refreshing often piled up spent refresh tokens and live access tokens without limit (D9) | Low | Fixed: caps per reader and app, hourly cleanup of expired tokens |
+| V3-4 | The audit log named who connected which app and made which token, while Admin › Apps promised a count only (I13) | Low | Fixed: only blocking is recorded |
+| V3-5 | Allowing an app again when its metadata couldn't be read erased its name | Bug | Fixed |
+| V3-6 | A metadata document that failed once was treated as missing for a day | Bug | Fixed: retried after 5 minutes |
+| V3-7 | mau's OAuth error page overflowed phone screens, lacked the site footer and font, and broke "https://" across lines | Bug | Fixed |
+| V3-8 | Admin › Apps ran two phrases together and said "Blocked" twice | Bug | Fixed |
+| V3-9 | `change_password`'s comment contradicted the code (sessions are signed out) | Doc | Fixed |
+| V3-10 | Apps on one origin can't be told apart (S11) | Low | Accepted: identity is the origin |
+| V3-11 | Personal tokens may never expire and survive a Settings password change (S12) | Medium | Accepted (user's choice and decision); §8.6 |
+| V3-12 | Signing up from the consent screen loses the way back | UX | Open (§8.7) |
+
+Follow-up the same day: the API pages joined the Firefox suite (`api`: 10
+steps, a static app on a second origin signing in for real), and 9 more API
+tests check that every `/api/v1` route refuses a token missing its scope,
+plus each endpoint's own behavior (catalog search and adding a result,
+shares, edits, copies, percent readings, expired tokens, the token endpoint's
+errors, the token limit). 235 server tests in all.
 
 ## Appendix A: review of 2026-11-11
 

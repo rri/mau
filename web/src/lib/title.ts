@@ -15,11 +15,13 @@ const PAGES: Record<string, string> = {
 	'/settings/google-books': 'Google Books',
 	'/settings/import': 'Import & export',
 	'/settings/invites': 'Invites',
+	'/settings/api': 'Apps & API access',
 	'/settings/admin/users': 'Users',
 	'/settings/admin/signup': 'Signup & invites',
 	'/settings/admin/providers': 'Catalog providers',
 	'/settings/admin/queue': 'Review queue',
 	'/settings/admin/catalog': 'Shared catalog',
+	'/settings/admin/apps': 'Apps',
 	'/settings/admin/audit': 'Audit log',
 	'/settings/admin/stats': 'Instance stats',
 	'/signin': 'Sign in',
@@ -30,7 +32,8 @@ const PAGES: Record<string, string> = {
 const PREFIXES: [string, string][] = [
 	['/invite/', 'Invitation'],
 	['/reset/', 'New password'],
-	['/setup/', 'Set up mau']
+	['/setup/', 'Set up mau'],
+	['/authorize/', 'Connect an app']
 ];
 
 export function pageTitle(

@@ -10,6 +10,7 @@ use axum::routing::{delete, get, patch, post, put};
 use axum::{Json, Router};
 use serde::Serialize;
 use sqlx::SqlitePool;
+use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
 use crate::auth::pending::PendingStore;
@@ -32,8 +33,12 @@ pub struct AppState {
     pub limits: Arc<RateLimits>,
     /// Import jobs in progress.
     pub imports: Arc<crate::importer::Jobs>,
-    /// The server's own clock, for changes it makes (imports).
+    /// The server's own clock, for changes it makes (imports, the API).
     pub clock: Arc<Mutex<mau_core::hlc::Clock>>,
+    /// OAuth requests waiting for an answer, and codes waiting for exchange.
+    pub oauth: Arc<crate::api::oauth::OAuthStore>,
+    /// Apps' metadata documents.
+    pub oauth_meta: Arc<crate::api::client::MetadataFetcher>,
 }
 
 impl AppState {
@@ -64,8 +69,15 @@ impl AppState {
                 }
             }))
             .build()?;
+        let oauth_meta = Arc::new(crate::api::client::MetadataFetcher::new(&format!(
+            "mau/{} (+{})",
+            mau_core::VERSION,
+            config.public_url
+        ))?);
         Ok(Self {
             http,
+            oauth: Arc::new(crate::api::oauth::OAuthStore::default()),
+            oauth_meta,
             limits: Arc::new(RateLimits::default()),
             imports: Arc::new(crate::importer::Jobs::default()),
             clock: Arc::new(Mutex::new(mau_core::hlc::Clock::new("srv"))),
@@ -122,6 +134,23 @@ pub fn router(state: AppState) -> Router {
         .route("/sessions/{id}", delete(manage::revoke_session))
         .route("/recovery-codes", get(manage::recovery_status))
         .route("/recovery-codes/regenerate", post(manage::regenerate_codes))
+        // Apps & API access (the signed-in browser only; no token reaches these)
+        .route("/api-access", get(crate::api::manage::list))
+        .route("/api-access/tokens", post(crate::api::manage::create))
+        .route(
+            "/api-access/tokens/{id}",
+            delete(crate::api::manage::revoke_token),
+        )
+        .route(
+            "/api-access/apps/{id}",
+            delete(crate::api::manage::revoke_app),
+        )
+        .route("/oauth/requests/{id}", get(crate::api::oauth::request_info))
+        .route(
+            "/oauth/requests/{id}/approve",
+            post(crate::api::oauth::approve),
+        )
+        .route("/oauth/requests/{id}/deny", post(crate::api::oauth::deny))
         // Library sync
         .route("/sync", post(crate::library::sync))
         .route("/sync/download", post(crate::library::download))
@@ -205,6 +234,8 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/admin/audit", get(crate::admin::audit_log))
         .route("/admin/stats", get(crate::admin::stats))
+        .route("/admin/apps", get(crate::api::manage::admin_list))
+        .route("/admin/apps/block", post(crate::api::manage::admin_block))
         .route(
             "/covers",
             post(crate::covers::upload).layer(axum::extract::DefaultBodyLimit::max(
@@ -217,8 +248,33 @@ pub fn router(state: AppState) -> Router {
             crate::ratelimit::layer,
         ))
         .layer(middleware::from_fn_with_state(state.clone(), check_origin));
+    // For other programs: bearer tokens only, never cookies, so any origin
+    // may call them (CORS `*`, no credentials).
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::PATCH,
+            Method::DELETE,
+        ])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
+        .expose_headers([header::WWW_AUTHENTICATE, header::RETRY_AFTER])
+        .max_age(std::time::Duration::from_secs(600));
+    let public_api = Router::new()
+        .nest("/api/v1", crate::api::v1::routes())
+        .route("/oauth/token", post(crate::api::oauth::token))
+        .route("/oauth/revoke", post(crate::api::oauth::revoke))
+        .route(
+            "/.well-known/oauth-authorization-server",
+            get(crate::api::oauth::metadata),
+        )
+        .layer(cors);
     Router::new()
+        .merge(public_api)
         .nest("/api", api)
+        .route("/oauth/authorize", get(crate::api::oauth::authorize))
         .route("/covers/{name}", get(crate::covers::serve))
         .route("/u/{username}", get(crate::public::profile))
         .route("/s/{token}", get(crate::public::share))

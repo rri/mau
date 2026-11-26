@@ -156,8 +156,9 @@ pub struct PasswordChange {
     pub password: String,
 }
 
-/// Sets a new password. Other sessions stay signed in; Settings → Sessions
-/// can sign them out.
+/// Sets a new password and signs out every other session (this one stays).
+/// API tokens and connected apps keep working: they're listed, and revoked,
+/// in Settings → Apps & API access.
 pub async fn change_password(
     State(state): State<AppState>,
     Authed(s): Authed,

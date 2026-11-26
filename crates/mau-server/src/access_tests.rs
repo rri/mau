@@ -11,7 +11,7 @@ use tower::ServiceExt;
 use crate::app_tests::TestApp;
 
 /// Every API endpoint that needs a signed-in user (method, path).
-const SIGNED_IN: &[(&str, &str)] = &[
+pub(crate) const SIGNED_IN: &[(&str, &str)] = &[
     ("POST", "/api/auth/confirm"),
     ("PATCH", "/api/account"),
     ("DELETE", "/api/account"),
@@ -55,10 +55,17 @@ const SIGNED_IN: &[(&str, &str)] = &[
     ("POST", "/api/invites"),
     ("DELETE", "/api/invites/x"),
     ("POST", "/api/covers"),
+    ("GET", "/api/api-access"),
+    ("POST", "/api/api-access/tokens"),
+    ("DELETE", "/api/api-access/tokens/x"),
+    ("DELETE", "/api/api-access/apps/x"),
+    ("GET", "/api/oauth/requests/x"),
+    ("POST", "/api/oauth/requests/x/approve"),
+    ("POST", "/api/oauth/requests/x/deny"),
 ];
 
 /// Admin-only endpoints.
-const ADMIN: &[(&str, &str)] = &[
+pub(crate) const ADMIN: &[(&str, &str)] = &[
     ("GET", "/api/admin/users"),
     ("PATCH", "/api/admin/users/x"),
     ("DELETE", "/api/admin/users/x"),
@@ -77,6 +84,8 @@ const ADMIN: &[(&str, &str)] = &[
     ("PUT", "/api/admin/catalog/editions/x"),
     ("GET", "/api/admin/audit"),
     ("GET", "/api/admin/stats"),
+    ("GET", "/api/admin/apps"),
+    ("POST", "/api/admin/apps/block"),
 ];
 
 /// A session that hasn't confirmed its password recently.

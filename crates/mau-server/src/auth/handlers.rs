@@ -679,7 +679,8 @@ pub async fn record_recovery_event(
     Ok(())
 }
 
-/// Sets a new password and signs out every session.
+/// Sets a new password and signs out every session. API tokens and app
+/// connections end too: whoever had the account may have made them.
 async fn reset_password(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     user_id: &str,
@@ -694,6 +695,7 @@ async fn reset_password(
         .bind(user_id)
         .execute(&mut **tx)
         .await?;
+    crate::api::token::revoke_all(tx, user_id).await?;
     Ok(())
 }
 

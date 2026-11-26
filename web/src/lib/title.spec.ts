@@ -16,6 +16,9 @@ describe('page titles', () => {
 	it('names settings and admin pages as their headings do', () => {
 		expect(pageTitle('/settings/recovery', { signedIn: true })).toBe('Recovery codes · mau');
 		expect(pageTitle('/settings/admin/audit', { signedIn: true })).toBe('Audit log · mau');
+		expect(pageTitle('/settings/api', { signedIn: true })).toBe('Apps & API access · mau');
+		expect(pageTitle('/settings/admin/apps', { signedIn: true })).toBe('Apps · mau');
+		expect(pageTitle('/authorize/r1', { signedIn: true })).toBe('Connect an app · mau');
 	});
 	it('names the public pages', () => {
 		expect(pageTitle('/signin', { signedIn: false })).toBe('Sign in · mau');

@@ -13,6 +13,7 @@ optionally, an authenticator app.
 - Choices made while building it: [`docs/DECISIONS.md`](docs/DECISIONS.md)
 - The interactive design mocks: [`mocks/`](mocks/)
 - What it defends against: [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
+- For programs using your library: [`docs/API.md`](docs/API.md)
 
 ## Building
 

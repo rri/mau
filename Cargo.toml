@@ -34,11 +34,13 @@ sqlx = { version = "0.9", default-features = false, features = ["sqlite", "runti
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "fs"] }
 toml = "0.9"
-tower-http = { version = "0.6", features = ["trace", "compression-gzip", "compression-br"] }
+tower-http = { version = "0.6", features = ["trace", "compression-gzip", "compression-br", "cors"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ts-rs = "11"
 uuid = { version = "1", features = ["v4", "v7", "serde"] }
+url = "2"
+jiff = { version = "0.2", default-features = false, features = ["std", "tz-system", "tzdb-zoneinfo"] }
 
 # Password and recovery-code hashing (argon2) is ~10x slower unoptimized; a
 # sign-up hashes 11 times, which outlasts end-to-end test timeouts in CI.

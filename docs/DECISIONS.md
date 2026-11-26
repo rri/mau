@@ -1271,3 +1271,110 @@ From the bug reports on GitHub (#1, #2, #3):
   deploy, and about 20 ms of CPU per scanner download, for 1.1 MB more
   binary. Splitting the CI test job and debug info in CI stay as decided
   above.
+
+## Apps and API access (2026-11-25)
+
+Asked by the user: personal API tokens with granular read and write scopes,
+and "Sign in with mau" for other apps (OAuth), with CORS handled correctly.
+Chosen by the user when asked:
+
+- **A new public API at `/api/v1`** rather than opening the sync protocol to
+  other programs. The first endpoint is `/api/v1/profile`.
+- **Consent is all or nothing** for what the app asks for.
+- **Personal tokens may never expire** (30, 90 or 365 days, or never).
+- **No admin actions through the API**, by any token.
+- **Apps are known by their address, with no registration** and nothing for
+  an admin to approve ("I have no interest in having mau vet third-party
+  apps"). Registration by users and then by admins only were each chosen and
+  then dropped while the design was discussed.
+- **A static website must be able to sign in** from its own JavaScript.
+
+Mine, approved with the design:
+
+- **Personal tokens and app connections are the same access underneath**:
+  one `api_tokens` table (kinds `personal`, `access`, `refresh`), SHA-256
+  hashes only, prefixes `mau_pat_`, `mau_at_`, `mau_rt_` so leaked tokens are
+  recognizable. Opaque, not JWTs, so revoking takes effect at once.
+- **OAuth 2.1, authorization code with PKCE (S256 only)**, `state` required,
+  `iss` on every answer (RFC 9207; one app may talk to many instances),
+  optional `response_mode=fragment`. Access tokens 1 hour; refresh tokens 30
+  days, replaced on every use, and a reused one ends the grant. A reused code
+  ends the grant too (RFC 6749 §10.5). No client secrets: every app is a
+  public client.
+- **The app's address is its identity** (`client_id` = its `https://` URL;
+  `http://localhost…` for development). Redirects must be on the same origin;
+  loopback (any port) and app schemes (reverse-domain, `com.example.app:`)
+  only when listed in a metadata document at the `client_id` (the IETF
+  client ID metadata document). The consent screen names the host; the app's
+  own name appears beside it as "calls itself “…”", never instead.
+- **Allowing an app, and making a personal token, need a password
+  confirmation** (the 10-minute one): both outlive the session that made them.
+- **Two CORS policies**: `/api/v1`, `/oauth/token`, `/oauth/revoke` and the
+  discovery document allow any origin with no credentials (they never read
+  cookies, so there's nothing to borrow); the cookie API sends no CORS
+  headers and keeps its `Origin` check. `/api/v1` reads only
+  `Authorization: Bearer`; the cookie API ignores it.
+- **API writes are the app's own sync operations** with the server's clock,
+  applied by `library::apply` in one transaction per request, after the write
+  lock is taken, so validation, ownership, conflict rules and sync to devices
+  are the same. A refused operation fails the whole request.
+- **Fields beyond `books:read` appear only with their scope** (`rating`,
+  `notes`, `copies`, `reading`); writes check per field (`notes` needs
+  `notes:write`, and so on).
+- **Dates for API writes default to today in the reader's time zone**, using
+  the system's time-zone database (jiff); an unknown zone falls back to UTC.
+  Apps may send `date`, not after tomorrow and not before 1900.
+- **Catalog search and shares through the API reuse the app's handlers** as a
+  session that has never confirmed a password, so anything needing a
+  confirmation refuses.
+- **Requests and codes live in server memory** (10 minutes, 60 seconds), like
+  two-factor sign-ins; a restart means signing in again. At most 10,000
+  requests are kept (oldest dropped).
+- **An app's row is created when someone first allows it**, not when a link
+  is opened, so links nobody accepted leave nothing in the database.
+- **Ending access**: a password set through recovery, a reset link or
+  `mau reset-password` ends every token and connection; a password changed
+  in Settings doesn't (they're listed and revoked separately, as GitHub does).
+  Suspension pauses tokens; deletion cascades.
+- **Admin › Apps** lists connected apps by address with a count of people,
+  never who, and can block an address (all apps at that origin): connections
+  end at once, and unblocking reconnects nobody. Blocking doesn't ask for a
+  password confirmation (like suspending a user: it only removes access).
+- **The audit log records blocking and unblocking only**, not who connected
+  which app or made which token, so the log doesn't tell admins what the
+  count hides.
+- **The `next` parameter on sign-in** accepts only a path on this site;
+  anything else goes Home.
+
+Found and fixed while checking it (tests, Firefox screenshots at 390 and
+1440 px in both themes, and a threat review; see docs/THREAT_MODEL.md v3):
+
+- The admin Apps card ran "first connected" into "· last used" without a
+  space, and said "Blocked" twice.
+- mau's own OAuth error page overflowed a phone screen and lacked the app's
+  font and the site footer; its messages now name the host
+  (`stats.example.com`) rather than the origin (`https://…`), which wrapped
+  after `https://`.
+- A blocked address was still fetched for its metadata before being refused;
+  the block check now comes first.
+- A metadata document that couldn't be read was remembered as missing for a
+  day; failures are now retried after 5 minutes. Addresses on a port other
+  than 443 aren't fetched at all.
+- Allowing an app again when its metadata couldn't be read erased the name it
+  had given before.
+- An app that refreshes very often would pile up spent refresh tokens and
+  live access tokens; each person's connection keeps at most 20 live access
+  tokens and 50 spent refresh tokens, and expired tokens are deleted hourly.
+- `change_password`'s comment said other sessions stay signed in; they're
+  signed out (the code was right).
+
+Then (asked by the user): the Firefox suite gained `api.mjs`, in which a
+static app served on a second localhost port signs in for real (consent,
+password confirmation, PKCE and CORS from its own JavaScript, refresh, deny,
+bad links, personal tokens, disconnecting, blocking, axe in both themes at
+two widths). More API tests cover every route's scope and each endpoint's
+behavior. Its first run caught two wrong assumptions in the new tests, none
+in the app.
+
+Not done: signing up from the consent page doesn't return to it (sign-in
+does); fetching a real metadata document isn't tested.

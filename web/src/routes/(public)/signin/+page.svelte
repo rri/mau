@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { post } from '#lib/api/client.ts';
+	import { safeNext } from '#lib/next.ts';
 	import type { LoginResult } from '#lib/api/generated/LoginResult.ts';
 	import { auth } from '#lib/auth.svelte.ts';
 
@@ -11,14 +13,16 @@
 	let ticket = $state<string | null>(null);
 	let busy = $state(false);
 	let error = $state('');
+	/** Back to the page that asked for a sign-in (an app's consent page), or Home. */
+	const next = $derived(safeNext(page.url.searchParams.get('next')));
 
 	$effect(() => {
-		if (auth.me) goto('/', { replaceState: true });
+		if (auth.me) goto(next, { replaceState: true });
 	});
 
 	async function done() {
 		await auth.refresh();
-		goto('/', { replaceState: true });
+		goto(next, { replaceState: true });
 	}
 
 	async function signIn(e: SubmitEvent) {

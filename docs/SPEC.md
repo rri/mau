@@ -16,8 +16,9 @@ document disagree, this document wins.
 
 ### Sign-in
 - Username and password, with optional two-factor codes from an authenticator
-  app (TOTP). No passkeys, no OAuth. (Passkeys were the first design; see
-  docs/DECISIONS.md, "After launch".)
+  app (TOTP). No passkeys, and no signing in to mau with another site's
+  account. (Passkeys were the first design; see docs/DECISIONS.md, "After
+  launch".) mau is itself an OAuth provider for other apps (§2a).
 - Sign-in screen: **Username**, **Password**, **Sign in**, a **Forgot your
   password?** link, and **Create an account** only when signup is open.
   Otherwise it says "New here? Ask for an invite link." With two-factor on, a
@@ -76,6 +77,56 @@ recovery codes, and deleting the account; for admins, also issuing a reset
 link, deleting a user, and making someone an admin (each can take over or
 remove accounts). The password, plus an authenticator (or recovery) code when
 two-factor is on. Valid for 10 minutes. Cancelling changes nothing and says so.
+
+## 2a. Apps and API access
+
+Other programs can read and change a reader's library through the API at
+`/api/v1` (reference: `docs/API.md`), with a bearer token. Tokens come two
+ways; underneath they're the same kind of access:
+
+- **Personal tokens**, made in Settings › Apps & API access for the reader's
+  own scripts: a name, what it may do (scopes), and an expiry of 30, 90
+  (default) or 365 days, or never. Making one needs a password confirmation.
+  The token (`mau_pat_…`) is shown once, with **Copy token**; **Done** waits
+  for "I've saved it". The list shows each token's name, its first characters,
+  what it allows, its expiry and when it was last used, with **Revoke**.
+- **Connected apps** ("Sign in with mau", OAuth 2.1 with PKCE). An app is
+  known by its address (its `client_id`, an `https://` address, or
+  `http://localhost…` while it's being built); nothing is registered or
+  approved in advance. An app may only send people back to its own address,
+  unless a small JSON document at its address lists loopback or app-scheme
+  addresses (native apps). An app in a browser (a static site) gets its token
+  from its own page's JavaScript.
+- **The flow:** the app sends the browser to `/oauth/authorize`. A bad app
+  address or return address gets mau's own error page, never a redirect.
+  Signed out, the reader signs in first and comes back. Then **Connect an
+  app**: "*host* wants to use your mau account", the account ("Signed in as
+  *name* @*username*"), **Continue as *name*** and **Use another account**
+  (signs out, then back after signing in). Then **Allow *host*?**: everything
+  the app asked for, in plain words (notes marked Private); a note when the
+  app runs on this computer; where the reader goes back to. **Allow** (with a
+  password confirmation) or **Deny**: all or nothing. Both go back to the app.
+  Requests last 10 minutes.
+- **Tokens for apps:** an access token for an hour and a refresh token for 30
+  days, replaced on every use; using an old one ends the app's access.
+  Settings › Apps & API access lists connected apps by address, with what
+  each may do and **Disconnect**.
+- **Scopes:** `profile:read`; `books:read`, `books:write`, `books:delete`;
+  `tags:write`; `reading:read`, `reading:write`; `ratings:read`/`:write`;
+  `notes:read`/`:write`; `copies:read`/`:write`; `catalog:search`;
+  `shares:read`/`:write`. Changing something includes seeing it. Nothing about
+  the account itself (password, two-factor, sessions, recovery codes, tokens,
+  connected apps, the Google Books key), imports, invites, or admin can be
+  reached with any token, an admin's included.
+- **When tokens end:** revoking or disconnecting; expiry; a password set
+  through a recovery code, a reset link or `mau reset-password` (every token
+  and connection). A password changed in Settings keeps them (they're listed
+  and revoked separately). A suspended account's tokens stop working until
+  it's unsuspended; deleting the account deletes them.
+- **Admins** see every connected app by address (Settings › Admin › Apps),
+  with how many people connected it (never who), and can **Block** an
+  address: everyone's connections to it end, and nobody can connect an app
+  there until it's unblocked.
 
 ## 3. Data model
 
@@ -299,6 +350,7 @@ A list of sections, each its own page, then **Sign out**.
 - **Sharing:** finished books, currently active, a tag, or the whole catalog.
   Each is Private (default) or Public. Ratings optional per item; notes never.
   "Make a new link" breaks the old one. Sharing with specific people is postponed.
+- **Apps & API access:** connected apps and personal tokens (§2a).
 - **Import & export:** import from Goodreads (CSV), StoryGraph (CSV),
   LibraryThing (TSV/JSON), dinky.dev (JSON), or any CSV with column mapping
   (needs Title + Authors, or ISBN). Review before commit: matched / check match
@@ -336,7 +388,8 @@ A list of sections, each its own page, then **Sign out**.
   delete; the last admin is protected), signup and invites, catalog providers
   (order, keys, on/off), review queue (edit, merge into existing, add to shared
   catalog, decline), shared catalog editor (users' overrides still win for
-  them), audit log (kept forever), instance stats.
+  them), apps (connected apps by address; block), audit log (kept forever),
+  instance stats.
 
 ## 9. Public profile
 
@@ -420,7 +473,11 @@ A list of sections, each its own page, then **Sign out**.
   with hmac and sha1.
 - **Frontend:** SvelteKit with the static adapter (single-page app), embedded
   in the server binary. No Node at runtime.
-- **API:** JSON REST under `/api`, frontend types generated from Rust.
+- **API:** JSON REST under `/api`, frontend types generated from Rust, for the
+  signed-in browser (session cookie, same origin). The public API is
+  `/api/v1` with bearer tokens only, open to any origin (CORS `*`, no
+  credentials); OAuth at `/oauth/authorize`, `/oauth/token`, `/oauth/revoke`
+  and `/.well-known/oauth-authorization-server`.
 - **Sessions:** random ID in an HttpOnly, Secure, SameSite=Lax cookie; stored
   in SQLite.
 - **Covers:** files in the data directory named by content hash, resized to a
@@ -481,7 +538,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | SHELL-04 | Tab on a book or Add a book | The tab of the section the reader came from stays highlighted (Home, Reading or Catalog; Catalog when opened directly). | C |
 | SHELL-05 | Settings tab | Highlighted on every `/settings/…` page. On `/` the logo has an accent ring. | C |
 | SHELL-06 | Origin | Visiting Home, Reading or Catalog makes it the origin for later books and Add (kept per browser tab, across reloads). | C |
-| SHELL-10 | Tab title | Every page sets "*Page* · mau": Home, Reading, Catalog, Add a book, the book's title, each settings page's heading, Sign in, Invitation, New password, Set up mau. The landing page: "mau · your personal library and reading log". | U, C, B |
+| SHELL-10 | Tab title | Every page sets "*Page* · mau": Home, Reading, Catalog, Add a book, the book's title, each settings page's heading, Sign in, Invitation, New password, Set up mau, Connect an app. The landing page: "mau · your personal library and reading log". | U, C, B |
 | SHELL-11 | Unknown address | A card like sign-in: logo, "Page not found", an explanation, and **Go to Home** (signed in) or **Go to the front page**. Tab title "Page not found · mau". | C, B |
 | SHELL-12 | Other routing errors | The same card titled "Something went wrong" with the error's message. | C |
 | SHELL-20 | Toast | One at a time, bottom of the screen, `role="status"`, 10 seconds with a shrinking timer bar; an optional action (Undo, View) runs once and closes it. A new toast replaces the old one. | C (UI-01), B |
@@ -523,6 +580,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | AUTH-05 | Links | **Forgot your password?** always; **Create an account** only when signup is open, else "New here? Ask for an invite link." | C |
 | AUTH-06 | Before setup | "This instance has no admin yet…" notice; no signup link. | C, B |
 | AUTH-07 | Signed in already | `/signin` goes to Home. | C |
+| AUTH-08 | `?next=` | After signing in (or when already signed in), `/signin?next=/path` goes to that path on this site; anything else (another site, `//host`) goes Home. | U, C |
 | AUTH-10 | Forgot password | Username, recovery code, new password twice; success signs in and toasts "New password set. N recovery codes left." (1 code). | C, A, B |
 | AUTH-11 | Reset link | "Checking the link…", then "New password for @*name*", a note that other devices sign out and (with two-factor on) that two-factor will be turned off, the new password fields. Success signs in. | C, A, B |
 | AUTH-12 | Used or expired reset link | "This link doesn't work" and why. | C, B |
@@ -531,6 +589,18 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | AUTH-22 | Invite link | "*Inviter* invited you to mau." then the flow; a used or expired link explains and offers sign-in. | C, B |
 | AUTH-23 | Setup link | "Set up this instance", **Create the admin account**, then the flow with the admin notice. A used link explains how to get a new one. | C, B, E |
 | AUTH-30 | New password fields | "N more characters needed." under 10; "The two don't match."; **Show password**; the submit button waits for a valid pair. The server also refuses common passwords. | C, A, B |
+
+### 14.4a Connecting an app (`/oauth/authorize` → `/authorize/<request>`)
+
+| ID | Element | Behavior | Tests |
+|---|---|---|---|
+| AUTH-40 | Signed out | Goes to `/signin?next=/authorize/<request>` and comes back. | C |
+| AUTH-41 | Account, then scopes | Card titled "Connect an app": "*host* wants to use your mau account.", "Signed in as *name* @*username*", **Continue as *name***, **Use another account**. Then "Allow *host*?": the app's own name as "calls itself “…”" beside the address, each scope in plain words (notes marked Private), "You'll go back to *host*…", **Deny** and **Allow**, **Back**. Tab title "Connect an app · mau". | C, B |
+| AUTH-42 | Allow | Asks for the password (and code) unless confirmed in the last 10 minutes, then goes back to the app with `code`, `state` and `iss`. | C, A, B |
+| AUTH-43 | Deny | Goes back to the app with `error=access_denied`. | C, A |
+| AUTH-44 | Use another account | Signs out (deleting this device's copy) and signs in again with `next`. | C |
+| AUTH-45 | Expired, local | An answered or 10-minute-old request: "This request has expired" and Go to Home. An app on this computer: "This app is running on this computer (*host*), not on a website." | C |
+| AUTH-46 | Bad links | An unusable app address or return address, or a blocked app: mau's own error page (logo, the reason, "Go back to the app…", Go to mau, site footer), never a redirect. Other problems (unknown scope, no PKCE, no state) go back to the app as OAuth errors. | A, B |
 
 ### 14.5 Reading (`/reading`)
 
@@ -620,7 +690,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 
 | ID | Element | Behavior | Tests |
 |---|---|---|---|
-| SET-01 | Index | Rows with chevrons: *display name* (@username), Password, Two-factor (On/Off), Sessions, Recovery codes ("N of 10 left"), Sharing ("N shared"), Google Books (Own key/Off), Import & export; admins: an Admin group (anchor `#admin`) with seven pages. | C |
+| SET-01 | Index | Rows with chevrons: *display name* (@username), Password, Two-factor (On/Off), Sessions, Recovery codes ("N of 10 left"), Sharing ("N shared"), Google Books (Own key/Off), Import & export, Apps & API access; admins: an Admin group (anchor `#admin`) with eight pages (Apps between Shared catalog and Audit log). | C |
 | SET-02 | Variants | Non-admins: no Admin group; **Invites** when they may invite or have pending invites. "None left" for zero codes; "Nothing shared". | C |
 | SET-03 | Sign out | With unsynced changes, a dialog explains they'd be lost; otherwise (or "Sign out anyway") the session ends, this device's copy is deleted, and sign-in opens. | C, B |
 | SET-10 | Account | Trail Settings › Account; display name, bio (280 characters), username with rules, time zone (with "Use *device zone*" when they differ). | C |
@@ -643,6 +713,10 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | SET-43 | Google Books | Explanation; a key field (Save key tests it first); then "Key ending in …abcd" with Remove and Replace…. | C, A |
 | SET-44 | Invites | Each link creates one account within 7 days and is shown once; pending invites with "Expires today/tomorrow/in N days" and Revoke; **Create invite link** when allowed. | C, A, B |
 | SET-45 | No permission | "You can't create more invites right now."; no empty message while loading. | C |
+| SET-50 | Apps & API access | An intro with "How the API works" (docs/API.md); **Connected apps**: each by address (and the name it calls itself), what it may do, "Connected *date* · Last used *ago*" (or "Never used"), **Disconnect**; **Personal tokens**: name, first characters, what it allows, "Expires *date*" or "Never expires", last used, **Revoke**. | C, A, B |
+| SET-51 | Empty | "No apps connected. When an app asks you to sign in with mau and you allow it, it appears here."; "No tokens yet." | C |
+| SET-52 | Make a token | **Make a token**: Name, Expires (30 days, 90 days, a year, Never; "works until you revoke it" for Never), "It may see" and "It may change" checkboxes; a name and a scope are required; the password confirmation; then the token once with **Copy token**, "I've saved it", **Done**. | C, A, B |
+| SET-53 | Offline | "Apps and tokens need a connection." | C |
 
 ### 14.10 Import & export (`/settings/import`)
 
@@ -675,6 +749,8 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | ADM-40 | Audit log | Time and "*actor* *action*", newest first, 200 at a time with **Older** (by entry, so nothing is skipped). | C, A |
 | ADM-41 | Empty log | "Nothing recorded yet." after loading. | C |
 | ADM-42 | Stats | Users, books, shared works, private entries, cover and database sizes. | C |
+| ADM-50 | Apps | Each connected app by address, the name it calls itself, its full address when it has a path, "Connected by N people · First connected *date* · last used *ago*" (never who); blocked ones with a Blocked pill and **Unblock**. "No apps connected yet." | C, A, B |
+| ADM-51 | Block | A dialog: "Block *host*?", how many people are disconnected, that no app at that address can be connected until unblocked and that unblocking reconnects nobody; recorded in the audit log. | C, A, B |
 
 ### 14.12 Shared pieces
 
@@ -706,15 +782,21 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | SRV-03 | Rate limits on sign-in, codes, recovery, and confirmation; repeated wrong codes lock the account for a while. | A |
 | SRV-04 | Sync: field-level last-writer-wins, progress chains, tombstones, other users' rows untouchable, invalid batches rejected whole. | A, U |
 | SRV-05 | Exports contain only the reader's own books, notes included. | A |
+| SRV-10 | `/api/v1` takes bearer tokens only and the cookie API takes cookies only; no token reaches anything outside `/api/v1`, an admin's included. | A |
+| SRV-11 | Every `/api/v1` endpoint and field checks its scope (403 `insufficient_scope` with `WWW-Authenticate`); a book's `rating`, `notes`, `copies` and `reading` appear only with their read scopes; another reader's rows answer 404. | A |
+| SRV-12 | API writes become the app's own sync operations (server clock, same validation and conflict rules) and reach devices with their next sync; reading actions follow §4 (start/resume/re-read, pause, finish, progress that finishes at the total). | A |
+| SRV-13 | CORS: `/api/v1`, `/oauth/token`, `/oauth/revoke` and the discovery document allow any origin without credentials, errors included; the cookie API sends no CORS headers and keeps its origin check. | A |
+| SRV-14 | OAuth: exact PKCE (S256), codes for 60 seconds and once (a reused code ends the access it gave), refresh tokens once (a reused one ends the app's access), redirects only to the app's origin or addresses its metadata lists (loopback, app schemes), `iss` on every answer, blocked addresses refused. | A, U |
+| SRV-15 | Tokens: only hashes stored; recovery and reset links end all of an account's tokens; suspension pauses them; per app and person at most 20 live access and 50 spent refresh tokens are kept; expired tokens are deleted hourly; 120 requests a minute per token, 60 a minute per address at the token endpoint and authorize. | A |
 
 ## 15. Verification
 
-| Layer | Where | Runs with | Count (2026-11-11) |
+| Layer | Where | Runs with | Count (2026-11-25) |
 |---|---|---|---|
 | U: unit | `web/src/lib/*.spec.ts`, `*.svelte.test.ts` for runes modules; Rust `#[test]` | `npx vitest run`, `cargo test` | part of the counts below |
-| C: page and component | `web/src/**/*.svelte.test.ts` (jsdom, Testing Library, mock library in `web/src/test/fixtures.ts`, mock API by route) | `npx vitest run --project client` | 207 web tests in all |
-| A: API | `crates/mau-server/src/**` tests against a temporary SQLite database (`app_tests.rs`, `access_tests.rs`, and per module) | `cargo test` | 198 Rust tests |
-| B: Firefox | `web/browser-tests/` (headless Firefox via puppeteer-core, throwaway seeded servers on free ports; axe-core for WCAG 2.1 AA) | `just browser-test` | 30 steps (+1 with `MAU_BROWSER_NETWORK=1`) |
+| C: page and component | `web/src/**/*.svelte.test.ts` (jsdom, Testing Library, mock library in `web/src/test/fixtures.ts`, mock API by route) | `npx vitest run --project client` | 246 web tests in all |
+| A: API | `crates/mau-server/src/**` tests against a temporary SQLite database (`app_tests.rs`, `access_tests.rs`, and per module) | `cargo test` | 235 Rust tests |
+| B: Firefox | `web/browser-tests/` (headless Firefox via puppeteer-core, throwaway seeded servers on free ports; axe-core for WCAG 2.1 AA) | `just browser-test` | 40 steps (+1 with `MAU_BROWSER_NETWORK=1`) |
 | E: Playwright | `web/e2e/` (Chromium) | `just e2e`, and in CI | 5 |
 
 `just test` runs the unit, page, and API tests with type checks. Every
@@ -744,3 +826,8 @@ behavior above has at least one automated test, except:
   phone width; Safari's own bottom bar and the home indicator only on a
   real iPhone.
 - **Pixel layout**: checked by eye from screenshots; no visual-diff tests.
+- **Fetching an app's metadata document from the internet**: the tests stand
+  in a document; the resolver's address rules are unit-tested. The Firefox
+  suite's `api` steps sign in from a real static app on a second localhost
+  port (consent, PKCE, CORS, no cookies), so they cover apps on this
+  computer, not an `https://` app.
