@@ -1434,3 +1434,22 @@ Sharing and Admin › Users:
   "Connected Nov 26, 2026 · last used today", "Never expires · never used",
   "Connected by 1 person · first connected … · last used …" (a blocked app's
   line starts "First connected").
+
+## Penetration test (2026-11-26)
+
+Asked by the user: test that sign-in and access control work as designed and
+fail closed, and look for vulnerabilities. A scripted black-box run of 127
+checks against fresh local instances (details: docs/THREAT_MODEL.md,
+Appendix D). Not run against maubooks.org, where it would trip lockouts and
+leave test accounts behind.
+
+- **Fixed:** app addresses and return addresses containing a backslash, a
+  space or a control character are refused. `http://app\@evil.example/`
+  already resolved to the app itself, but different parsers read such
+  addresses differently.
+- **Stated, unchanged:** every sign-in (password, code, recovery, reset
+  link, signup) counts as a password confirmation for the next 10 minutes,
+  so sensitive actions right after signing in don't ask again. This was the
+  behavior already; it's now written down as an accepted risk (E3, P-2).
+- **By design:** loopback app addresses in any spelling (`https://0x7f000001/`)
+  are apps on this computer; consent requests aren't tied to a browser.

@@ -33,6 +33,14 @@ fn is_loopback_host(host: &str) -> bool {
     host == "localhost" || host == "127.0.0.1" || host == "[::1]"
 }
 
+/// Backslashes and control characters or spaces: URL parsers disagree about
+/// these (`https://app.example\\@evil.example` is the app to some and evil to
+/// others), so an address containing them is refused outright.
+fn ambiguous(s: &str) -> bool {
+    s.chars()
+        .any(|c| c == '\\' || c.is_control() || c.is_whitespace())
+}
+
 fn origin_of(u: &Url) -> String {
     u.origin().ascii_serialization()
 }
@@ -43,6 +51,9 @@ fn origin_of(u: &Url) -> String {
 pub fn parse_client_id(s: &str) -> Result<ClientId, &'static str> {
     if s.is_empty() || s.len() > 300 {
         return Err("The app's address (client_id) is missing or too long.");
+    }
+    if ambiguous(s) {
+        return Err("The app's address (client_id) can't contain backslashes or spaces.");
     }
     let u = Url::parse(s).map_err(|_| "The app's address (client_id) isn't a valid URL.")?;
     if !u.username().is_empty() || u.password().is_some() || u.fragment().is_some() {
@@ -118,6 +129,9 @@ pub fn parse_metadata(client: &ClientId, body: &[u8]) -> Option<Metadata> {
 ///
 /// Fragments are never allowed.
 pub fn redirect_allowed(client: &ClientId, meta: Option<&Metadata>, redirect: &str) -> bool {
+    if ambiguous(redirect) || redirect.len() > 1000 {
+        return false;
+    }
     let Ok(r) = Url::parse(redirect) else {
         return false;
     };
@@ -359,6 +373,17 @@ mod tests {
         ));
         assert!(!redirect_allowed(&c, None, "http://127.0.0.1:9000/cb"));
         assert!(!redirect_allowed(&c, None, "com.example.stats:/cb"));
+        // Parsers disagree about backslashes and control characters.
+        for tricky in [
+            "https://stats.example.com\\@evil.example/",
+            "https://stats.example.com/cb\\..\\x",
+            "https://stats.example.com/c b",
+            "https://stats.example.com/\tcb",
+            "https://stats.example.com/cb\n",
+        ] {
+            assert!(!redirect_allowed(&c, None, tricky), "{tricky:?}");
+        }
+        assert!(parse_client_id("https://stats.example.com\\@evil.example/").is_err());
 
         let meta = Metadata {
             name: None,
@@ -395,6 +420,20 @@ mod tests {
         // A Cyrillic "е" in place of the Latin "e".
         let c = parse_client_id("https://\u{0435}xample.com/").unwrap();
         assert!(c.origin.starts_with("https://xn--"), "{}", c.origin);
+    }
+
+    #[test]
+    fn nested_blob_urls_are_refused_without_crashing() {
+        // RUSTSEC-2026-0592: Url::origin() overflowed the stack on these.
+        let deep = format!("{}https://stats.example.com/", "blob:".repeat(20_000));
+        assert!(parse_client_id(&deep).is_err());
+        let c = parse_client_id("https://stats.example.com/").unwrap();
+        assert!(!redirect_allowed(&c, None, &deep));
+        let meta = Metadata {
+            name: None,
+            redirect_uris: vec![deep.clone()],
+        };
+        assert!(!redirect_allowed(&c, Some(&meta), &deep));
     }
 
     #[test]

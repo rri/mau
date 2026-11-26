@@ -241,7 +241,7 @@ Risk is the rating *after* the listed controls. Status: ✅ in place,
 |---|---|---|---|
 | E1 | Non-admin reaching admin endpoints | `Admin` extractor on every admin handler; invites limited to the creator's own unless admin ✅ | Low |
 | E2 | Removing the last admin | Refused for demote, suspend, and delete ✅ | Low |
-| E3 | Sensitive changes from a stolen session | Password, username, two-factor, recovery codes, and account deletion need a password (and code) confirmation within 10 minutes ✅; **so do an admin's reset links for others, deleting users, and granting admin** ✅. The Google Books key does not (decision 2026-11-08) ⚠️ | Low |
+| E3 | Sensitive changes from a stolen session | Password, username, two-factor, recovery codes, and account deletion need a password (and code) confirmation within 10 minutes ✅; **so do an admin's reset links for others, deleting users, and granting admin** ✅. The Google Books key does not (decision 2026-11-08) ⚠️. Every sign-in counts as a confirmation for 10 minutes, so a cookie stolen within 10 minutes of signing in could do these (P-2) ⚠️ | Low |
 | E4 | Server-side request forgery through cover URLs | https only; host allowlist of provider image hosts; redirects only to https domain names (no IP literals or localhost), at most five; responses read with a 10 MB cap ✅. **A mau export's provider IDs must look like Open Library or Google IDs before they're used in a URL (finding V2-4, fixed)** ✅ | Low |
 | E5 | Supply-chain compromise of dependencies | See T9: **`cargo audit` and `npm audit --omit=dev` run in CI on every push and weekly** ✅; npm has 4 low dev-only advisories, all one Dependabot alert (GHSA-gcqx-w48m-w2h4, deepmerge, used by `@sveltejs/vite-plugin-svelte` at build time on mau's own config; none at runtime; no fixed version yet), left open by decision 2026-11-12 ⚠️ | Medium |
 | **E6** | **The deploy path giving more than `mau`'s rights** | **Nothing uploaded runs as root: the binary runs as `mau` under systemd hardening, and `mau-deploy` runs both its `--version` check and the database copy as `mau` (finding V2-2, fixed) ✅. The script itself runs as root, and takes only a checksum, a commit hash, and the binary** | Low |
@@ -326,6 +326,56 @@ tests check that every `/api/v1` route refuses a token missing its scope,
 plus each endpoint's own behavior (catalog search and adding a result,
 shares, edits, copies, percent readings, expired tokens, the token endpoint's
 errors, the token limit). 235 server tests in all.
+
+## Appendix D: penetration test of 2026-11-26
+
+A scripted black-box test over HTTP against two fresh local instances of the
+deployed code (one behind a trusted proxy as on maubooks.org, one trusting
+no proxy), plus database access only to age a session's confirmation. 127
+checks, all passing after one fix:
+
+- **Setup and signup** (10): the setup link works once and only from the
+  log; invites work once; reserved, look-alike and path-like usernames and
+  common passwords are refused.
+- **Sessions** (13): HttpOnly, SameSite=Lax, a new token on every sign-in (no
+  fixation), logout ends the session on the server, garbage cookies are 401.
+- **Sign-in** (9): unknown users and wrong passwords get identical answers
+  in similar time (ratio 1.22); 20 a minute per address and 10 per account,
+  and while limited even the right password is refused; prepended or
+  untrusted `X-Forwarded-For` entries don't escape the limits.
+- **Two-factor** (11): a ticket alone grants nothing; codes can't be replayed
+  or reused out of order; a ticket dies after 5 wrong codes; another user
+  can't complete someone's setup; recovery codes stand in.
+- **Recovery and reset** (6): codes and links work once, are rate-limited,
+  and sign out every session and end every token.
+- **Fail closed** (2 checks over 101 endpoints): all 81 signed-in endpoints
+  answer 401 signed out, all 20 admin endpoints 403 to a regular user.
+- **CSRF and CORS** (11): writes refused with no Origin, another site,
+  `null`, a look-alike prefix, another port or a trailing slash, and for
+  form-encoded "simple" requests; no CORS on the cookie API; the cookie does
+  nothing on `/api/v1`.
+- **Confirmation** (4): with an aged confirmation, password, username,
+  two-factor, recovery codes, account deletion, tokens, and the admin powers
+  all answer `reauth_required`.
+- **Isolation** (8): another user's sessions, shares, private works, books
+  (through sync) and exports are out of reach.
+- **Public pages, traversal, injection, headers** (14): suspended owners show
+  nothing; no file outside the web root; SQL and script injection in
+  parameters cause no error and names and bios are escaped; security
+  headers and CSP on every kind of response; 413 for oversized bodies;
+  reset links use `public_url`, never the Host header.
+- **Tokens and OAuth** (34): tokens never reach the cookie API, admin, or
+  token-making, mangled or wrong-kind tokens and query-string tokens are
+  refused; ten redirect tricks and nine `client_id` tricks are refused with
+  mau's own page; PKCE `plain`, wrong verifiers, codes for another app,
+  widened refresh scopes and replayed refresh tokens fail closed; approving
+  needs a session, a same-origin POST and a recent confirmation.
+
+| # | Finding | Severity | Outcome |
+|---|---|---|---|
+| P-1 | A return address or app address containing a backslash (`http://app\@evil.example/`) was accepted. Parsers read it as the app's own address, so nothing went off-site, but parser disagreement is how open redirects start | Low | Fixed: backslashes, spaces and control characters are refused |
+| P-2 | Signing in counts as a password confirmation for 10 minutes, so a session cookie stolen in that time can do sensitive actions (E3) | Low | Accepted (deliberate, like "sudo mode"); now stated in E3 and the decisions log |
+| P-3 | A consent request isn't tied to the browser that opened it; whoever is signed in where the link is opened may answer it, for their own account | Info | By design (people arrive before signing in), as with any OAuth server |
 
 ## Appendix A: review of 2026-11-11
 
