@@ -52,7 +52,7 @@
 
 <div class="sec">
 	<p class="help">
-		Apps people have connected to their accounts with "Sign in with mau". Apps don't need approval;
+		Apps people have connected to their accounts with “Sign in with mau”. Apps don't need approval;
 		each is known by its address. Block one that misleads people or misuses access.
 	</p>
 	{#if apps?.length}

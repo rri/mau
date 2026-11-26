@@ -71,7 +71,7 @@
 		{ href: '/settings/admin/providers', label: 'Catalog providers' },
 		{ href: '/settings/admin/queue', label: 'Review queue' },
 		{ href: '/settings/admin/catalog', label: 'Shared catalog', sub: 'Fix records for everyone' },
-		{ href: '/settings/admin/apps', label: 'Apps', sub: 'Connected with Sign in with mau' },
+		{ href: '/settings/admin/apps', label: 'Apps', sub: 'Connected with “Sign in with mau”' },
 		{ href: '/settings/admin/audit', label: 'Audit log' },
 		{ href: '/settings/admin/stats', label: 'Instance stats' }
 	];
