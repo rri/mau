@@ -1453,3 +1453,34 @@ leave test accounts behind.
   behavior already; it's now written down as an accepted risk (E3, P-2).
 - **By design:** loopback app addresses in any spelling (`https://0x7f000001/`)
   are apps on this computer; consent requests aren't tied to a browser.
+
+## A small icon (2026-11-26)
+
+Asked by the user: an icon that works at small sizes, derived from the
+logo, which is hard to make out in a tab. Four variations were drawn from
+the logo's own shapes and compared at real sizes, as raw pixels at 16 and
+32px, in browser tabs and on a phone home screen: both cats closer (A), the
+brown Bengal alone (B), and both cats peeking over the book, with and
+without paws (C, D). At 16px only B still read as a face; the silver cat's
+dark-on-pale markings average out to grey.
+
+Chosen by the user: **B wherever mau shows as an icon, the logo everywhere
+else as branding.**
+
+Mine:
+
+- **What changed:** `icon.svg` (tabs, the manifest's "any" icon, public and
+  OAuth pages' `<link rel="icon">`), `favicon.ico` (16, 32, 48px),
+  `icon-192.png`, `icon-512.png`, `icon-maskable.svg` and
+  `icon-maskable-512.png`, `apple-touch-icon.png`. `logo.svg` is unchanged
+  and stays in the sidebar, landing, sign-in and error pages.
+- **The icon keeps the logo's navy badge and coat colors**, drops the
+  gradients, shadows, tail, whisker dots and fine stripes, and enlarges the
+  face, eyes and ears; the book is a slim band at the foot.
+- **A thin amber edge** (the logo's own faint edge, stronger) keeps the badge
+  visible on dark tab bars, where the navy otherwise disappears.
+- **Maskable and iPhone icons are full-bleed navy without the edge**, the
+  artwork at 70% (inside Android's safe circle) and 86% (iOS rounds the
+  corners itself), as before.
+- **PNGs and the ICO were rendered from the SVG with ImageMagick** (8-bit,
+  stripped); the 512px icon is about half its old size.

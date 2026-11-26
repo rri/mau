@@ -427,10 +427,16 @@ A list of sections, each its own page, then **Sign out**.
 - Active books sit on a softly tinted card with an accent bar on the left;
   inactive books have desaturated covers and grey titles.
 - Logo: two Bengal cats reading an open book on a navy badge, no lettering
-  (web/static/logo.svg). It's the favicon and every app icon, a badge as wide
-  as the tab buttons (176px) at the top of the wide-screen sidebar, and a 112px badge on the sign-in,
-  sign-up, invite, reset, and setup pages. Installed-app splash screens are
-  navy (#1E242B) to match.
+  (web/static/logo.svg). It's the branding: a badge as wide as the tab
+  buttons (176px) at the top of the wide-screen sidebar, the landing page's
+  badge, and a 112px badge on the sign-in, sign-up, invite, reset, setup and
+  error pages. Installed-app splash screens are navy (#1E242B) to match.
+- Icon: the logo's brown Bengal alone, larger, over the book's edge, with a
+  thin amber edge on the badge so it shows on dark tab bars
+  (web/static/icon.svg), because the full logo blurs at small sizes. It's
+  every icon: the browser tab, favicon.ico (16, 32, 48px), the installed
+  app's icons (192 and 512px), and, on a full navy square without the badge
+  edge, the maskable icon and the iPhone home-screen icon.
 - Phones: a tab bar Home · Reading · Catalog · Settings floating above the
   bottom edge (at least 14px, more where the phone needs room for its home
   indicator), rounded, with tabs 62px tall; the current tab is tinted. It
