@@ -15,6 +15,10 @@
 	let error = $state('');
 	/** Back to the page that asked for a sign-in (an app's consent page), or Home. */
 	const next = $derived(safeNext(page.url.searchParams.get('next')));
+	/** Signing up keeps the way back too. */
+	const signup = $derived(next === '/' ? '/signup' : `/signup?next=${encodeURIComponent(next)}`);
+	/** Sent here by an app that wants to connect. */
+	const forApp = $derived(next.startsWith('/authorize/'));
 
 	$effect(() => {
 		if (auth.me) goto(next, { replaceState: true });
@@ -68,6 +72,10 @@
 		This instance has no admin yet. Open the setup link printed in the server log to create the
 		admin account.
 	</p>
+{/if}
+
+{#if forApp}
+	<p class="notice">Sign in to continue to the app that sent you here.</p>
 {/if}
 
 {#if ticket}
@@ -127,7 +135,7 @@
 	<div class="links">
 		<a class="link" href="/signin/recovery">Forgot your password?</a>
 		{#if auth.status?.signup_mode === 'open' && !auth.status?.setup_required}
-			<a class="link" href="/signup">Create an account</a>
+			<a class="link" href={signup}>Create an account</a>
 		{:else}
 			<span class="help">New here? Ask for an invite link.</span>
 		{/if}

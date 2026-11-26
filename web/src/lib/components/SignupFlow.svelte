@@ -10,8 +10,16 @@
 	let {
 		invite = null,
 		setup = null,
-		intro
-	}: { invite?: string | null; setup?: string | null; intro: string } = $props();
+		intro,
+		next = '/'
+	}: {
+		invite?: string | null;
+		setup?: string | null;
+		intro: string;
+		/** Where "Start using mau" goes: Home, or the page that sent the
+		 *  person to sign up (an app's consent screen). */
+		next?: string;
+	} = $props();
 
 	let step = $state<1 | 2 | 3>(1);
 	let username = $state('');
@@ -81,7 +89,7 @@
 
 	async function finish() {
 		await auth.refresh();
-		goto('/', { replaceState: true });
+		goto(next, { replaceState: true });
 	}
 </script>
 

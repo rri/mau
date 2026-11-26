@@ -1376,5 +1376,61 @@ two widths). More API tests cover every route's scope and each endpoint's
 behavior. Its first run caught two wrong assumptions in the new tests, none
 in the app.
 
-Not done: signing up from the consent page doesn't return to it (sign-in
-does); fetching a real metadata document isn't tested.
+Not done: fetching a real metadata document isn't tested.
+
+### Access Tokens wording and layout (2026-11-26)
+
+Asked by the user:
+
+- **Settings › Access Tokens** (was "Apps & API access"), with the sections
+  Connected apps and **Personal Access Tokens**; **Generate a token** and
+  **Generate token** (were "Make a token", "Make token"). The intro now says
+  "Third-party apps can read and change your library…" and "generate a
+  personal access token"; the "How the API works" link is gone. The name's
+  placeholder is "e.g. Reading log backup".
+- **Scopes have short labels** ("Profile", "Books and tags", "Private
+  notes"…) under two bold headings, **READ** and **READ & MODIFY**, wherever
+  they appear: making a token, each token and connected app (as small
+  chips), and the consent screen ("wants access to:"). The footnote under the
+  checkboxes is gone.
+- The consent screen says "Once you allow access, you'll be redirected to
+  *host*. You can disconnect it at any time in Settings › Access Tokens."
+- **Signing up from an app's sign-in comes back to the app**: sign-in's
+  `next` carries over to **Create an account**, and **Start using mau** goes
+  there. Sign-in sent by an app says "Sign in to continue to the app that
+  sent you here."
+
+Mine:
+
+- **Grouping comes from the server** (`ScopeInfo.group`): `:read` scopes and
+  `catalog:search` are READ, the rest READ & MODIFY, so the three screens
+  can't disagree. Read and modify scopes of one resource share a label; the
+  heading tells them apart. Notes stay highlighted, and the consent screen
+  adds "Your notes are private: mau never shares them anywhere else."
+- **Allow or Deny on a request that expired while the screen was open** (10
+  minutes, or a server restart) shows "This request has expired" instead of
+  an error line.
+
+### Consistent styling and wording on the access pages (2026-11-26)
+
+Asked by the user: verify styling and colors (some text colors differed), and
+make status lines consistent. Every text style on the new pages was measured
+in Firefox (color, size, weight, case) in light and dark, against Sessions,
+Sharing and Admin › Users:
+
+- **READ / READ & MODIFY headings** were grey 11px on cards and near-black
+  13px on the form; both are now grey, 12px, bold, letter-spaced.
+- **Scope chips** use the Catalog filter chips' look (surface, line border,
+  grey text), smaller; "Private notes" uses the warning pill's tinted amber.
+- **Names and hosts on the consent screen** are semibold (600), as card names
+  are everywhere, not bold (700).
+- **The token hint** is 14px like other mono details.
+- **mau's OAuth error page** has the signed-out cards' 24px heading, the
+  reason as the main line and the advice in grey 14px, like the consent
+  screen. It follows the device's light or dark setting, as the public pages
+  do (a server page can't see the theme saved in the app).
+- **Status lines are capitalized only at the start; parts after "·" are
+  lowercase**, as in "Active · page 3 of 9" and "Offline · 2 unsynced":
+  "Connected Nov 26, 2026 · last used today", "Never expires · never used",
+  "Connected by 1 person · first connected … · last used …" (a blocked app's
+  line starts "First connected").

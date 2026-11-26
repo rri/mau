@@ -134,7 +134,7 @@ pub fn router(state: AppState) -> Router {
         .route("/sessions/{id}", delete(manage::revoke_session))
         .route("/recovery-codes", get(manage::recovery_status))
         .route("/recovery-codes/regenerate", post(manage::regenerate_codes))
-        // Apps & API access (the signed-in browser only; no token reaches these)
+        // Access Tokens (the signed-in browser only; no token reaches these)
         .route("/api-access", get(crate::api::manage::list))
         .route("/api-access/tokens", post(crate::api::manage::create))
         .route(

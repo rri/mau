@@ -1,10 +1,16 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { auth } from '#lib/auth.svelte.ts';
+	import { safeNext } from '#lib/next.ts';
 	import SignupFlow from '#lib/components/SignupFlow.svelte';
+
+	/** Back to the page that sent the person here (an app's consent screen). */
+	const next = $derived(safeNext(page.url.searchParams.get('next')));
+	const signin = $derived(next === '/' ? '/signin' : `/signin?next=${encodeURIComponent(next)}`);
 </script>
 
 {#if auth.status?.signup_mode === 'open' && !auth.status.setup_required}
-	<SignupFlow intro="Create your mau account." />
+	<SignupFlow intro="Create your mau account." {next} />
 {:else}
 	<h1>Signup isn't open</h1>
 	{#if auth.status?.signup_mode === 'closed'}
@@ -12,5 +18,5 @@
 	{:else}
 		<p>You need an invite link to create an account on this instance.</p>
 	{/if}
-	<div class="links"><a class="link" href="/signin">Back to sign in</a></div>
+	<div class="links"><a class="link" href={signin}>Back to sign in</a></div>
 {/if}

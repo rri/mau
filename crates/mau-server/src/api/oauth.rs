@@ -180,9 +180,9 @@ fn error_page(status: StatusCode, title: &str, message: &str) -> Response {
                     div.card {
                         img src="/logo.svg" alt="mau" width="112" height="112";
                         h1 { (title) }
-                        p { (message) }
-                        p { "Go back to the app and try again, or tell its developer." }
-                        p { a href="/" { "Go to mau" } }
+                        p.lead { (message) }
+                        p.help { "Go back to the app and try again, or tell its developer." }
+                        p.links { a href="/" { "Go to mau" } }
                     }
                 }
                 // The same footer as every page (web/src/lib/components/Footer.svelte).
@@ -212,7 +212,8 @@ html,body{height:100%}
 body{margin:0;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font:15px/1.5 'Instrument Sans',system-ui,sans-serif}
 main{flex:1;display:grid;place-items:center;padding:24px 16px}
 .card{max-width:420px;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:28px 24px;display:grid;gap:12px;text-align:center}
-img{margin:0 auto;border-radius:22.5%}h1{margin:0;font-size:22px;font-weight:600;text-wrap:balance}p{margin:0;color:var(--muted);overflow-wrap:anywhere}a{color:var(--accent)}
+img{margin:0 auto;border-radius:22.5%}h1{margin:0;font-size:24px;font-weight:600;letter-spacing:-0.01em;text-wrap:balance}
+p{margin:0;overflow-wrap:anywhere}.lead{font-size:15px}.help{font-size:14px;color:var(--muted)}.links{font-size:15px}a{color:var(--accent)}
 footer{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 10px;padding:16px;font-size:13px;color:var(--muted)}footer a{color:inherit}";
 
 /// Adds `params` to the app's redirect address, in the query or (with

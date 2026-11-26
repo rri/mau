@@ -13,6 +13,7 @@
 	import { withReauth } from '#lib/confirm.svelte.ts';
 	import { library } from '#lib/library.svelte.ts';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
+	import ScopeList from '#lib/components/ScopeList.svelte';
 
 	const id = $derived(page.params.id ?? '');
 	const here = $derived(`/authorize/${encodeURIComponent(id)}`);
@@ -60,13 +61,15 @@
 			// Back to the app (a full navigation: it's another site).
 			location.assign(r.redirect);
 		} catch (e) {
-			error = (e as Error).message;
+			// The request expired (10 minutes) or the server restarted.
+			if ((e as { status?: number }).status === 404) gone = true;
+			else error = (e as Error).message;
 			busy = false;
 		}
 	}
 
 	/** Notes are never shared anywhere else in mau: say so. */
-	const privateScope = (s: string) => s.startsWith('notes:');
+	const asksForNotes = $derived(info?.scopes.some((s) => s.scope.startsWith('notes:')) ?? false);
 </script>
 
 {#if gone}
@@ -95,23 +98,20 @@
 		<p class="lead">
 			<b class="host">{info.host}</b>{#if info.name}<span class="help">
 					· calls itself “{info.name}”</span
-				>{/if} wants to:
+				>{/if} wants access to:
 		</p>
-		<ul class="scopes">
-			{#each info.scopes as s (s.scope)}
-				<li class:private={privateScope(s.scope)}>
-					{s.label}{#if privateScope(s.scope)}<span class="pill warn">Private</span>{/if}
-				</li>
-			{/each}
-		</ul>
+		<div class="asked"><ScopeList scopes={info.scopes} markPrivate /></div>
+		{#if asksForNotes}
+			<p class="help">Your notes are private: mau never shares them anywhere else.</p>
+		{/if}
 		{#if info.local}
 			<p class="notice">
 				This app is running on this computer ({info.host}), not on a website.
 			</p>
 		{/if}
 		<p class="help">
-			You'll go back to <b>{info.redirect_to}</b>. You can disconnect it at any time in Settings ›
-			Apps &amp; API access. Only allow apps you trust.
+			Once you allow access, you'll be redirected to <b>{info.redirect_to}</b>. You can disconnect
+			it at any time in Settings › Access Tokens. Only allow apps you trust.
 		</p>
 		{#if error}<p class="error" role="alert">{error}</p>{/if}
 		<div class="choices">
@@ -139,6 +139,12 @@
 		text-align: center;
 		text-wrap: balance;
 	}
+	/* Names and hosts in the app's semibold, like card names elsewhere. */
+	.host,
+	.who b,
+	.help :global(b) {
+		font-weight: 600;
+	}
 	.host {
 		overflow-wrap: anywhere;
 	}
@@ -155,25 +161,10 @@
 		font-size: 13px;
 		color: var(--muted);
 	}
-	.scopes {
-		margin: 0;
-		padding: 0;
-		list-style: none;
-		display: grid;
+	.asked {
+		padding: 10px 12px;
 		border: 1px solid var(--line);
 		border-radius: 12px;
-		overflow: hidden;
-	}
-	.scopes li {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 8px;
-		padding: 10px 12px;
-		font-size: 15px;
-	}
-	.scopes li + li {
-		border-top: 1px solid var(--line);
 	}
 	.choices {
 		display: grid;

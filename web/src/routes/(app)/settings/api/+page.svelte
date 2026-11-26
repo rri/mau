@@ -1,8 +1,8 @@
 <script lang="ts">
-	// Settings › Apps & API access: apps this reader connected ("Sign in
-	// with mau"), and personal tokens they made for their own scripts. Both
-	// are the same kind of access underneath; they differ in how the token
-	// reaches the program.
+	// Settings › Access Tokens: apps this reader connected ("Sign in with
+	// mau"), and personal access tokens they generated for their own scripts.
+	// Both are the same kind of access underneath; they differ in how the
+	// token reaches the program.
 	import { onMount } from 'svelte';
 	import { del, get, post } from '#lib/api/client.ts';
 	import type { ApiAccess } from '#lib/api/generated/ApiAccess.ts';
@@ -15,8 +15,8 @@
 	import { library } from '#lib/library.svelte.ts';
 	import { toasts } from '#lib/toast.svelte.ts';
 	import PageHead from '#lib/components/PageHead.svelte';
+	import ScopeList from '#lib/components/ScopeList.svelte';
 
-	const DOCS = 'https://github.com/rri/mau/blob/main/docs/API.md';
 	const tz = auth.me?.time_zone ?? 'UTC';
 	const today = dateOfMs(Date.now(), tz);
 
@@ -43,12 +43,13 @@
 	}
 	onMount(load);
 
-	const labelOf = (scope: string) => data?.scopes.find((s) => s.scope === scope)?.label ?? scope;
-	const reads = $derived(data?.scopes.filter((s) => s.scope.endsWith(':read')) ?? []);
-	const changes = $derived(data?.scopes.filter((s) => !s.scope.endsWith(':read')) ?? []);
+	const infosOf = (scopes: string[]) => data?.scopes.filter((s) => scopes.includes(s.scope)) ?? [];
+	const reads = $derived(data?.scopes.filter((s) => s.group === 'read') ?? []);
+	const changes = $derived(data?.scopes.filter((s) => s.group !== 'read') ?? []);
 
 	function lastUsed(at: number | null) {
-		return at === null ? 'Never used' : `Last used ${ago(dateOfMs(at, tz), today)}`;
+		// After a "·", so lowercase (as "Active · page 3 of 9" elsewhere).
+		return at === null ? 'never used' : `last used ${ago(dateOfMs(at, tz), today)}`;
 	}
 	function expiry(t: TokenInfo) {
 		return t.expires_at === null
@@ -123,7 +124,7 @@
 	}
 </script>
 
-<PageHead title="Apps & API access" />
+<PageHead title="Access Tokens" />
 
 {#if !library.online}
 	<p class="sec notice">Apps and tokens need a connection.</p>
@@ -144,12 +145,8 @@
 {:else if data}
 	<div class="sec">
 		<p class="help">
-			Other programs can read and change your library through mau's API. An app you sign in to with
-			mau appears under Connected apps. For your own scripts, make a personal token. <a
-				class="link"
-				href={DOCS}
-				rel="noopener">How the API works</a
-			>
+			Third-party apps can read and change your library through mau's API. An app you sign in to
+			with mau appears under Connected apps. For your own scripts, generate a personal access token.
 		</p>
 	</div>
 
@@ -163,9 +160,7 @@
 							<span class="name host">{a.host}</span>{#if a.name}<span class="help">{a.name}</span
 								>{/if}
 						</div>
-						<ul class="allows">
-							{#each a.scopes as s (s.scope)}<li>{s.label}</li>{/each}
-						</ul>
+						<ScopeList scopes={a.scopes} markPrivate />
 						<div class="meta">
 							Connected {fmtDate(dateOfMs(a.created_at, tz))} · {lastUsed(a.last_used_at)}
 						</div>
@@ -186,7 +181,7 @@
 	</div>
 
 	<div class="sec">
-		<h2>Personal tokens</h2>
+		<h2>Personal Access Tokens</h2>
 		{#if data.tokens.length}
 			<div class="cards">
 				{#each data.tokens as t (t.id)}
@@ -194,7 +189,7 @@
 						<div class="top">
 							<span class="name">{t.name}</span><span class="mono hint">{t.hint}…</span>
 						</div>
-						<div class="meta">{t.scopes.map(labelOf).join(' · ')}</div>
+						<ScopeList scopes={infosOf(t.scopes)} markPrivate />
 						<div class="meta">{expiry(t)} · {lastUsed(t.last_used_at)}</div>
 						<div class="acts">
 							<button class="btn sm danger-ghost" type="button" onclick={() => revoke(t)}
@@ -215,7 +210,7 @@
 						id="tk-name"
 						bind:value={name}
 						maxlength="60"
-						placeholder="e.g. Kindle highlights script"
+						placeholder="e.g. Reading log backup"
 						autocomplete="off"
 					/></label
 				>
@@ -231,7 +226,7 @@
 						This token works until you revoke it. Revoke it here when you stop using it.
 					</p>{/if}
 				<fieldset>
-					<legend>It may see</legend>
+					<legend>READ</legend>
 					{#each reads as s (s.scope)}
 						<label class="check"
 							><input type="checkbox" value={s.scope} bind:group={chosen} />
@@ -240,7 +235,7 @@
 					{/each}
 				</fieldset>
 				<fieldset>
-					<legend>It may change</legend>
+					<legend>READ &amp; MODIFY</legend>
 					{#each changes as s (s.scope)}
 						<label class="check"
 							><input type="checkbox" value={s.scope} bind:group={chosen} />
@@ -248,19 +243,15 @@
 						>
 					{/each}
 				</fieldset>
-				<p class="help">
-					Changing something includes seeing it. No token can reach your password, sign-ins, other
-					tokens, or admin.
-				</p>
 				{#if formError}<p class="error" role="alert">{formError}</p>{/if}
 				<div class="row-end">
 					<button class="btn" type="button" onclick={() => (making = false)}>Cancel</button>
-					<button class="btn primary" type="submit" disabled={busy}>Make token</button>
+					<button class="btn primary" type="submit" disabled={busy}>Generate token</button>
 				</div>
 			</form>
 		{:else}
 			<div class="row-end">
-				<button class="btn primary" type="button" onclick={startMaking}>Make a token</button>
+				<button class="btn primary" type="button" onclick={startMaking}>Generate a token</button>
 			</div>
 		{/if}
 	</div>
@@ -272,13 +263,8 @@
 		overflow-wrap: anywhere;
 	}
 	.hint {
-		font-size: 13px;
-		color: var(--muted);
-	}
-	.allows {
-		margin: 0;
-		padding-left: 18px;
 		font-size: 14px;
+		color: var(--muted);
 	}
 	.secret {
 		padding: 12px;
@@ -300,10 +286,12 @@
 		display: grid;
 		gap: 8px;
 	}
+	/* The same heading as each token's scopes (ScopeList). */
 	legend {
 		padding: 0 4px;
-		font-size: 13px;
-		font-weight: 600;
+		font-size: 12px;
+		font-weight: 700;
+		letter-spacing: 0.06em;
 		color: var(--muted);
 	}
 	.check {

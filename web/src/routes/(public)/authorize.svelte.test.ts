@@ -16,8 +16,8 @@ const info = (over: object = {}) => ({
 	local: false,
 	redirect_to: 'stats.example.com',
 	scopes: [
-		{ scope: 'books:read', label: 'See your books, with their tags and when you added them' },
-		{ scope: 'notes:read', label: 'See your private notes' }
+		{ scope: 'books:read', label: 'Books and tags', group: 'read' },
+		{ scope: 'notes:read', label: 'Private notes', group: 'read' }
 	],
 	me: ME,
 	...over
@@ -53,8 +53,13 @@ describe('Connect an app', () => {
 		await userEvent.click(screen.getByRole('button', { name: 'Continue as R. Reader' }));
 		expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Allow stats.example.com?');
 		expect(screen.getByText(/calls itself “Reading Stats”/)).toBeInTheDocument();
-		expect(screen.getByText('See your private notes').closest('li')).toHaveTextContent('Private');
-		expect(screen.getByText(/You'll go back to/)).toHaveTextContent('stats.example.com');
+		expect(screen.getByText('READ')).toBeInTheDocument();
+		expect(screen.getByText('Private notes').closest('li')).toHaveClass('private');
+		expect(screen.getByText(/mau never shares them/)).toBeInTheDocument();
+		expect(screen.getByText(/Once you allow access, you'll be redirected to/)).toHaveTextContent(
+			'stats.example.com'
+		);
+		expect(screen.getByText(/Settings › Access Tokens/)).toBeInTheDocument();
 	});
 
 	it('AUTH-42 Allow confirms the password, then goes back to the app', async () => {
@@ -100,6 +105,21 @@ describe('Connect an app', () => {
 			})
 		);
 		expect(auth.me).toBeNull();
+	});
+
+	it('AUTH-45 a request that expired while the screen was open says so on Allow', async () => {
+		mockApi({
+			'GET /oauth/requests/r1': info(),
+			'POST /oauth/requests/r1/approve': new Response(
+				JSON.stringify({ error: 'not_found', message: 'expired' }),
+				{ status: 404 }
+			)
+		});
+		render(Authorize);
+		await userEvent.click(await screen.findByRole('button', { name: 'Continue as R. Reader' }));
+		await userEvent.click(screen.getByRole('button', { name: 'Allow' }));
+		expect(await screen.findByText('This request has expired')).toBeInTheDocument();
+		expect(assign).not.toHaveBeenCalled();
 	});
 
 	it('AUTH-45 an expired request says to start again; an app on this computer is called out', async () => {

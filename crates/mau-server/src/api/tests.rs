@@ -134,7 +134,7 @@ async fn personal_tokens_need_a_confirmation_and_are_shown_once() {
     let (status, made) = app
         .post(
             "/api/api-access/tokens",
-            json!({"name": "Kindle sync", "scopes": ["profile:read"], "expires_in_days": null}),
+            json!({"name": "Backup sync", "scopes": ["profile:read"], "expires_in_days": null}),
             Some(&cookie),
         )
         .await;
@@ -143,7 +143,7 @@ async fn personal_tokens_need_a_confirmation_and_are_shown_once() {
     assert!(secret.starts_with("mau_pat_"));
     assert_eq!(made["token"]["expires_at"], Value::Null);
     let (_, list) = app.get("/api/api-access", Some(&cookie)).await;
-    assert_eq!(list["tokens"][0]["name"], "Kindle sync");
+    assert_eq!(list["tokens"][0]["name"], "Backup sync");
     assert_eq!(list["tokens"][0]["hint"], &secret[..12]);
     assert!(
         !list.to_string().contains(secret),

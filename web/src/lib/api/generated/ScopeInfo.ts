@@ -3,4 +3,8 @@
 /**
  * A scope with its description, for the consent screen and Settings.
  */
-export type ScopeInfo = { scope: string, label: string, };
+export type ScopeInfo = { scope: string, label: string, 
+/**
+ * read, or modify (read & modify)
+ */
+group: string, };

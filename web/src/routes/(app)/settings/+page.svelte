@@ -62,7 +62,7 @@
 			value: auth.me?.google_books ? 'Own key' : 'Off'
 		},
 		{ href: '/settings/import', label: 'Import & export' },
-		{ href: '/settings/api', label: 'Apps & API access' },
+		{ href: '/settings/api', label: 'Access Tokens' },
 		...(canInvite ? [{ href: '/settings/invites', label: 'Invites' }] : [])
 	]);
 	const adminItems: Item[] = [

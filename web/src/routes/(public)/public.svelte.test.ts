@@ -288,6 +288,38 @@ describe('Signup', () => {
 		expect(nav.goto).toHaveBeenCalledWith('/', { replaceState: true });
 	});
 
+	it('AUTH-08 signing up from an app’s sign-in keeps the way back to it', async () => {
+		signOut('open');
+		mockApi({ 'GET /auth/status': status() });
+		at('/signin?next=%2Fauthorize%2Fr1');
+		const { unmount } = render(SignIn);
+		expect(
+			screen.getByText('Sign in to continue to the app that sent you here.')
+		).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Create an account' })).toHaveAttribute(
+			'href',
+			'/signup?next=%2Fauthorize%2Fr1'
+		);
+		unmount();
+		mockApi({
+			'POST /auth/username-available': { available: true, message: 'Available.' },
+			'POST /auth/register': { codes: ['aaaaa-11111'] },
+			'GET /auth/status': status()
+		});
+		at('/signup?next=%2Fauthorize%2Fr1');
+		render(Signup);
+		await userEvent.type(screen.getByLabelText('Username'), 'newbie');
+		await screen.findByText('Available.');
+		await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+		await userEvent.type(screen.getByLabelText('Password'), PW);
+		await userEvent.type(screen.getByLabelText('Type it again'), PW);
+		await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
+		await userEvent.click(await screen.findByLabelText("I've saved these codes somewhere safe"));
+		await userEvent.click(screen.getByRole('button', { name: 'Start using mau' }));
+		expect(nav.goto).toHaveBeenLastCalledWith('/authorize/r1', { replaceState: true });
+		at('/');
+	});
+
 	it('AUTH-22 an invite link names who invited; a used one says so', async () => {
 		at('/invite/good', { token: 'good' });
 		mockApi({ 'GET /auth/invite/good': { valid: true, inviter: 'R. Reader' } });

@@ -8,50 +8,35 @@ use std::collections::BTreeSet;
 use serde::Serialize;
 use ts_rs::TS;
 
-/// Every scope, in the order the consent screen lists them, with the words
-/// it uses.
+/// Every scope, in the order screens list them, with its short label. Shown
+/// under READ (seeing, searching) or READ & MODIFY (changing, removing).
 pub const ALL: &[(&str, &str)] = &[
-    (
-        "profile:read",
-        "See your display name, username, bio and time zone",
-    ),
-    (
-        "books:read",
-        "See your books, with their tags and when you added them",
-    ),
-    (
-        "books:write",
-        "Add books, and change the titles, authors and covers you see",
-    ),
-    (
-        "books:delete",
-        "Remove books from your list, with their readings, notes and copies",
-    ),
-    ("tags:write", "Add and remove tags"),
-    (
-        "reading:read",
-        "See your readings and the pages you've read each day",
-    ),
-    (
-        "reading:write",
-        "Start, pause and finish books, and log your progress",
-    ),
-    ("ratings:read", "See your ratings"),
-    ("ratings:write", "Change your ratings"),
-    ("notes:read", "See your private notes"),
-    ("notes:write", "Change your private notes"),
-    (
-        "copies:read",
-        "See the copies you own and where you keep them",
-    ),
-    ("copies:write", "Add, change and remove your copies"),
-    ("catalog:search", "Search the catalog for books"),
-    ("shares:read", "See what you've published"),
-    (
-        "shares:write",
-        "Publish parts of your library, change those links, and stop sharing",
-    ),
+    ("profile:read", "Profile"),
+    ("books:read", "Books and tags"),
+    ("books:write", "Books"),
+    ("books:delete", "Removing books"),
+    ("tags:write", "Tags"),
+    ("reading:read", "Reading progress"),
+    ("reading:write", "Reading progress"),
+    ("ratings:read", "Ratings"),
+    ("ratings:write", "Ratings"),
+    ("notes:read", "Private notes"),
+    ("notes:write", "Private notes"),
+    ("copies:read", "Copies and locations"),
+    ("copies:write", "Copies and locations"),
+    ("catalog:search", "Catalog search"),
+    ("shares:read", "Sharing"),
+    ("shares:write", "Sharing"),
 ];
+
+/// `read` for scopes that only see (or search), `modify` for the rest.
+pub fn group(scope: &str) -> &'static str {
+    if scope.ends_with(":read") || scope == "catalog:search" {
+        "read"
+    } else {
+        "modify"
+    }
+}
 
 /// A scope with its description, for the consent screen and Settings.
 #[derive(Debug, Clone, Serialize, TS)]
@@ -59,6 +44,8 @@ pub const ALL: &[(&str, &str)] = &[
 pub struct ScopeInfo {
     pub scope: String,
     pub label: String,
+    /// read, or modify (read & modify)
+    pub group: String,
 }
 
 /// A set of known scopes.
@@ -111,10 +98,7 @@ impl Scopes {
     pub fn infos(&self) -> Vec<ScopeInfo> {
         ALL.iter()
             .filter(|(k, _)| self.0.contains(k))
-            .map(|(k, l)| ScopeInfo {
-                scope: (*k).to_string(),
-                label: (*l).to_string(),
-            })
+            .map(|(k, l)| info(k, l))
             .collect()
     }
 
@@ -131,12 +115,15 @@ impl std::fmt::Display for Scopes {
 
 /// Every scope with its description.
 pub fn all_infos() -> Vec<ScopeInfo> {
-    ALL.iter()
-        .map(|(k, l)| ScopeInfo {
-            scope: (*k).to_string(),
-            label: (*l).to_string(),
-        })
-        .collect()
+    ALL.iter().map(|(k, l)| info(k, l)).collect()
+}
+
+fn info(scope: &str, label: &str) -> ScopeInfo {
+    ScopeInfo {
+        scope: scope.to_string(),
+        label: label.to_string(),
+        group: group(scope).to_string(),
+    }
 }
 
 #[cfg(test)]
@@ -152,6 +139,17 @@ mod tests {
             "admin".to_string()
         );
         assert!(Scopes::parse("").unwrap().is_empty());
+    }
+
+    #[test]
+    fn scopes_are_grouped_by_what_they_allow() {
+        assert_eq!(group("notes:read"), "read");
+        assert_eq!(group("catalog:search"), "read");
+        assert_eq!(group("notes:write"), "modify");
+        assert_eq!(group("books:delete"), "modify");
+        for (k, l) in ALL {
+            assert!(l.len() <= 24, "{k}: keep labels short");
+        }
     }
 
     #[test]

@@ -8,8 +8,9 @@ bearer token:
 
 There are two ways to get one:
 
-- **A personal token**, for your own scripts: Settings › Apps & API access ›
-  Make a token. Choose what it may do and when it expires. It's shown once.
+- **A personal access token**, for your own scripts: Settings › Access
+  Tokens › Generate a token. Choose what it may do and when it expires. It's
+  shown once.
 - **"Sign in with mau"** (OAuth 2.1 with PKCE), for an app other people use,
   or one that shouldn't ask anyone to paste a secret. See below.
 
@@ -222,7 +223,7 @@ reaches the site's server logs.
   end it.
 - The token endpoint and authorize allow 60 requests a minute per address.
 
-People see connected apps in Settings › Apps & API access and can disconnect
+People see connected apps in Settings › Access Tokens and can disconnect
 them. Setting a password through account recovery ends every token and
 connection; a suspended account's tokens stop working; an admin can block an
 app's address.

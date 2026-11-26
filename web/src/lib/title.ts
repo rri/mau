@@ -15,7 +15,7 @@ const PAGES: Record<string, string> = {
 	'/settings/google-books': 'Google Books',
 	'/settings/import': 'Import & export',
 	'/settings/invites': 'Invites',
-	'/settings/api': 'Apps & API access',
+	'/settings/api': 'Access Tokens',
 	'/settings/admin/users': 'Users',
 	'/settings/admin/signup': 'Signup & invites',
 	'/settings/admin/providers': 'Catalog providers',

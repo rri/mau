@@ -84,12 +84,14 @@ Other programs can read and change a reader's library through the API at
 `/api/v1` (reference: `docs/API.md`), with a bearer token. Tokens come two
 ways; underneath they're the same kind of access:
 
-- **Personal tokens**, made in Settings › Apps & API access for the reader's
-  own scripts: a name, what it may do (scopes), and an expiry of 30, 90
-  (default) or 365 days, or never. Making one needs a password confirmation.
-  The token (`mau_pat_…`) is shown once, with **Copy token**; **Done** waits
-  for "I've saved it". The list shows each token's name, its first characters,
-  what it allows, its expiry and when it was last used, with **Revoke**.
+- **Personal access tokens**, generated in Settings › Access Tokens for the
+  reader's own scripts: a name, what it may do (scopes, under READ and READ &
+  MODIFY), and an expiry of 30, 90 (default) or 365 days, or never.
+  Generating one needs a password confirmation. The token (`mau_pat_…`) is
+  shown once, with **Copy token**; **Done** waits for "I've saved it". The
+  list shows each token's name, its first characters, what it allows (the
+  same two groups, as small chips), its expiry and when it was last used,
+  with **Revoke**.
 - **Connected apps** ("Sign in with mau", OAuth 2.1 with PKCE). An app is
   known by its address (its `client_id`, an `https://` address, or
   `http://localhost…` while it's being built); nothing is registered or
@@ -99,19 +101,27 @@ ways; underneath they're the same kind of access:
   from its own page's JavaScript.
 - **The flow:** the app sends the browser to `/oauth/authorize`. A bad app
   address or return address gets mau's own error page, never a redirect.
-  Signed out, the reader signs in first and comes back. Then **Connect an
-  app**: "*host* wants to use your mau account", the account ("Signed in as
+  Signed out, the reader signs in first (or signs up, where signup is open)
+  and comes back. Then **Connect an app**: "*host* wants to use your mau account", the account ("Signed in as
   *name* @*username*"), **Continue as *name*** and **Use another account**
   (signs out, then back after signing in). Then **Allow *host*?**: everything
-  the app asked for, in plain words (notes marked Private); a note when the
-  app runs on this computer; where the reader goes back to. **Allow** (with a
-  password confirmation) or **Deny**: all or nothing. Both go back to the app.
-  Requests last 10 minutes.
+  the app asked for, as short labels under READ and READ & MODIFY (notes
+  highlighted, with "Your notes are private…"); a note when the app runs on
+  this computer; "Once you allow access, you'll be redirected to *host*".
+  **Allow** (with a password confirmation) or **Deny**: all or nothing. Both
+  go back to the app. Requests last 10 minutes; answering an expired one
+  shows "This request has expired".
 - **Tokens for apps:** an access token for an hour and a refresh token for 30
   days, replaced on every use; using an old one ends the app's access.
-  Settings › Apps & API access lists connected apps by address, with what
-  each may do and **Disconnect**.
-- **Scopes:** `profile:read`; `books:read`, `books:write`, `books:delete`;
+  Settings › Access Tokens lists connected apps by address, with what each
+  may do and **Disconnect**.
+- **Scopes** (labels in brackets): `profile:read` (Profile); `books:read`
+  (Books and tags), `books:write` (Books), `books:delete` (Removing books);
+  `tags:write` (Tags); `reading:*` (Reading progress); `ratings:*` (Ratings);
+  `notes:*` (Private notes); `copies:*` (Copies and locations);
+  `catalog:search` (Catalog search); `shares:*` (Sharing). READ holds the
+  `:read` scopes and catalog search; READ & MODIFY the rest. In full:
+  `profile:read`; `books:read`, `books:write`, `books:delete`;
   `tags:write`; `reading:read`, `reading:write`; `ratings:read`/`:write`;
   `notes:read`/`:write`; `copies:read`/`:write`; `catalog:search`;
   `shares:read`/`:write`. Changing something includes seeing it. Nothing about
@@ -350,7 +360,7 @@ A list of sections, each its own page, then **Sign out**.
 - **Sharing:** finished books, currently active, a tag, or the whole catalog.
   Each is Private (default) or Public. Ratings optional per item; notes never.
   "Make a new link" breaks the old one. Sharing with specific people is postponed.
-- **Apps & API access:** connected apps and personal tokens (§2a).
+- **Access Tokens:** connected apps and personal access tokens (§2a).
 - **Import & export:** import from Goodreads (CSV), StoryGraph (CSV),
   LibraryThing (TSV/JSON), dinky.dev (JSON), or any CSV with column mapping
   (needs Title + Authors, or ISBN). Review before commit: matched / check match
@@ -580,7 +590,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | AUTH-05 | Links | **Forgot your password?** always; **Create an account** only when signup is open, else "New here? Ask for an invite link." | C |
 | AUTH-06 | Before setup | "This instance has no admin yet…" notice; no signup link. | C, B |
 | AUTH-07 | Signed in already | `/signin` goes to Home. | C |
-| AUTH-08 | `?next=` | After signing in (or when already signed in), `/signin?next=/path` goes to that path on this site; anything else (another site, `//host`) goes Home. | U, C |
+| AUTH-08 | `?next=` | After signing in (or when already signed in), `/signin?next=/path` goes to that path on this site; anything else (another site, `//host`) goes Home. **Create an account** and signup's **Back to sign in** keep it, and **Start using mau** goes there after signing up. Sent by an app: "Sign in to continue to the app that sent you here." | U, C |
 | AUTH-10 | Forgot password | Username, recovery code, new password twice; success signs in and toasts "New password set. N recovery codes left." (1 code). | C, A, B |
 | AUTH-11 | Reset link | "Checking the link…", then "New password for @*name*", a note that other devices sign out and (with two-factor on) that two-factor will be turned off, the new password fields. Success signs in. | C, A, B |
 | AUTH-12 | Used or expired reset link | "This link doesn't work" and why. | C, B |
@@ -595,11 +605,11 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | ID | Element | Behavior | Tests |
 |---|---|---|---|
 | AUTH-40 | Signed out | Goes to `/signin?next=/authorize/<request>` and comes back. | C |
-| AUTH-41 | Account, then scopes | Card titled "Connect an app": "*host* wants to use your mau account.", "Signed in as *name* @*username*", **Continue as *name***, **Use another account**. Then "Allow *host*?": the app's own name as "calls itself “…”" beside the address, each scope in plain words (notes marked Private), "You'll go back to *host*…", **Deny** and **Allow**, **Back**. Tab title "Connect an app · mau". | C, B |
+| AUTH-41 | Account, then scopes | Card titled "Connect an app": "*host* wants to use your mau account.", "Signed in as *name* @*username*", **Continue as *name***, **Use another account**. Then "Allow *host*?": the app's own name as "calls itself “…”" beside the address, "wants access to:", the scopes as chips under READ and READ & MODIFY (notes highlighted, with "Your notes are private: mau never shares them anywhere else."), "Once you allow access, you'll be redirected to *host*. You can disconnect it at any time in Settings › Access Tokens…", **Deny** and **Allow**, **Back**. Tab title "Connect an app · mau". | C, B |
 | AUTH-42 | Allow | Asks for the password (and code) unless confirmed in the last 10 minutes, then goes back to the app with `code`, `state` and `iss`. | C, A, B |
 | AUTH-43 | Deny | Goes back to the app with `error=access_denied`. | C, A |
 | AUTH-44 | Use another account | Signs out (deleting this device's copy) and signs in again with `next`. | C |
-| AUTH-45 | Expired, local | An answered or 10-minute-old request: "This request has expired" and Go to Home. An app on this computer: "This app is running on this computer (*host*), not on a website." | C |
+| AUTH-45 | Expired, local | An answered or 10-minute-old request, on opening it or on pressing Allow or Deny: "This request has expired" and Go to Home. An app on this computer: "This app is running on this computer (*host*), not on a website." | C |
 | AUTH-46 | Bad links | An unusable app address or return address, or a blocked app: mau's own error page (logo, the reason, "Go back to the app…", Go to mau, site footer), never a redirect. Other problems (unknown scope, no PKCE, no state) go back to the app as OAuth errors. | A, B |
 
 ### 14.5 Reading (`/reading`)
@@ -690,7 +700,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 
 | ID | Element | Behavior | Tests |
 |---|---|---|---|
-| SET-01 | Index | Rows with chevrons: *display name* (@username), Password, Two-factor (On/Off), Sessions, Recovery codes ("N of 10 left"), Sharing ("N shared"), Google Books (Own key/Off), Import & export, Apps & API access; admins: an Admin group (anchor `#admin`) with eight pages (Apps between Shared catalog and Audit log). | C |
+| SET-01 | Index | Rows with chevrons: *display name* (@username), Password, Two-factor (On/Off), Sessions, Recovery codes ("N of 10 left"), Sharing ("N shared"), Google Books (Own key/Off), Import & export, Access Tokens; admins: an Admin group (anchor `#admin`) with eight pages (Apps between Shared catalog and Audit log). | C |
 | SET-02 | Variants | Non-admins: no Admin group; **Invites** when they may invite or have pending invites. "None left" for zero codes; "Nothing shared". | C |
 | SET-03 | Sign out | With unsynced changes, a dialog explains they'd be lost; otherwise (or "Sign out anyway") the session ends, this device's copy is deleted, and sign-in opens. | C, B |
 | SET-10 | Account | Trail Settings › Account; display name, bio (280 characters), username with rules, time zone (with "Use *device zone*" when they differ). | C |
@@ -713,9 +723,9 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | SET-43 | Google Books | Explanation; a key field (Save key tests it first); then "Key ending in …abcd" with Remove and Replace…. | C, A |
 | SET-44 | Invites | Each link creates one account within 7 days and is shown once; pending invites with "Expires today/tomorrow/in N days" and Revoke; **Create invite link** when allowed. | C, A, B |
 | SET-45 | No permission | "You can't create more invites right now."; no empty message while loading. | C |
-| SET-50 | Apps & API access | An intro with "How the API works" (docs/API.md); **Connected apps**: each by address (and the name it calls itself), what it may do, "Connected *date* · Last used *ago*" (or "Never used"), **Disconnect**; **Personal tokens**: name, first characters, what it allows, "Expires *date*" or "Never expires", last used, **Revoke**. | C, A, B |
+| SET-50 | Access Tokens | An intro ("Third-party apps can read and change your library…"); **Connected apps**: each by address (and the name it calls itself), what it may do (chips under READ and READ & MODIFY), "Connected *date* · last used *ago*" (or "· never used"), **Disconnect**; **Personal Access Tokens**: name, first characters, what it allows (the same chips), "Expires *date*" or "Never expires", last used, **Revoke**. | C, A, B |
 | SET-51 | Empty | "No apps connected. When an app asks you to sign in with mau and you allow it, it appears here."; "No tokens yet." | C |
-| SET-52 | Make a token | **Make a token**: Name, Expires (30 days, 90 days, a year, Never; "works until you revoke it" for Never), "It may see" and "It may change" checkboxes; a name and a scope are required; the password confirmation; then the token once with **Copy token**, "I've saved it", **Done**. | C, A, B |
+| SET-52 | Generate a token | **Generate a token**: Name (placeholder "e.g. Reading log backup"), Expires (30 days, 90 days, a year, Never; "works until you revoke it" for Never), checkboxes under **READ** and **READ & MODIFY** (bold); **Generate token**; a name and a scope are required; the password confirmation; then the token once with **Copy token**, "I've saved it", **Done**. | C, A, B |
 | SET-53 | Offline | "Apps and tokens need a connection." | C |
 
 ### 14.10 Import & export (`/settings/import`)
@@ -749,7 +759,7 @@ them. "—" marks a behavior with no automated test; §15 lists why.
 | ADM-40 | Audit log | Time and "*actor* *action*", newest first, 200 at a time with **Older** (by entry, so nothing is skipped). | C, A |
 | ADM-41 | Empty log | "Nothing recorded yet." after loading. | C |
 | ADM-42 | Stats | Users, books, shared works, private entries, cover and database sizes. | C |
-| ADM-50 | Apps | Each connected app by address, the name it calls itself, its full address when it has a path, "Connected by N people · First connected *date* · last used *ago*" (never who); blocked ones with a Blocked pill and **Unblock**. "No apps connected yet." | C, A, B |
+| ADM-50 | Apps | Each connected app by address, the name it calls itself, its full address when it has a path, "Connected by N people · first connected *date* · last used *ago*" (never who; a blocked app's line starts "First connected"); blocked ones with a Blocked pill and **Unblock**. "No apps connected yet." | C, A, B |
 | ADM-51 | Block | A dialog: "Block *host*?", how many people are disconnected, that no app at that address can be connected until unblocked and that unblocking reconnects nobody; recorded in the audit log. | C, A, B |
 
 ### 14.12 Shared pieces

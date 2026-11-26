@@ -44,11 +44,13 @@ describe('Admin › Apps', () => {
 		const a = (await screen.findByText('stats.example.com')).closest('.card') as HTMLElement;
 		expect(a).toHaveTextContent('Calls itself “Reading Stats”');
 		expect(a).toHaveTextContent(
-			'Connected by 3 people · First connected Nov 6, 2026 · last used today'
+			'Connected by 3 people · first connected Nov 6, 2026 · last used today'
 		);
 		const b = screen.getByText('x.example').closest('.card') as HTMLElement;
 		expect(within(b).getByText('Blocked', { selector: '.pill' })).toBeInTheDocument();
 		expect(within(b).getByRole('button', { name: 'Unblock' })).toBeInTheDocument();
+		// Without "Connected by", the next part starts the line, capitalized.
+		expect(b).toHaveTextContent('First connected Nov 6, 2026');
 	});
 
 	it('ADM-51 blocking asks first, saying who is disconnected', async () => {

@@ -288,8 +288,6 @@ The 2026-11-11 review's findings V2-1 to V2-5 are fixed (Appendix A).
 6. Consider a notice to the reader when a personal token is made or an app
    is connected (R4), and an optional maximum lifetime for personal tokens
    that an admin can set (S12).
-7. Signing up from the consent screen should return to it, as signing in
-   does.
 
 ## Appendix C: review of 2026-11-25 (API access)
 
@@ -298,7 +296,7 @@ extractor, revocation), `api/scope.rs`, `api/client.rs` (client IDs, redirect
 rules, metadata fetching and its resolver), `api/oauth.rs` (authorize,
 consent, token, revoke, discovery), `api/v1.rs`, `api/manage.rs`, the router
 and CORS layers, the changes to password reset, the sign-in `next`
-parameter, the consent page, Settings › Apps & API access, Admin › Apps and
+parameter, the consent page, Settings › Access Tokens, Admin › Apps and
 the service worker. Checks: 226 server tests (27 new for API access,
 including every cookie and admin endpoint called with an admin's token,
 cross-user access on every book endpoint, code and refresh-token reuse,
@@ -320,7 +318,7 @@ making a token, blocking) at 390 and 1440 px in light and dark, with axe
 | V3-9 | `change_password`'s comment contradicted the code (sessions are signed out) | Doc | Fixed |
 | V3-10 | Apps on one origin can't be told apart (S11) | Low | Accepted: identity is the origin |
 | V3-11 | Personal tokens may never expire and survive a Settings password change (S12) | Medium | Accepted (user's choice and decision); §8.6 |
-| V3-12 | Signing up from the consent screen loses the way back | UX | Open (§8.7) |
+| V3-12 | Signing up from the consent screen loses the way back | UX | Fixed: sign-up keeps `next` like sign-in |
 
 Follow-up the same day: the API pages joined the Firefox suite (`api`: 10
 steps, a static app on a second origin signing in for real), and 9 more API

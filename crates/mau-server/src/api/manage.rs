@@ -1,4 +1,4 @@
-//! Settings → Apps & API access (each person's own), and Admin → Apps.
+//! Settings → Access Tokens (each person's own), and Admin → Apps.
 //! These are for the signed-in browser only: no token can reach them, so a
 //! token can never make more tokens or connect more apps.
 

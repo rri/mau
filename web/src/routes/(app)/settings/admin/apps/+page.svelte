@@ -28,6 +28,12 @@
 	onMount(load);
 
 	const people = (n: number) => (n === 1 ? '1 person' : `${n} people`);
+	/** Parts joined with "·", lowercase after the dots and capitalized at the
+	 *  start, as status lines are everywhere in the app. */
+	const line = (parts: string[]) => {
+		const s = parts.join(' · ');
+		return s.charAt(0).toUpperCase() + s.slice(1);
+	};
 
 	async function setBlocked(a: AppRow, blocked: boolean) {
 		error = '';
@@ -60,13 +66,13 @@
 					{#if a.name}<div class="meta">Calls itself “{a.name}”</div>{/if}
 					{#if a.client_id !== a.origin + '/'}<div class="meta mono">{a.client_id}</div>{/if}
 					<div class="meta">
-						{[
-							...(a.blocked ? [] : [`Connected by ${people(a.people)}`]),
-							`First connected ${fmtDate(dateOfMs(a.first_seen, tz))}`,
+						{line([
+							...(a.blocked ? [] : [`connected by ${people(a.people)}`]),
+							`first connected ${fmtDate(dateOfMs(a.first_seen, tz))}`,
 							...(a.last_used_at === null
 								? []
 								: [`last used ${ago(dateOfMs(a.last_used_at, tz), today)}`])
-						].join(' · ')}
+						])}
 					</div>
 					<div class="acts">
 						{#if a.blocked}

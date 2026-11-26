@@ -76,7 +76,7 @@ else {
 }
 
 export async function run() {
-	console.log('Apps & API access (seeded library, an app on another origin):');
+	console.log('Access tokens and apps (seeded library, an app on another origin):');
 	const server = await startServer();
 	server.seedReader();
 	const app = await startApp(server.base);
@@ -128,7 +128,7 @@ export async function run() {
 				await until('Signed in as');
 				await click('button', 'Continue as R. Reader');
 				await until(`Allow ${app.host}?`);
-				await until('See your private notes');
+				await until('Private notes');
 				await until('This app is running on this computer');
 				const scopes = await page.$$eval('.scopes li', (l) => l.map((x) => x.textContent.trim()));
 				if (scopes.length !== 3) throw new Error(`scopes: ${scopes.join(' | ')}`);
@@ -179,20 +179,20 @@ export async function run() {
 		});
 
 		await step(
-			'Settings › Apps & API access lists the app; making a token shows it once',
+			'Settings › Access Tokens lists the app; generating a token shows it once',
 			async () => {
-				await go('/settings', 'Apps & API access');
-				await click('a', 'Apps & API access');
+				await go('/settings', 'Access Tokens');
+				await click('a', 'Access Tokens');
 				await until('Connected apps');
 				await until(app.host);
-				await until('See your private notes');
+				await until('Private notes');
 				forgetConfirmation();
-				await click('button', 'Make a token');
+				await click('button', 'Generate a token');
 				await type('#tk-name', 'Firefox test script');
 				await page.select('#tk-exp', 'never');
 				await until('works until you revoke it');
-				await click('.check', 'See your display name');
-				await click('button', 'Make token');
+				await click('.check', 'Profile');
+				await click('button', 'Generate token');
 				await confirm();
 				await until('Your new token');
 				const secret = (await text()).match(/mau_pat_[A-Za-z0-9_-]{43}/)[0];
@@ -274,7 +274,7 @@ export async function run() {
 					await until('Allow');
 					for (const v of await b.axe()) found.push(`${theme} ${w}px consent scopes: ${v}`);
 					for (const [path, wait] of [
-						['/settings/api', 'Personal tokens'],
+						['/settings/api', 'Personal Access Tokens'],
 						['/settings/admin/apps', app.host],
 						['/oauth/authorize?client_id=nope', "doesn't work"]
 					]) {

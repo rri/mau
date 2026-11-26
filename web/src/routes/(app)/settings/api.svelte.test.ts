@@ -1,5 +1,5 @@
-// Settings › Apps & API access (spec §8): connected apps, personal tokens,
-// and making a token (confirmed, shown once).
+// Settings › Access Tokens (spec §8): connected apps, personal access
+// tokens, and generating one (confirmed, shown once).
 import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
@@ -12,9 +12,9 @@ import { freezeTime, mockApi, signIn, useLibrary } from '../../../test/fixtures.
 const DAY = 86_400_000;
 const NOW = Date.parse('2026-11-11T08:00:00Z');
 const scopes = [
-	{ scope: 'profile:read', label: 'See your display name, username, bio and time zone' },
-	{ scope: 'books:read', label: 'See your books, with their tags and when you added them' },
-	{ scope: 'notes:write', label: 'Change your private notes' }
+	{ scope: 'profile:read', label: 'Profile', group: 'read' },
+	{ scope: 'books:read', label: 'Books and tags', group: 'read' },
+	{ scope: 'notes:write', label: 'Private notes', group: 'modify' }
 ];
 const access = (over: Partial<ApiAccess> = {}): ApiAccess => ({
 	apps: [
@@ -32,7 +32,7 @@ const access = (over: Partial<ApiAccess> = {}): ApiAccess => ({
 	tokens: [
 		{
 			id: 't1',
-			name: 'Kindle script',
+			name: 'Backup script',
 			hint: 'mau_pat_3fA9',
 			scopes: ['books:read'],
 			created_at: NOW - 10 * DAY,
@@ -54,7 +54,7 @@ beforeEach(() => {
 	useLibrary();
 });
 
-describe('Apps & API access', () => {
+describe('Access Tokens', () => {
 	it('SET-50 lists connected apps by address and personal tokens by name, with Disconnect and Revoke', async () => {
 		const fetch = mockApi({
 			'GET /api-access': access(),
@@ -64,11 +64,11 @@ describe('Apps & API access', () => {
 		render(Api);
 		const app = (await screen.findByText('stats.example.com')).closest('.card') as HTMLElement;
 		expect(app).toHaveTextContent('Reading Stats');
-		expect(app).toHaveTextContent('See your books, with their tags and when you added them');
-		expect(app).toHaveTextContent('Connected Oct 12, 2026 · Last used 2 days ago');
-		const tok = screen.getByText('Kindle script').closest('.card') as HTMLElement;
+		expect(app).toHaveTextContent('READ Books and tags');
+		expect(app).toHaveTextContent('Connected Oct 12, 2026 · last used 2 days ago');
+		const tok = screen.getByText('Backup script').closest('.card') as HTMLElement;
 		expect(tok).toHaveTextContent('mau_pat_3fA9…');
-		expect(tok).toHaveTextContent('Never expires · Never used');
+		expect(tok).toHaveTextContent('Never expires · never used');
 		await userEvent.click(within(app).getByRole('button', { name: 'Disconnect' }));
 		await userEvent.click(within(tok).getByRole('button', { name: 'Revoke' }));
 		const methods = fetch.mock.calls.map(([u, i]) => `${i?.method ?? 'GET'} ${u}`);
@@ -100,16 +100,16 @@ describe('Apps & API access', () => {
 		});
 		render(Api);
 		render(ConfirmDialog);
-		await userEvent.click(await screen.findByRole('button', { name: 'Make a token' }));
-		await userEvent.click(screen.getByRole('button', { name: 'Make token' }));
+		await userEvent.click(await screen.findByRole('button', { name: 'Generate a token' }));
+		await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
 		expect(screen.getByRole('alert')).toHaveTextContent('Give the token a name');
 		await userEvent.type(screen.getByLabelText('Name'), 'Backup');
-		await userEvent.click(screen.getByRole('button', { name: 'Make token' }));
+		await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
 		expect(screen.getByRole('alert')).toHaveTextContent('Choose at least one');
 		await userEvent.click(screen.getByLabelText(scopes[1].label));
 		await userEvent.selectOptions(screen.getByLabelText('Expires'), 'never');
 		expect(screen.getByText(/works until you revoke it/)).toBeInTheDocument();
-		await userEvent.click(screen.getByRole('button', { name: 'Make token' }));
+		await userEvent.click(screen.getByRole('button', { name: 'Generate token' }));
 		await userEvent.type(await screen.findByLabelText('Password'), 'pw');
 		await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
 		expect(await screen.findByText('mau_pat_3fA9secretsecret')).toBeInTheDocument();
