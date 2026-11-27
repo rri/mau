@@ -19,13 +19,213 @@ The API answers JSON. Errors look like
 people as is. Any website may call the API from the browser: CORS allows every
 origin, and no cookies are involved.
 
+[Common tasks](#common-tasks) shows how to add books (with editions, copies
+and covers), track reading and page through a library.
+[Endpoints](#endpoints) is the full reference.
+
+## Common tasks
+
+The examples use curl with two variables:
+
+    export MAU=https://maubooks.org
+    export TOKEN=mau_pat_…
+
+Answers are trimmed to what matters. Every request that sends JSON needs
+`Content-Type: application/json`.
+
+### Check the token
+
+    curl -H "Authorization: Bearer $TOKEN" $MAU/api/v1/profile
+
+    {"id": "…", "username": "reader", "display_name": "A Reader", "time_zone": "America/New_York", …}
+
+A 401 means the token is wrong, expired or revoked. A 403 means it lacks a
+scope; the answer names the scope it needs.
+
+### Add a book by ISBN (the simplest way)
+
+Send the ISBN. mau finds the work, its editions and its cover:
+
+    curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+      $MAU/api/v1/books -d '{"isbn": "9780141439518"}'
+
+    201 Created
+    {
+      "id": "01a21f23-8d65-…", "work_id": "01a21f23-8d60-…",
+      "title": "Pride and Prejudice", "authors": ["Jane Austen"], "first_year": 1813,
+      "cover": {"small": "https://maubooks.org/covers/d470…-s.jpg", "medium": "…-m.jpg", "large": "…-l.jpg"},
+      "editions": [
+        {"id": "01a21f23-8d61-…", "isbn13": "9780141439518", "publisher": "Penguin Books",
+         "binding": "Paperback", "year": 2003, "pages": 435},
+        …
+      ],
+      "state": "inactive", "tags": [], "copies": [], "reading": null, …
+    }
+
+Hyphens and ISBN-10s are fine (`"0-14-143951-3"`).
+
+- **An ISBN mau doesn't know:** 404. Add the book by hand instead (see below).
+- **A mistyped ISBN:** 400 with `"error": "isbn"` (the check digit is wrong).
+- **A book already on the list:** 409 with `"error": "exists"`; the message
+  includes the book's ID.
+
+**Record the copy you own at the same time.** It needs `copies:write`; tags
+need `tags:write`:
+
+    curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+      $MAU/api/v1/books -d '{
+        "isbn": "9780141439518",
+        "tags": ["classics"],
+        "copy": {"format": "Paperback", "location": "Living room"}
+      }'
+
+    "copies": [{"id": "…", "format": "Paperback", "location": "Living room",
+                "edition_id": "01a21f23-8d61-…"}]
+
+The copy's `edition_id` is the edition with the ISBN you sent: here the 2003
+Penguin paperback. A barcode scanner app needs only this one request per book.
+If any part is refused (a scope, a tag, the copy), nothing is added.
+
+### Add a book by title or author
+
+Search first (`catalog:search`), then add the result you want by its
+`provider` and `source_id`:
+
+    curl -H "Authorization: Bearer $TOKEN" "$MAU/api/v1/catalog/search?q=middlemarch+eliot"
+
+    {"isbn": null, "sources": ["Open Library"], "errors": [],
+     "results": [
+       {"provider": "openlibrary", "source_id": "OL20867W", "title": "Middlemarch",
+        "authors": ["George Eliot"], "cover_url": "https://covers.openlibrary.org/…",
+        "edition_count": 332, "book_id": null},
+       …]}
+
+    curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+      $MAU/api/v1/books -d '{"catalog": {"provider": "openlibrary", "source_id": "OL20867W"}}'
+
+- **`book_id`** is set when the reader already has that book: don't add it again.
+- **Search results stay usable for 30 days.** Adding one you never searched
+  for, or one that has expired, answers 404 "Search again".
+- **To pick the edition**, add `"isbn"` to `catalog` (for example
+  `{"provider": "openlibrary", "source_id": "OL20867W", "isbn": "9780393877199"}`).
+  A `copy` sent with it gets that edition.
+- **Searching by ISBN works too** (`q=978-0-14-143951-8`): the answer's
+  `isbn` is the normalized ISBN-13.
+
+### Choose an edition for a copy
+
+Every book lists its `editions`. Put one's `id` on a copy, when adding the
+book or later:
+
+    curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+      $MAU/api/v1/books/$BOOK/copies -d '{"format": "Ebook", "edition_id": "01a21f23-ffa7-…"}'
+
+    201 Created
+    {"id": "$COPY", "format": "Ebook", "location": "", "edition_id": "01a21f23-ffa7-…"}
+
+    curl -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+      $MAU/api/v1/copies/$COPY -d '{"location": "Kobo"}'
+
+- **`format`** is one of `Hardcover`, `Paperback`, `Ebook` or `Audiobook`.
+- **An edition from another book** answers 400 with `"error": "edition_id"`.
+- **`"edition_id": null`** (or `""`) means the edition isn't known.
+- **To match a scanned ISBN**, compare it with the editions' `isbn13`.
+  Several editions may lack an ISBN or page count; providers don't always
+  know them.
+
+### Add a book no source knows
+
+    curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+      $MAU/api/v1/books -d '{
+        "manual": {"title": "Family Recipes", "authors": ["Grandma"], "first_year": 1962},
+        "copy": {"format": "Hardcover", "location": "Kitchen"}
+      }'
+
+A manual book is private to the reader. It has no cover and no editions, so
+its copy's `edition_id` is null.
+
+### Show covers
+
+A book's `cover` has three sizes (`small`, `medium` and `large`), or is
+`null` when no source had one. They're ordinary image URLs on the mau
+instance:
+
+- **No token is needed** to load them: use them directly in `<img src>`.
+- **A cover URL never changes** (it's served `immutable`), so it can be
+  cached forever.
+- **The cover comes from the catalog,** downloaded when the book is first
+  added: the work's cover, or else one of its editions'. It doesn't follow a
+  copy's edition.
+- **A reader's own cover comes first:** one they uploaded on the book's page
+  in mau. The API can't upload or change covers.
+
+### Track reading
+
+    # Start (or resume, or re-read); a new reading can give the page count.
+    curl … -X POST $MAU/api/v1/books/$BOOK/start -d '{"total": 880}'
+    # Log pages: read 40 more today, or reached page 120 yesterday.
+    curl … -X POST $MAU/api/v1/books/$BOOK/progress -d '{"add": 40}'
+    curl … -X POST $MAU/api/v1/books/$BOOK/progress -d '{"position": 120, "date": "2026-11-26"}'
+    # Finish (also happens on reaching the last page), or pause.
+    curl … -X POST $MAU/api/v1/books/$BOOK/finish -d '{}'
+    curl … -X POST $MAU/api/v1/books/$BOOK/pause -d '{}'
+
+Here `curl …` means curl with both headers. Each answers the Book, with
+`"reading": {"started_on": "2026-11-27", "finished": false, "unit": "pages",
+"position": 120, "total": 880, …}`. Dates are `YYYY-MM-DD`, by default today
+in the reader's time zone. For an ebook read by percent, start with
+`{"unit": "percent"}` and log a `position` from 0 to 100.
+
+### Rate, note and tag
+
+    curl … -X PATCH $MAU/api/v1/books/$BOOK -d '{"rating": 5, "notes": "Dorothea!"}'
+    curl … -X PUT $MAU/api/v1/books/$BOOK/tags/victorian
+    curl … -X DELETE $MAU/api/v1/books/$BOOK/tags/victorian
+
+A `rating` is 1 to 5 stars, or 0 to clear it. Tags are added and removed one
+at a time, by name in the path.
+
+### Read the whole library
+
+Books come in pages: pass each answer's `next` as `after` until it's `null`.
+
+```js
+const headers = { Authorization: `Bearer ${token}` };
+let books = [], after = '';
+do {
+  const page = await (await fetch(
+    `${mau}/api/v1/books?limit=200${after && `&after=${after}`}`, { headers })).json();
+  books.push(...page.books);
+  after = page.next;
+} while (after);
+```
+
+Add `state=active` (being read), `inactive` or `finished` to list only those.
+The fields a book includes depend on the token's scopes: no `notes` without
+`notes:read`, no `copies` without `copies:read`, and so on.
+
+### Errors and limits
+
+| Status | `error` | What to do |
+|---|---|---|
+| 400 | the field at fault (`isbn`, `edition_id`, `book`, …) | Fix the request; `message` says how |
+| 401 | `unauthorized`, `invalid_token` | Get a new token |
+| 403 | `insufficient_scope` | Ask for the scope in `WWW-Authenticate` |
+| 404 | `not_found` | The book, copy or search result isn't there |
+| 409 | `exists`, `not_reading` | Already on the list; not being read |
+| 429 | `rate_limited` | Wait a minute |
+
+Each token may make 120 requests a minute. Searches and ISBN lookups at the
+sources share the reader's 30 a minute; ISBNs already in mau's catalog don't
+count.
+
 ## Scopes
 
 | Scope | Allows |
 |---|---|
 | `profile:read` | Display name, username, bio and time zone |
 | `books:read` | Books, with their tags and when they were added |
-| `books:write` | Adding books; changing the title, authors and cover the reader sees |
+| `books:write` | Adding books; changing the title and authors the reader sees |
 | `books:delete` | Removing books (with their readings, notes and copies) |
 | `tags:write` | Adding and removing tags |
 | `reading:read` | Readings and the pages read each day |
