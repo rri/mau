@@ -2170,3 +2170,409 @@ async fn a_reader_may_have_fifty_tokens_and_admins_can_only_block_known_apps() {
         .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+// ---------------------------------------------------------------------------
+// Editions, a copy when adding, and adding by ISBN
+
+/// Open Library's answers for Dune, as if fetched already (no network in
+/// tests): the work, its editions, and an ISBN lookup.
+async fn seed_dune(app: &TestApp) {
+    let cand = json!({
+        "provider": "openlibrary", "source_id": "OL893415W", "title": "Dune",
+        "authors": ["Frank Herbert"], "first_year": 1965, "cover_url": null,
+        "edition_count": 2, "editions": []
+    });
+    crate::providers::cache_put(&app.state.db, "search:openlibrary:dune", &json!([cand])).await;
+    crate::providers::cache_put(&app.state.db, "isbn:openlibrary:9780441013593", &cand).await;
+    crate::providers::cache_put(
+        &app.state.db,
+        "isbn:openlibrary:9780000000002",
+        &Value::Null,
+    )
+    .await;
+    crate::providers::cache_put(
+        &app.state.db,
+        "editions:openlibrary:OL893415W",
+        &json!([
+            {"source_id": "OL1M", "publisher": "Ace", "binding": "Paperback", "year": 2005, "isbn13": "9780441013593", "pages": 528, "cover_url": null},
+            {"source_id": "OL2M", "publisher": "Chilton", "binding": "Hardcover", "year": 1965, "isbn13": "9780801950773", "pages": 412, "cover_url": null}
+        ]),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn books_list_their_editions_for_copies() {
+    let app = TestApp::new().await;
+    seed_dune(&app).await;
+    let (_, cookie) = app.user("rri", false).await;
+    let t = pat(&app, &cookie, ALL).await;
+    api(&app, "GET", "/api/v1/catalog/search?q=dune", &t, None).await;
+    let r = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &t,
+        Some(json!({"catalog": {"provider": "openlibrary", "source_id": "OL893415W"}})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.text);
+    let eds = r.body["editions"].as_array().unwrap();
+    assert_eq!(eds.len(), 2);
+    let hard = eds.iter().find(|e| e["isbn13"] == "9780801950773").unwrap();
+    assert_eq!(hard["binding"], "Hardcover");
+    assert_eq!(hard["pages"], 412);
+    // A copy can point at one of them.
+    let book = r.body["id"].as_str().unwrap();
+    let r = api(
+        &app,
+        "POST",
+        &format!("/api/v1/books/{book}/copies"),
+        &t,
+        Some(json!({"format": "Hardcover", "edition_id": hard["id"]})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.text);
+    assert_eq!(r.body["edition_id"], hard["id"]);
+    // Editions show with books:read alone (no copies:read needed).
+    let reader = pat(&app, &cookie, &["books:read"]).await;
+    let r = api(&app, "GET", &format!("/api/v1/books/{book}"), &reader, None).await;
+    assert_eq!(r.body["editions"].as_array().unwrap().len(), 2);
+    assert!(r.body.get("copies").is_none());
+    // A manual entry has no editions.
+    let r = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &t,
+        Some(json!({"manual": {"title": "Notes", "authors": ["Me"]}})),
+    )
+    .await;
+    assert_eq!(r.body["editions"], json!([]));
+}
+
+#[tokio::test]
+async fn copies_only_point_at_their_own_books_editions() {
+    let app = TestApp::new().await;
+    seed_dune(&app).await;
+    let (_, cookie) = app.user("rri", false).await;
+    let t = pat(&app, &cookie, ALL).await;
+    api(&app, "GET", "/api/v1/catalog/search?q=dune", &t, None).await;
+    let dune = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &t,
+        Some(json!({"catalog": {"provider": "openlibrary", "source_id": "OL893415W"}})),
+    )
+    .await
+    .body;
+    let dune_edition = dune["editions"][0]["id"].as_str().unwrap().to_string();
+    let emma = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &t,
+        Some(json!({"manual": {"title": "Emma", "authors": ["Jane Austen"]}})),
+    )
+    .await
+    .body;
+    let emma_id = emma["id"].as_str().unwrap();
+    // Dune's edition on Emma's copy: refused, through the API…
+    let r = api(
+        &app,
+        "POST",
+        &format!("/api/v1/books/{emma_id}/copies"),
+        &t,
+        Some(json!({"format": "Paperback", "edition_id": dune_edition})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST, "{}", r.text);
+    assert_eq!(r.body["error"], "edition_id");
+    let r = api(
+        &app,
+        "POST",
+        &format!("/api/v1/books/{emma_id}/copies"),
+        &t,
+        Some(json!({"format": "Paperback"})),
+    )
+    .await;
+    let copy = r.body["id"].as_str().unwrap().to_string();
+    let r = api(
+        &app,
+        "PATCH",
+        &format!("/api/v1/copies/{copy}"),
+        &t,
+        Some(json!({"edition_id": dune_edition})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+    let r = api(
+        &app,
+        "PATCH",
+        &format!("/api/v1/copies/{copy}"),
+        &t,
+        Some(json!({"edition_id": ""})),
+    )
+    .await;
+    assert_eq!(
+        r.status,
+        StatusCode::OK,
+        "an empty edition is the unknown edition"
+    );
+    // …and through sync it becomes "unknown edition" rather than pointing elsewhere.
+    let now = crate::util::now_ms();
+    let hlc = format!("{now:013}-0000-dev");
+    let (status, body) = app
+        .post(
+            "/api/sync",
+            json!({"since": 0, "ops": [
+                {"id": "o1", "hlc": hlc, "op": {"type": "copy.create", "id": "c-sync", "book_id": emma_id, "format": "Ebook", "location": "", "edition_id": dune_edition}}
+            ]}),
+            Some(&cookie),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let synced = body["changes"]["copies"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"] == "c-sync")
+        .unwrap();
+    assert_eq!(synced["edition_id"], Value::Null);
+    // Another reader's private edition is out of reach too.
+    let (_, other) = app.user("juno", false).await;
+    let o = pat(&app, &other, ALL).await;
+    let mine = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &o,
+        Some(json!({"manual": {"title": "Juno's", "authors": ["J"]}})),
+    )
+    .await
+    .body;
+    let r = api(
+        &app,
+        "POST",
+        &format!("/api/v1/books/{}/copies", mine["id"].as_str().unwrap()),
+        &o,
+        Some(json!({"format": "Ebook", "edition_id": dune_edition})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn adding_by_isbn_with_a_copy() {
+    let app = TestApp::new().await;
+    seed_dune(&app).await;
+    let (_, cookie) = app.user("rri", false).await;
+    let t = pat(&app, &cookie, ALL).await;
+    // Not yet in the shared catalog: looked up at the provider (ISBN-10 is fine).
+    let r = api(&app, "POST", "/api/v1/books", &t, Some(json!({"isbn": "0-441-01359-7", "copy": {"format": "Paperback", "location": "Shelf 2"}}))).await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.text);
+    assert_eq!(r.body["title"], "Dune");
+    let ace = r.body["editions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["isbn13"] == "9780441013593")
+        .unwrap()["id"]
+        .clone();
+    assert_eq!(
+        r.body["copies"][0]["edition_id"], ace,
+        "the copy is the edition with that ISBN"
+    );
+    assert_eq!(r.body["copies"][0]["location"], "Shelf 2");
+    let r = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &t,
+        Some(json!({"isbn": "9780441013593"})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::CONFLICT, "already on the list");
+
+    // Now in the shared catalog: another reader gets the same work, no provider asked.
+    sqlx::query("DELETE FROM provider_cache")
+        .execute(&app.state.db)
+        .await
+        .unwrap();
+    let (_, other) = app.user("juno", false).await;
+    let o = pat(&app, &other, &["books:write"]).await;
+    let r = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &o,
+        Some(json!({"isbn": "9780801950773"})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.text);
+    assert_eq!(r.body["title"], "Dune");
+    // A copy needs copies:write.
+    let r = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &o,
+        Some(json!({"manual": {"title": "X", "authors": ["Y"]}, "copy": {"format": "Ebook"}})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+
+    // Bad and unknown ISBNs (the providers' answers seeded again: no network).
+    seed_dune(&app).await;
+    let r = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &t,
+        Some(json!({"isbn": "9780441013594"})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST, "check digit");
+    assert_eq!(r.body["error"], "isbn");
+    let r = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &t,
+        Some(json!({"isbn": "9780000000002"})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND, "{}", r.text);
+    let r = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &t,
+        Some(json!({"isbn": "9780441013593", "manual": {"title": "A", "authors": ["B"]}})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST, "one way at a time");
+    // An explicit edition must be the book's; a wrong one changes nothing.
+    let before = api(&app, "GET", "/api/v1/books", &t, None).await.body["books"]
+        .as_array()
+        .unwrap()
+        .len();
+    let r = api(&app, "POST", "/api/v1/books", &t, Some(json!({"manual": {"title": "Emma", "authors": ["Jane Austen"]}, "copy": {"format": "Ebook", "edition_id": ace}}))).await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+    let after = api(&app, "GET", "/api/v1/books", &t, None).await.body["books"]
+        .as_array()
+        .unwrap()
+        .len();
+    assert_eq!(before, after, "the whole add was refused");
+}
+
+#[tokio::test]
+async fn editions_for_copies_in_detail() {
+    let app = TestApp::new().await;
+    seed_dune(&app).await;
+    let (_, cookie) = app.user("rri", false).await;
+    let t = pat(&app, &cookie, ALL).await;
+    // A mistyped ISBN on a catalog result is refused, not ignored.
+    api(&app, "GET", "/api/v1/catalog/search?q=dune", &t, None).await;
+    let r = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &t,
+        Some(json!({"catalog": {"provider": "openlibrary", "source_id": "OL893415W", "isbn": "9780441013594"}})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST, "{}", r.text);
+    assert_eq!(r.body["error"], "isbn");
+    // A catalog add with an ISBN: the copy gets that edition.
+    let r = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &t,
+        Some(json!({"catalog": {"provider": "openlibrary", "source_id": "OL893415W", "isbn": "9780801950773"}, "copy": {"format": "Hardcover"}})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.text);
+    let work = r.body["work_id"].as_str().unwrap().to_string();
+    let hard = r.body["editions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["isbn13"] == "9780801950773")
+        .unwrap()["id"]
+        .clone();
+    assert_eq!(r.body["copies"][0]["edition_id"], hard);
+
+    // Another reader's private edition of the same work: theirs to use, not mine.
+    let (juno_id, other) = app.user("juno", false).await;
+    sqlx::query(
+        "INSERT INTO editions (id, work_id, publisher, binding, year, isbn13, pages, owner_id, source, seq)
+         VALUES ('ed-juno', ?, 'Juno Press', 'Paperback', 2020, NULL, 300, ?, 'manual', 0)",
+    )
+    .bind(&work)
+    .bind(&juno_id)
+    .execute(&app.state.db)
+    .await
+    .unwrap();
+    let o = pat(&app, &other, ALL).await;
+    let r = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &o,
+        Some(json!({"work_id": work, "copy": {"format": "Paperback", "edition_id": "ed-juno"}})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.text);
+    assert_eq!(r.body["copies"][0]["edition_id"], "ed-juno");
+    assert_eq!(r.body["editions"].as_array().unwrap().len(), 3);
+    let mine = api(&app, "GET", "/api/v1/books", &t, None).await.body["books"][0].clone();
+    assert_eq!(
+        mine["editions"].as_array().unwrap().len(),
+        2,
+        "private editions stay private"
+    );
+    let r = api(
+        &app,
+        "POST",
+        &format!("/api/v1/books/{}/copies", mine["id"].as_str().unwrap()),
+        &t,
+        Some(json!({"format": "Paperback", "edition_id": "ed-juno"})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST, "{}", r.text);
+
+    // Looking an ISBN up at the providers counts as a search (30 a minute).
+    for _ in 0..30 {
+        let r = api(
+            &app,
+            "POST",
+            "/api/v1/books",
+            &o,
+            Some(json!({"isbn": "9780000000002"})),
+        )
+        .await;
+        assert_eq!(r.status, StatusCode::NOT_FOUND, "{}", r.text);
+    }
+    let r = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &o,
+        Some(json!({"isbn": "9780000000002"})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::TOO_MANY_REQUESTS);
+    // An ISBN already in the shared catalog asks no provider, so isn't counted.
+    let r = api(
+        &app,
+        "POST",
+        "/api/v1/books",
+        &o,
+        Some(json!({"isbn": "9780441013593"})),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::CONFLICT, "{}", r.text);
+}

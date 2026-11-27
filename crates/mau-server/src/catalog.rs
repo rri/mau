@@ -185,6 +185,21 @@ pub async fn find_candidates(
     Ok((results, sources, errors))
 }
 
+/// The best provider match for an ISBN (already normalized to ISBN-13),
+/// asked the way the Add page's search asks: only Google Books with the
+/// user's own key, otherwise the admin's providers in order.
+pub(crate) async fn isbn_candidate(
+    state: &AppState,
+    google_key: Option<&str>,
+    isbn: &str,
+) -> ApiResult<Option<Candidate>> {
+    let (results, _, _) = match google_key {
+        Some(key) => own_google(state, key, isbn, Some(isbn)).await,
+        None => find_candidates(state, isbn, Some(isbn)).await?,
+    };
+    Ok(results.into_iter().next())
+}
+
 /// Searches only Google Books with a user's own key.
 async fn own_google(
     state: &AppState,

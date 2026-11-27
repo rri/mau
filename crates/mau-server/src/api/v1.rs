@@ -193,6 +193,18 @@ struct ReadingWithEvents {
     events: Vec<Event>,
 }
 
+/// An edition of a book's work: what a copy can point at (`edition_id`).
+#[derive(Serialize)]
+struct Edition {
+    id: String,
+    isbn13: Option<String>,
+    publisher: Option<String>,
+    /// Hardcover, Paperback, Ebook, Audiobook, as the source describes it.
+    binding: Option<String>,
+    year: Option<i64>,
+    pages: Option<i64>,
+}
+
 /// A book as the API shows it. Fields beyond `books:read` appear only when
 /// the token has their scope: `rating` (ratings:read), `notes` (notes:read),
 /// `copies` (copies:read) and `reading` (reading:read, the current reading).
@@ -207,6 +219,8 @@ struct Book {
     people: Vec<Person>,
     first_year: Option<i64>,
     cover: Option<Cover>,
+    /// The work's editions, for choosing a copy's edition.
+    editions: Vec<Edition>,
     /// active, inactive, or finished
     state: &'static str,
     added_at: i64,
@@ -375,6 +389,18 @@ async fn load_books(
             people: work.people.clone(),
             first_year: work.first_year,
             cover,
+            editions: work
+                .editions
+                .iter()
+                .map(|e| Edition {
+                    id: e.id.clone(),
+                    isbn13: e.isbn13.clone(),
+                    publisher: e.publisher.clone(),
+                    binding: e.binding.clone(),
+                    year: e.year,
+                    pages: e.pages,
+                })
+                .collect(),
             state: state_name,
             added_at,
             tags: tags.remove(&id).unwrap_or_default(),
@@ -535,8 +561,65 @@ struct AddBook {
     catalog: Option<CatalogRef>,
     /// A book entered by hand, private to you.
     manual: Option<ManualBook>,
+    /// An ISBN-10 or ISBN-13: found in the shared catalog, or else looked up
+    /// the way a catalog search would (your Google Books key if you have one).
+    isbn: Option<String>,
     /// Needs tags:write.
     tags: Option<Vec<String>>,
+    /// A copy you own, added with the book. Needs copies:write. Without an
+    /// `edition_id`, the edition with the ISBN you added by (if any).
+    copy: Option<NewCopy>,
+}
+
+fn normalize_isbn(raw: &str) -> ApiResult<String> {
+    mau_core::isbn::normalize(raw).ok_or_else(|| {
+        bad(
+            "isbn",
+            "That isn't a valid ISBN. Check for a typo: the last digit is a check digit.",
+        )
+    })
+}
+
+/// The edition of a work with this ISBN that the user can see.
+async fn edition_by_isbn(
+    conn: &mut SqliteConnection,
+    user_id: &str,
+    work_id: &str,
+    isbn: &str,
+) -> sqlx::Result<Option<String>> {
+    sqlx::query_scalar(
+        "SELECT id FROM editions WHERE work_id = ? AND isbn13 = ? AND (owner_id IS NULL OR owner_id = ?) LIMIT 1",
+    )
+    .bind(work_id)
+    .bind(isbn)
+    .bind(user_id)
+    .fetch_optional(conn)
+    .await
+}
+
+/// Checks a copy's `edition_id`: one of the book's own editions, or empty
+/// for an unknown edition.
+async fn check_edition(
+    conn: &mut SqliteConnection,
+    user_id: &str,
+    book_id: &str,
+    edition_id: Option<&str>,
+) -> ApiResult<()> {
+    match edition_id {
+        Some(e) if !e.is_empty() => {
+            if library::book_edition(conn, user_id, book_id, e)
+                .await?
+                .is_none()
+            {
+                return Err(bad(
+                    "edition_id",
+                    "That edition isn't one of this book's. Use an id from the book's editions.",
+                ));
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
 }
 
 /// Rank before the first inactive book (a new or paused book's place).
@@ -580,18 +663,65 @@ async fn add_book(
     if req.tags.as_ref().is_some_and(|t| !t.is_empty()) {
         auth.require("tags:write")?;
     }
+    if req.copy.is_some() {
+        auth.require("copies:write")?;
+    }
     let given = [
         req.work_id.is_some(),
         req.catalog.is_some(),
         req.manual.is_some(),
+        req.isbn.is_some(),
     ];
     if given.iter().filter(|g| **g).count() != 1 {
         return Err(bad(
             "book",
-            "Send one of work_id, catalog (a search result's provider and source_id), or manual.",
+            "Send one of work_id, catalog (a search result's provider and source_id), isbn, or manual.",
         ));
     }
     let user_id = auth.user.id.clone();
+    // The ISBN the book was added by, for the copy's edition.
+    let wanted_isbn = match (
+        req.isbn.as_deref(),
+        req.catalog.as_ref().and_then(|c| c.isbn.as_deref()),
+    ) {
+        (Some(i), _) | (None, Some(i)) => Some(normalize_isbn(i)?),
+        _ => None,
+    };
+    // By ISBN: the shared catalog first; otherwise the providers, as a
+    // search would ask them (and counted as one).
+    let isbn_work = match (&req.isbn, &wanted_isbn) {
+        (Some(_), Some(isbn)) => {
+            let shared: Option<String> = sqlx::query_scalar(
+                "SELECT work_id FROM editions WHERE owner_id IS NULL AND isbn13 = ? LIMIT 1",
+            )
+            .bind(isbn)
+            .fetch_optional(&state.db)
+            .await?;
+            match shared {
+                Some(w) => Some(w),
+                None => {
+                    state.limits.check("search", &user_id, 30)?;
+                    let cand = crate::catalog::isbn_candidate(
+                        &state,
+                        auth.user.google_books_key.as_deref(),
+                        isbn,
+                    )
+                    .await?
+                    .ok_or_else(|| {
+                        ApiError::not_found(format!(
+                            "No book with ISBN {isbn} was found in the catalog or its sources. Add it by hand (manual) instead."
+                        ))
+                    })?;
+                    Some(
+                        crate::catalog::ensure_candidate(&state, &cand, Some(isbn))
+                            .await?
+                            .id,
+                    )
+                }
+            }
+        }
+        _ => None,
+    };
     // A catalog result goes into the shared catalog first (from the cached
     // search result only, so apps can't make up catalog records).
     let catalog_work = match &req.catalog {
@@ -606,7 +736,7 @@ async fn add_book(
         None => None,
     };
     let mut b = Batch::begin(&state).await?;
-    let work_id = match (&req.work_id, catalog_work, &req.manual) {
+    let work_id = match (&req.work_id, catalog_work.or(isbn_work), &req.manual) {
         (Some(w), _, _) => w.clone(),
         (_, Some(w), _) => w,
         (_, _, Some(m)) => {
@@ -658,7 +788,7 @@ async fn add_book(
             &user_id,
             OpKind::BookCreate {
                 id: id.clone(),
-                work_id,
+                work_id: work_id.clone(),
                 rank,
                 added_at: now_ms(),
             },
@@ -666,6 +796,28 @@ async fn add_book(
         .await?;
     if applied != Applied::Yes {
         return Err(bad("work_id", "No such work in the catalog."));
+    }
+    if let Some(copy) = req.copy {
+        let edition_id = match (&copy.edition_id, &wanted_isbn) {
+            (Some(e), _) => {
+                check_edition(b.conn(), &user_id, &id, Some(e)).await?;
+                Some(e.clone())
+            }
+            (None, Some(isbn)) => edition_by_isbn(b.conn(), &user_id, &work_id, isbn).await?,
+            (None, None) => None,
+        };
+        b.apply(
+            &state,
+            &user_id,
+            OpKind::CopyCreate {
+                id: new_id(),
+                book_id: id.clone(),
+                format: copy.format,
+                location: copy.location,
+                edition_id,
+            },
+        )
+        .await?;
     }
     for tag in req.tags.unwrap_or_default() {
         b.apply(
@@ -837,6 +989,7 @@ async fn add_copy(
     auth.require("copies:write")?;
     let mut b = Batch::begin(&state).await?;
     live_book(b.conn(), &auth.user.id, &book_id).await?;
+    check_edition(b.conn(), &auth.user.id, &book_id, req.edition_id.as_deref()).await?;
     let id = new_id();
     b.apply(
         &state,
@@ -890,6 +1043,11 @@ async fn edit_copy(
     auth.require("copies:write")?;
     let mut b = Batch::begin(&state).await?;
     live_copy(b.conn(), &auth.user.id, &id).await?;
+    let book_id: String = sqlx::query_scalar("SELECT book_id FROM copies WHERE id = ?")
+        .bind(&id)
+        .fetch_one(b.conn())
+        .await?;
+    check_edition(b.conn(), &auth.user.id, &book_id, req.edition_id.as_deref()).await?;
     b.apply(
         &state,
         &auth.user.id,

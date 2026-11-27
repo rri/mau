@@ -502,6 +502,29 @@ async fn work_visible(
     .await
 }
 
+/// `edition_id` if it's an edition of the book's work that the user can see
+/// (shared, or their own); otherwise none, as for an unknown edition. A copy
+/// can't point at another work's edition or someone else's private one.
+pub async fn book_edition(
+    conn: &mut SqliteConnection,
+    user_id: &str,
+    book_id: &str,
+    edition_id: &str,
+) -> sqlx::Result<Option<String>> {
+    if edition_id.is_empty() {
+        return Ok(None);
+    }
+    sqlx::query_scalar(
+        "SELECT e.id FROM editions e JOIN books b ON b.work_id = e.work_id
+         WHERE e.id = ? AND b.id = ? AND (e.owner_id IS NULL OR e.owner_id = ?)",
+    )
+    .bind(edition_id)
+    .bind(book_id)
+    .bind(user_id)
+    .fetch_optional(conn)
+    .await
+}
+
 /// The book's owner and deleted flag, if it exists.
 async fn book_owner(
     conn: &mut SqliteConnection,
@@ -762,14 +785,14 @@ pub async fn apply(
             let location = clean_text(location, 200, "location")?;
             let n = sqlx::query(
                 "INSERT INTO copies (id, book_id, user_id, format, location, edition_id, clock, seq)
-                 VALUES (?, ?, ?, ?, ?, (SELECT id FROM editions WHERE id = ?), ?, ?) ON CONFLICT(id) DO NOTHING",
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING",
             )
             .bind(id)
             .bind(book_id)
             .bind(user_id)
             .bind(format)
             .bind(location)
-            .bind(edition_id.as_deref().unwrap_or(""))
+            .bind(book_edition(conn, user_id, book_id, edition_id.as_deref().unwrap_or("")).await?)
             .bind(full_clock(&["format", "location", "edition_id"], hlc))
             .bind(seq)
             .execute(&mut *conn)
@@ -814,10 +837,11 @@ pub async fn apply(
             if let Some(v) = &fields.edition_id
                 && claim(&mut clock, "edition_id", hlc)
             {
-                edition = sqlx::query_scalar("SELECT id FROM editions WHERE id = ?")
-                    .bind(v)
-                    .fetch_optional(&mut *conn)
+                let book_id: String = sqlx::query_scalar("SELECT book_id FROM copies WHERE id = ?")
+                    .bind(id)
+                    .fetch_one(&mut *conn)
                     .await?;
+                edition = book_edition(conn, user_id, &book_id, v).await?;
                 changed = true;
             }
             if !changed {

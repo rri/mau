@@ -1484,3 +1484,35 @@ Mine:
   corners itself), as before.
 - **PNGs and the ICO were rendered from the SVG with ImageMagick** (8-bit,
   stripped); the 512px icon is about half its old size.
+
+## API: editions, a copy when adding, adding by ISBN (2026-11-27)
+
+Asked by the user, after a review of how the API adds books: let apps
+choose a copy's edition, add a copy with the book, and add a book by ISBN
+in one call.
+
+- **Each book lists its work's editions** (id, ISBN-13, publisher, binding,
+  year, pages) under books:read. Before, a copy's `edition_id` couldn't be
+  learned through the API, so apps couldn't record which edition someone
+  owns.
+- **`isbn` is a fourth way to add a book.** The shared catalog is checked
+  first, by an edition with that ISBN, and providers aren't asked then.
+  Otherwise the ISBN is looked up exactly as the Add page's search would
+  (only Google Books with the reader's own key; otherwise the instance's
+  providers in order), counted against the reader's 30 searches a minute,
+  and the result joins the shared catalog from the provider's own record.
+  Adding by ISBN needs books:write only, not catalog:search: it adds a
+  book; the search behind it isn't shown to the app.
+- **`copy` adds a copy with the book** (copies:write). Without an
+  `edition_id` it takes the edition with the ISBN the book was added by. The
+  book, its tags and its copy are one transaction: anything refused leaves
+  nothing behind.
+- **A copy's edition must be one of its book's**, shared or the reader's own.
+  The sync code checked only that the edition existed anywhere, so a copy
+  could point at another work's edition or at someone else's private one
+  (whose details were never sent, but the pointer was stored). Now sync
+  stores such an edition as unknown, as it already did for an unknown id,
+  so devices are never refused a change; the API refuses it with a clear
+  error instead.
+- An invalid `isbn` inside a `catalog` reference is now a 400; it used to
+  be ignored.

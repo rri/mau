@@ -68,6 +68,7 @@ A **Book**:
       "people": [{"name": "George Eliot", "role": "author"}],
       "first_year": 1871,
       "cover": {"small": "https://…/covers/…-s.jpg", "medium": "…", "large": "…"} | null,
+      "editions": [Edition, …],      // the work's editions, for a copy's edition_id
       "state": "active" | "inactive" | "finished",
       "added_at": 1763500000000,
       "tags": ["classics"],
@@ -77,6 +78,9 @@ A **Book**:
       "reading": Reading | null      // with reading:read: the current (latest) reading
     }
 
+An **Edition**: `{"id", "isbn13", "publisher", "binding", "year", "pages"}`
+(any but `id` may be null). A manual entry has none.
+
 A **Reading**: `{"id", "started_on", "finished", "finished_on", "unit":
 "pages" | "percent", "position", "total", "pages"}`. Dates are `YYYY-MM-DD`;
 `finished_on` is null while reading or when the date isn't known. A percent
@@ -84,15 +88,32 @@ reading's `total` is 100 and `pages` is the copy's page count, if known.
 
 `GET /api/v1/books/{id}` (books:read): one Book.
 
-`POST /api/v1/books` (books:write; `tags` needs tags:write). One of:
+`POST /api/v1/books` (books:write; `tags` needs tags:write, `copy` needs
+copies:write). One of:
 
-    {"work_id": "…"}                                         // a work in the catalog
+    {"isbn": "9780441013593"}                                // ISBN-10 or -13
     {"catalog": {"provider": "openlibrary", "source_id": "OL…W", "isbn": null}}  // a search result
+    {"work_id": "…"}                                         // a work in the catalog
     {"manual": {"title": "…", "authors": ["…"], "first_year": 1871}}             // private to the reader
 
-plus optionally `"tags": ["…"]`. The book goes to the top of the inactive
-books. Answers 201 with the Book (or `{"ok": true}` without books:read); 409
-if it's already on the list.
+plus optionally `"tags": ["…"]` and a copy you own:
+`"copy": {"format": "Paperback", "location": "Hall", "edition_id": null}`.
+
+- **By ISBN** the work comes from the shared catalog when an edition there
+  has that ISBN; otherwise it's looked up the way a catalog search would
+  (only Google Books with your own key, if you've added one; otherwise the
+  instance's providers in order), counts as one search, and joins the
+  shared catalog. 404 if no source knows the ISBN; 400 for a mistyped one.
+- **From a search result or by ISBN**, the work is built from the
+  provider's own record: title, authors, first year, up to 20 editions and
+  the cover, which mau downloads and serves itself. Nothing an app sends
+  reaches the shared catalog.
+- **A copy without an `edition_id`** gets the edition with the ISBN you
+  added by (`isbn`, or the search result's `isbn`), if there is one.
+
+The book goes to the top of the inactive books. Answers 201 with the Book
+(or `{"ok": true}` without books:read); 409 if it's already on the list. If
+any part is refused (a tag, the copy), nothing is added.
 
 `PATCH /api/v1/books/{id}`: `title` and `authors` (books:write; `""` and `[]`
 go back to the catalog's), `rating` 0–5 (ratings:write; 0 clears), `notes`
@@ -107,7 +128,8 @@ history.
 
 `POST /api/v1/books/{id}/copies` (copies:write):
 `{"format": "Hardcover" | "Paperback" | "Ebook" | "Audiobook", "location": "…", "edition_id": null}`.
-`PATCH` and `DELETE /api/v1/copies/{id}`.
+`PATCH` and `DELETE /api/v1/copies/{id}`. An `edition_id` must be one of the
+book's `editions` (400 otherwise); `""` or null is an unknown edition.
 
 ### Reading
 
